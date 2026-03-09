@@ -15,7 +15,7 @@ export async function graphqlRequest<T>(
       ...(options?.token ? { Authorization: `Bearer ${options.token}` } : {}),
     },
     body: JSON.stringify({ query, variables }),
-    cache: "no-store", // dev: évite cache Next
+    cache: "no-store",
   });
 
   const json = await res.json();
@@ -25,8 +25,12 @@ export async function graphqlRequest<T>(
   }
 
   if (json?.errors?.length) {
+
     const first = (json.errors as GraphQLErrorItem[])[0];
-    throw new Error(first?.message || "GraphQL error");
+    const detail = JSON.stringify(json.errors, null, 2);
+    throw new Error(
+      `${first?.message || "GraphQL error"}\nDetails: ${detail}`
+    );
   }
 
   return json.data as T;
