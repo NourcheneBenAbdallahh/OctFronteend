@@ -33,10 +33,38 @@ const navItems: NavItem[] = [
     subItems: [{ name: "Ecommerce", path: "/", pro: false }],
   },
     {
-    icon: <GridIcon />,
-    name: "Packagings",
-    subItems: [{ name: "Ecommerce", path: "/", pro: false }],
-  },
+  icon: <BoxCubeIcon />,
+  name: "Emballages",
+  subItems: [{ name: "Emballages", path: "/emballages", pro: false }],
+},
+{
+  icon: <UserCircleIcon />,
+  name: "Fournisseurs",
+  subItems: [{ name: "Fournisseurs", path: "/fournisseurs", pro: false }],
+},
+{
+  icon: <PageIcon />,
+  name: "Contrats",
+  subItems: [{ name: "Contrats", path: "/contrats", pro: false }],
+}, {
+  icon: <BoxCubeIcon />,
+  name: "Entrepots",
+  path: "/entrepots",
+},
+
+{
+  icon: <GridIcon />,
+  name: "Stocks",
+  subItems: [
+    { name: "Mouvements", path: "/mouvements", pro: false },
+  ],
+},
+
+{
+  icon: <PageIcon />,
+  name: "Stock Inventaire",
+  subItems: [{ name: "Stock Inventaire", path: "/stock-inventaire", pro: false }],
+},
   {
     icon: <CalenderIcon />,
     name: "Calendar",
