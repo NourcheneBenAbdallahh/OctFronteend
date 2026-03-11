@@ -8,7 +8,6 @@ import Pagination from "@/components/tables/Pagination";
 import { TableEmballages } from "@/types/emballage";
 import { deleteEmballages } from "@/lib/emballages.api";
 
-const ITEMS_PER_PAGE = 10;
 interface Props {
   data: TableEmballages[];
   total: number;
@@ -22,11 +21,16 @@ export default function EmballagesTable({
   page, 
   limit, 
   onPageChange 
-}: Props) {  const [rows, setRows] = useState<TableEmballages[]>(data);
+}: Props) {
+  const [rows, setRows] = useState<TableEmballages[]>(data);
   const [isOpen, setIsOpen] = useState(false);
   const [editing, setEditing] = useState<TableEmballages | null>(null);
   const [query, setQuery] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
+
+  // Mettre à jour les données quand les props changent
+  useEffect(() => {
+    setRows(data);
+  }, [data]);
 
   const filteredRows = useMemo(() => {
     return rows.filter(r => 
@@ -35,13 +39,15 @@ export default function EmballagesTable({
     );
   }, [rows, query]);
 
-  const totalPages = Math.ceil(filteredRows.length / ITEMS_PER_PAGE);
-  const paginatedRows = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredRows.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredRows, currentPage]);
+  // Afficher les données filtrées ou toutes les données
+  const displayRows = query ? filteredRows : rows;
 
-  useEffect(() => { setCurrentPage(1); }, [query]);
+  // Pagination globale basée sur le total
+  const totalPages = Math.ceil(total / limit);
+
+  const handlePageChange = (newPage: number) => {
+    onPageChange(newPage);
+  };
 
   async function handleDelete(id: string | number) {
     if (!confirm("Supprimer cet emballage ?")) return;
@@ -52,24 +58,26 @@ export default function EmballagesTable({
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#F0F2F5]">
+    <div className="flex flex-col">
       <EmballagesHeader 
         query={query} setQuery={setQuery} 
         onOpenNew={() => { setEditing(null); setIsOpen(true); }} 
       />
 
-      <EmballagesListView 
-        rows={paginatedRows} 
-        onEdit={(item) => { setEditing(item); setIsOpen(true); }} 
-        onDelete={handleDelete} 
-      />
+      <div className="overflow-x-auto">
+        <EmballagesListView 
+          rows={displayRows} 
+          onEdit={(item) => { setEditing(item); setIsOpen(true); }} 
+          onDelete={handleDelete} 
+        />
+      </div>
 
       {totalPages > 1 && (
-        <div className="flex justify-center py-4 bg-white border-t">
+        <div className="flex justify-center py-4 border-t">
           <Pagination 
-            currentPage={currentPage} 
+            currentPage={page} 
             totalPages={totalPages} 
-            onPageChange={setCurrentPage} 
+            onPageChange={handlePageChange} 
           />
         </div>
       )}

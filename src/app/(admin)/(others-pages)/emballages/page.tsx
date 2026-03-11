@@ -1,5 +1,7 @@
 "use client";
 
+import ComponentCard from "@/components/common/ComponentCard";
+import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { listEmballages } from "@/lib/emballages.api";
@@ -33,35 +35,48 @@ export default function EmballagesPage() {
     }
   }
 
+  // Charger les données quand la page change
   useEffect(() => {
     fetchData(currentPage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage]);
 
   const handlePageChange = (newPage: number) => {
-    // Utilisation de router.push pour une navigation Next.js propre
     router.push(`/emballages?page=${newPage}`);
   };
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#F0F2F5]">
-        <div className="text-[#00A09D] font-bold animate-pulse uppercase tracking-widest">
-          Chargement des données...
+      <div>
+        <PageBreadcrumb pageTitle="Emballages" />
+        <div className="space-y-6">
+          <ComponentCard title="Emballages List">
+            <div className="flex h-64 items-center justify-center">
+              <div className="text-[#00A09D] font-bold animate-pulse uppercase tracking-widest">
+                Chargement...
+              </div>
+            </div>
+          </ComponentCard>
         </div>
       </div>
     );
   }
 
   return (
-    <main className="min-h-screen bg-[#F0F2F5]">
-      {/* On passe les props nécessaires au nouveau EmballagesTable */}
-      <EmballagesTable
-        data={emballages}
-        total={total}
-        page={currentPage}
-        limit={limit}
-        onPageChange={handlePageChange}
-      />
-    </main>
+    <div>
+      <PageBreadcrumb pageTitle="Emballages" />
+      <div className="space-y-6">
+        <ComponentCard title="Emballages List">
+          <EmballagesTable
+            data={emballages}
+            total={total}
+            page={currentPage}
+            limit={limit}
+            onPageChange={handlePageChange}
+          />
+        </ComponentCard>
+      </div>
+    </div>
   );
 }
+
