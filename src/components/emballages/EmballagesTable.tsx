@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import EmballagesRow from "./EmballagesRow";
-import EmballagesFilters from "./EmballagesFilters";
+import { useState, useMemo, useEffect } from "react";
+import { EmballagesHeader } from "./EmballagesHeader";
+import { EmballagesListView } from "./EmballagesListView";
 import EmballagesFormModal from "./EmballagesFormModal";
 import Pagination from "@/components/tables/Pagination";
-import {TableEmballages ,  Emballages as APIEmballages,normalizeEmballages
-  } from "@/types/emballage";
+import { TableEmballages } from "@/types/emballage";
+import { deleteEmballages } from "@/lib/emballages.api";
+
+const ITEMS_PER_PAGE = 10;
 interface Props {
   data: TableEmballages[];
   total: number;
@@ -14,59 +16,63 @@ interface Props {
   limit: number;
   onPageChange: (page: number) => void;
 }
-
-export default function EmballagesTable({ data, total, page, limit, onPageChange }: Props) {
-  const [rows, setRows] = useState<TableEmballages[]>(data);
+export default function EmballagesTable({ 
+  data, 
+  total, 
+  page, 
+  limit, 
+  onPageChange 
+}: Props) {  const [rows, setRows] = useState<TableEmballages[]>(data);
   const [isOpen, setIsOpen] = useState(false);
   const [editing, setEditing] = useState<TableEmballages | null>(null);
+  const [query, setQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
 
-  const totalPages = Math.ceil(total / limit);
+  const filteredRows = useMemo(() => {
+    return rows.filter(r => 
+      r.name.toLowerCase().includes(query.toLowerCase()) || 
+      r.code.toLowerCase().includes(query.toLowerCase())
+    );
+  }, [rows, query]);
 
-  function openCreate() {
-    setEditing(null);
-    setIsOpen(true);
-  }
+  const totalPages = Math.ceil(filteredRows.length / ITEMS_PER_PAGE);
+  const paginatedRows = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredRows.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredRows, currentPage]);
 
-  function openEdit(item: TableEmballages) {
-    setEditing(item);
-    setIsOpen(true);
+  useEffect(() => { setCurrentPage(1); }, [query]);
+
+  async function handleDelete(id: string | number) {
+    if (!confirm("Supprimer cet emballage ?")) return;
+    try {
+      await deleteEmballages(id);
+      setRows(prev => prev.filter(r => r.id !== id));
+    } catch { alert("Erreur lors de la suppression"); }
   }
 
   return (
-    <div className="space-y-4">
-      <EmballagesFilters onCreate={openCreate} />
-
-      <div className="overflow-hidden rounded-xl border">
-        <table className="w-full text-sm">
-          <thead>
-            <tr>
-              <th>Code</th>
-              <th>Name</th>
-              <th>Type</th>
-              <th>Capacity</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {rows.map((row) => (
-              <EmballagesRow
-                key={row.id}
-                row={row}
-                onEdit={openEdit}
-                setRows={setRows}
-              />
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <Pagination
-        currentPage={page}
-        totalPages={totalPages}
-        onPageChange={onPageChange}
+    <div className="flex flex-col min-h-screen bg-[#F0F2F5]">
+      <EmballagesHeader 
+        query={query} setQuery={setQuery} 
+        onOpenNew={() => { setEditing(null); setIsOpen(true); }} 
       />
+
+      <EmballagesListView 
+        rows={paginatedRows} 
+        onEdit={(item) => { setEditing(item); setIsOpen(true); }} 
+        onDelete={handleDelete} 
+      />
+
+      {totalPages > 1 && (
+        <div className="flex justify-center py-4 bg-white border-t">
+          <Pagination 
+            currentPage={currentPage} 
+            totalPages={totalPages} 
+            onPageChange={setCurrentPage} 
+          />
+        </div>
+      )}
 
       {isOpen && (
         <EmballagesFormModal

@@ -19,7 +19,7 @@ import {
 
 import type { MouvementStock, MouvementType } from "@/types/mouvement";
 import type { Lot } from "@/types/lot";
-import type { Emballages as Emballage } from "@/types/emballage";
+import type { EmballageRef as Emballage } from "@/types/emballage";
 import type { Entrepot } from "@/types/entrepot";
 
 export default function MouvementsPage() {
@@ -48,7 +48,6 @@ export default function MouvementsPage() {
     quantite: 0,
   });
 
-  // ----- Chargement des données -----
   const load = useCallback(async () => {
   setLoading(true);
   setError(null);
@@ -77,7 +76,6 @@ export default function MouvementsPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  // ----- Filtrage -----
   const filtered = useMemo(() => {
     const s = search.trim().toLowerCase();
     if (!s) return items;
@@ -124,7 +122,6 @@ export default function MouvementsPage() {
   return (
     <div className="space-y-6 p-4">
 
-      {/* HEADER */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white dark:bg-gray-900 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
         <div>
           <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">Flux de Stock</h1>
@@ -135,7 +132,6 @@ export default function MouvementsPage() {
         </Button>
       </div>
 
-      {/* FILTRE & TOTAL */}
       <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
         <input
           value={search}
@@ -148,10 +144,8 @@ export default function MouvementsPage() {
         </div>
       </div>
 
-      {/* ERREUR */}
       {error && <div className="p-4 rounded-xl bg-red-50 border border-red-100 text-red-600 text-sm font-medium animate-pulse">⚠️ {error}</div>}
 
-      {/* TABLE */}
       <MouvementsTable 
         items={filtered} 
         loading={loading} 
@@ -159,14 +153,12 @@ export default function MouvementsPage() {
         onDelete={(id) => handleAction(deleteMouvementDraft(id), "Supprimé")} 
       />
 
-      {/* PAGINATION */}
       <div className="p-6 flex items-center justify-between text-xs font-bold text-gray-400">
         <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Précédent</Button>
         <span>Page {page} sur {lastPage}</span>
         <Button variant="outline" size="sm" disabled={page >= lastPage} onClick={() => setPage(p => p + 1)}>Suivant</Button>
       </div>
 
-      {/* MODAL */}
       <MouvementsModal 
         isOpen={isOpen} 
         saving={saving}

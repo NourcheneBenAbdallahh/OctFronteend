@@ -1,7 +1,5 @@
 import type { MouvementType } from "@/types/mouvement";
-import type { Emballages as Emballage } from "@/types/emballage";
-
-// Types de mouvements pour UI
+import type { Emballage } from "@/types/mouvement";// Types de mouvements pour UI
 export const TYPES: { value: MouvementType; label: string; hint: string; color: string }[] = [
   { value: "ENT", label: "ENT (Entrée)", hint: "Ajoute stock (destination)", color: "text-blue-600 bg-blue-50" },
   { value: "PRD", label: "PRD (Sortie prod)", hint: "Diminue stock (source)", color: "text-orange-600 bg-orange-50" },
@@ -14,7 +12,13 @@ export const needsSource = (t: MouvementType) => ["PRD", "CDD", "PTE", "SPL"].in
 export const needsDestination = (t: MouvementType) => ["ENT", "CDD", "SPL"].includes(t);
 export const needsLot = (t: MouvementType) => t !== "ENT";
 
-export function formatEmballageLabel(emballage?: Emballage | null, fallbackId?: string | null) {
+export function formatEmballageLabel(
+  emballage?: Emballage | null,
+  fallbackId?: string | null
+) {
   if (!emballage) return fallbackId ? `#${fallbackId}` : "-";
-  return emballage.code && emballage.name ? `${emballage.code} — ${emballage.name}` : emballage.name || emballage.code || `#${emballage.id}`;
+
+  return emballage.code && emballage.name
+    ? `${emballage.code} — ${emballage.name}`
+    : emballage.name || emballage.code || `#${emballage.id}`;
 }

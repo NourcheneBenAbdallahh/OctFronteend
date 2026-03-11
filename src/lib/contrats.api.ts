@@ -1,4 +1,3 @@
-// lib/contrats.api.ts
 import { graphqlRequest } from "./graphqlClient";
 import { Contrat } from "../types/contrat";
 

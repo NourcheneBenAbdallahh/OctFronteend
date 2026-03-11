@@ -4,10 +4,7 @@ import { TableEmballages } from "./emballage";
 export type MouvementType = "ENT" | "PRD" | "CDD" | "PTE" | "SPL";
 export type MouvementStatut = "BROUILLON" | "VALIDE";
 
-export type Entrepot = {
-  id: string;
-  adresse: string;
-};
+import type { Entrepot } from "@/types/entrepot";
 
 export type Lot = {
   id: string;

@@ -107,3 +107,9 @@ export {
   ChevronUpIcon,
   ChatIcon,
 };
+export { 
+  Pencil as EditIcon, 
+  Trash2 as TrashIcon, 
+  Search as SearchIcon, 
+  X as XIcon 
+} from "lucide-react";

@@ -2,7 +2,7 @@
 import React from "react";
 import Button from "@/components/ui/button/Button";
 import { Modal } from "@/components/ui/modal";
-import { Emballages as Emballage } from "@/types/emballage";
+import { EmballageRef  as Emballage } from "@/types/emballage";
 import { Lot } from "@/types/lot";
 import { Entrepot } from "@/types/entrepot";
 import { MouvementType } from "@/types/mouvement";

@@ -1,13 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { listEmballages } from "@/lib/emballages.api";
 import EmballagesTable from "@/components/emballages/EmballagesTable";
-import {TableEmballages ,normalizeEmballages
-  } from "@/types/emballage";
+import { TableEmballages, normalizeEmballages } from "@/types/emballage";
+
 export default function EmballagesPage() {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  
+  // Lecture de la page depuis l'URL
   const pageParam = searchParams?.get("page");
   const currentPage = pageParam ? parseInt(pageParam) : 1;
   const limit = 10;
@@ -18,30 +21,40 @@ export default function EmballagesPage() {
 
   async function fetchData(page: number) {
     setLoading(true);
-    const res = await listEmballages(page, limit);
-    const normalized = res.emballages.data.map(normalizeEmballages);
-    setEmballages(normalized);
-    setTotal(res.emballages.paginatorInfo.total);
-    setLoading(false);
+    try {
+      const res = await listEmballages(page, limit);
+      const normalized = res.emballages.data.map(normalizeEmballages);
+      setEmballages(normalized);
+      setTotal(res.emballages.paginatorInfo.total);
+    } catch (error) {
+      console.error("Erreur lors du chargement des emballages:", error);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
     fetchData(currentPage);
   }, [currentPage]);
 
-  function handlePageChange(newPage: number) {
-    const url = new URL(window.location.href);
-    url.searchParams.set("page", newPage.toString());
-    window.history.pushState({}, "", url.toString());
-    fetchData(newPage);
+  const handlePageChange = (newPage: number) => {
+    // Utilisation de router.push pour une navigation Next.js propre
+    router.push(`/emballages?page=${newPage}`);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[#F0F2F5]">
+        <div className="text-[#00A09D] font-bold animate-pulse uppercase tracking-widest">
+          Chargement des données...
+        </div>
+      </div>
+    );
   }
 
-  if (loading) return <p>Loading...</p>;
-
   return (
-    <div className="p-6">
-      <h1 className="text-xl font-bold mb-4">Liste des emballages</h1>
-
+    <main className="min-h-screen bg-[#F0F2F5]">
+      {/* On passe les props nécessaires au nouveau EmballagesTable */}
       <EmballagesTable
         data={emballages}
         total={total}
@@ -49,6 +62,6 @@ export default function EmballagesPage() {
         limit={limit}
         onPageChange={handlePageChange}
       />
-    </div>
+    </main>
   );
 }
