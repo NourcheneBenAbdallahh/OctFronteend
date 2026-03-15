@@ -56,14 +56,39 @@ const navItems: NavItem[] = [
   icon: <GridIcon />,
   name: "Stocks",
   subItems: [
-    { name: "Mouvements", path: "/mouvements", pro: false },
+    { name: "Stocks", path: "/stock", pro: false },
+    { name: "Inventaire", path: "/stock-inventaire", pro: false },
   ],
+},
+{
+  icon: <BoxCubeIcon />,
+  name: "Lots",
+  path: "/lot",
 },
 
 {
   icon: <PageIcon />,
-  name: "Stock Inventaire",
-  subItems: [{ name: "Stock Inventaire", path: "/stock-inventaire", pro: false }],
+  name: "Commandes",
+  subItems: [{ name: "Commandes", path: "/commandes", pro: false }],
+},
+{
+  icon: <PageIcon />,
+  name: "Bon Livraisons",
+  subItems: [
+    { name: "Bon Livraisons", path: "/bon-livraisons", pro: false },
+  ],
+},
+{
+  icon: <PageIcon />,
+  name: "Factures",
+  subItems: [{ name: "Factures", path: "/factures", pro: false }],
+},
+{
+  icon: <PageIcon />,
+  name: "Mouvements de stock",
+  
+  subItems: [{ name: "Mouvements de stock ", path: "/mouvements", pro: false }],
+
 },
   {
     icon: <CalenderIcon />,

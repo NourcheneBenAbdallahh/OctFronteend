@@ -1,10 +1,9 @@
 import { graphqlRequest } from "./graphqlClient";
 import { listEmballages } from "./emballages.api";
-import type { MouvementStock, MouvementType, Entrepot, Lot, Emballage } from "@/types/mouvement";
-
+import type { MouvementStock, MouvementType, Lot, Emballage } from "@/types/mouvement";
+import type { Entrepot } from "@/types/entrepot";
 const GRAPHQL_URL = process.env.NEXT_PUBLIC_GRAPHQL_URL ?? "http://127.0.0.1:8000/graphql";
 
-// Fonction générique GraphQL
 async function gql<T>(query: string, variables?: Record<string, any>): Promise<T> {
   const res = await fetch(GRAPHQL_URL, {
     method: "POST",
@@ -22,7 +21,6 @@ async function gql<T>(query: string, variables?: Record<string, any>): Promise<T
   return json.data;
 }
 
-// ---------------- Queries ----------------
 export async function fetchEntrepots(): Promise<Entrepot[]> {
   const query = `
     query {
@@ -49,7 +47,6 @@ export async function fetchLots(page = 1, first = 100): Promise<Lot[]> {
 }
 
 export async function fetchEmballages(page = 1, first = 100): Promise<Emballage[]> {
-  // Utilisation de ton API emballages centralisée
   const res = await listEmballages(page, first);
   return res.emballages.data.map((e) => ({ id: e.id, code: e.code, name: e.name }));
 }
@@ -82,7 +79,7 @@ export async function fetchMouvements(page = 1, first = 10) {
   return gql<{ mouvementStocks: { data: MouvementStock[]; paginatorInfo: any } }>(query, { first, page });
 }
 
-// ---------------- Mutations ----------------
+
 export async function createMouvementDraft(input: {
   type_mouvement: MouvementType;
   emballage_id: string;

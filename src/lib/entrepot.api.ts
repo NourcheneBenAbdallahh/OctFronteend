@@ -1,7 +1,7 @@
 import { graphqlRequest } from "./graphqlClient";
 
 export type Entrepot = {
-  id: string;
+  id: string;nom: string;
   adresse: string;
   capacite_totale?: number | null;
   capacite_disponible?: number | null;
@@ -13,6 +13,7 @@ export async function fetchEntrepots() {
     query {
       entrepots {
         id
+        nom
         adresse
         capacite_totale
         capacite_disponible
@@ -25,7 +26,7 @@ export async function fetchEntrepots() {
   return res.entrepots;
 }
 
-export async function createEntrepot(input: {
+export async function createEntrepot(input: {nom: string;
   adresse: string;
   capacite_totale?: number;
   capacite_disponible?: number;
@@ -35,6 +36,7 @@ export async function createEntrepot(input: {
     mutation ($input: CreateEntrepotInput!) {
       createEntrepot(input: $input) {
         id
+        nom
         adresse
         statut
       }
@@ -45,15 +47,17 @@ export async function createEntrepot(input: {
 
 export async function updateEntrepot(input: {
   id: string;
+  nom?: string;
   adresse?: string;
-  capacite_totale?: number;
-  capacite_disponible?: number;
+capacite_totale?: number | null;     
+  capacite_disponible?: number | null;
   statut?: string;
 }) {
   const mutation = /* GraphQL */ `
     mutation ($input: UpdateEntrepotInput!) {
       updateEntrepot(input: $input) {
         id
+        nom
         adresse
         statut
       }

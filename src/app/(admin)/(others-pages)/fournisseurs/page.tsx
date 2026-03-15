@@ -1,6 +1,6 @@
 import ComponentCard from "@/components/common/ComponentCard";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
-import FournisseursTable from "@/components/tables/FournisseursTable";
+import FournisseursTable from "@/components/fournisseurs/FournisseursTable";
 import {
   listFournisseurs,
   normalizeFournisseur,
@@ -9,17 +9,13 @@ import {
 
 export default async function FournisseursPage() {
   const result = await listFournisseurs();
-
-  const rows: TableFournisseur[] =
-    result.fournisseurs.map(normalizeFournisseur);
+  const rows: TableFournisseur[] = result.fournisseurs.map(normalizeFournisseur);
 
   return (
-    <div>
-      <PageBreadcrumb pageTitle="Fournisseurs" />
-      <div className="space-y-6">
-        <ComponentCard title="Fournisseurs List">
-          <FournisseursTable data={rows} />
-        </ComponentCard>
+    <div className="p-6">
+      <PageBreadcrumb pageTitle="Gestion des Partenaires" />
+      <div className="mt-8">
+         <FournisseursTable data={rows} />
       </div>
     </div>
   );

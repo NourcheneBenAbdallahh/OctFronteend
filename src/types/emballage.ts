@@ -24,3 +24,8 @@ export function normalizeEmballages(p: Emballages): TableEmballages {
     status: p.status === "INACTIVE" ? "INACTIVE" : "ACTIVE",
   };
 }
+export type EmballageRef = {
+  id: string
+  code: string
+  name: string
+}
