@@ -44,8 +44,6 @@ export default function StockDetailsDrawer({ stock, open, onClose }: Props) {
           <div className="grid grid-cols-2 gap-4">
             <Info label="Sens" value={stock.sens} />
             <Info label="Quantité" value={String(stock.quantite)} />
-            <Info label="Stock initial" value={String(stock.quantite_init)} />
-            <Info label="Stock final" value={String(stock.quantite_finale)} />
             <Info label="Date stock" value={formatDate(stock.date_stock)} />
             <Info label="Lot" value={stock.lot?.code_lot || "—"} />
             <Info

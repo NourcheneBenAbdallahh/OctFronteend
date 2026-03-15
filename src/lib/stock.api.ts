@@ -71,10 +71,8 @@ export async function getStocks(page = 1, first = 50): Promise<Stock[]> {
           emballage_id
           lot_id
           date_stock
-          quantite_init
  quantite
           sens
-          quantite_finale
           user_id
           created_at
           updated_at
@@ -120,7 +118,7 @@ export async function updateStock(
     emballage_id?: string | number;
     lot_id?: string | number | null;
     date_stock?: string;
-     quantite?: number;
+    quantite?: number;
     sens?: "entree" | "sortie";
     user_id?: string | number | null;
   }
@@ -133,10 +131,8 @@ export async function updateStock(
         emballage_id
         lot_id
         date_stock
-        quantite_init
         quantite
         sens
-        quantite_finale
         user_id
         created_at
         updated_at

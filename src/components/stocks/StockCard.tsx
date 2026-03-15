@@ -62,16 +62,6 @@ export default function StockCard({ stock, onView, onEdit, onDelete }: Props) {
             </div>
           </div>
 
-          <div className="text-right">
-            <div className="text-[11px] uppercase font-bold text-gray-400">
-              Stock final
-            </div>
-            <div className="text-[26px] font-bold text-[#00A09D] mt-1">
-              {Number(stock.quantite_finale).toLocaleString("fr-FR", {
-                maximumFractionDigits: 2,
-              })}
-            </div>
-          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-5">
@@ -125,16 +115,7 @@ export default function StockCard({ stock, onView, onEdit, onDelete }: Props) {
         </div>
 
         <div className="grid grid-cols-3 gap-3 mt-4">
-          <div className="p-3 rounded-sm border border-gray-200">
-            <div className="text-[11px] uppercase font-bold text-gray-400">
-              Stock initial
-            </div>
-            <div className="mt-2 text-sm font-semibold text-gray-800">
-              {Number(stock.quantite_init).toLocaleString("fr-FR", {
-                maximumFractionDigits: 2,
-              })}
-            </div>
-          </div>
+         
 
           <div className="p-3 rounded-sm border border-gray-200">
             <div className="text-[11px] uppercase font-bold text-gray-400">
