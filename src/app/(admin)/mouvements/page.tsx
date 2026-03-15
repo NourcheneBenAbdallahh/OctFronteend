@@ -18,7 +18,7 @@ import {
 } from "@/lib/mouvement.api";
 
 import type { MouvementStock, MouvementType } from "@/types/mouvement";
-import type { Lot } from "@/types/lot";
+import type { Lot } from "@/types/mouvement";
 import type { EmballageRef as Emballage } from "@/types/emballage";
 import type { Entrepot } from "@/types/entrepot";
 
@@ -29,7 +29,7 @@ export default function MouvementsPage() {
 
   const [items, setItems] = useState<MouvementStock[]>([]);
   const [entrepots, setEntrepots] = useState<Entrepot[]>([]);
-  const [lots, setLots] = useState<Lot[]>([]);
+const [lots, setLots] = useState<any[]>([]);
   const [emballages, setEmballages] = useState<Emballage[]>([]);
 
   const [page, setPage] = useState(1);

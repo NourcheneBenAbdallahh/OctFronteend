@@ -3,7 +3,7 @@ import React from "react";
 import Button from "@/components/ui/button/Button";
 import { Modal } from "@/components/ui/modal";
 import { EmballageRef  as Emballage } from "@/types/emballage";
-import { Lot } from "@/types/lot";
+import { Lot } from "@/types/mouvement";
 import { Entrepot } from "@/types/entrepot";
 import { MouvementType } from "@/types/mouvement";
 import { needsLot, needsSource, needsDestination, formatEmballageLabel, TYPES } from "./utils";
@@ -20,7 +20,7 @@ interface Props {
     quantite: number;
   };
   setForm: React.Dispatch<React.SetStateAction<Props["form"]>>;
-  lots: Lot[];
+lots: any[];
   emballages: Emballage[];
   entrepots: Entrepot[];
   onClose: () => void;
