@@ -18,7 +18,7 @@ import {
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { 
   X, Plus, FileText, Calendar, Package, MapPin, 
-  Upload, Trash2, Edit2, AlertCircle, ChevronDown, Hash, ShoppingCart, Truck, CheckCircle2
+  Upload, Trash2, Edit2, AlertCircle, ChevronDown, Hash, ShoppingCart, Truck, CheckCircle2, Search
 } from "lucide-react";
 
 // --- SOUS-COMPOSANT : TIMELINE BUS ---
@@ -28,6 +28,7 @@ const CommandeTimeline = ({ total, dejaRecu, actuel }: { total: number; dejaRecu
   const pourcentageNouveau = (totalApresSaisie / total) * 100;
 
   return (
+    
     <div className="bg-gray-50/80 rounded-[2rem] p-6 border border-gray-100 my-2 animate-in fade-in zoom-in-95 duration-500">
       <div className="flex justify-between items-end mb-4">
         <div>
@@ -163,6 +164,17 @@ export default function BonLivraisonsTable({
     router.push(`${pathname}?${params.toString()}`);
   };
 
+
+  const stats = useMemo(() => {
+  const totalRecu = rows.reduce((acc, curr) => acc + (Number(curr.quantite_recue) || 0), 0);
+  const nbBl = rows.length;
+  // On calcule le reliquat global basé sur les commandes en attente
+  const reliquatGlobal = commandesEnAttente.reduce((acc, curr) => acc + (curr.quantite - (curr.quantite || 0)), 0);
+  
+  return { totalRecu, nbBl, reliquatGlobal };
+}, [rows, commandesEnAttente]);
+
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!editing && !file) { setErrorMessage("Le document BL est obligatoire"); return; }
@@ -200,24 +212,55 @@ export default function BonLivraisonsTable({
   }
 
   return (
-    <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-      {/* HEADER DU TABLEAU */}
-      <div className="p-6 border-b border-gray-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h3 className="text-lg font-black text-gray-900 tracking-tight">Flux de Réception</h3>
-          <p className="text-xs text-gray-400 font-medium">Visualisez et gérez vos entrées marchandises</p>
-        </div>
-        <button
-          onClick={() => { setEditing(null); setForm(emptyForm); setFile(null); setIsDrawerOpen(true); }}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-2 shadow-lg shadow-indigo-100 active:scale-95"
-        >
-          <Plus className="h-4 w-4 stroke-[3px]" /> RÉCEPTIONNER UN BL
-        </button>
+<div className="space-y-8">
+    {/* HEADER & STATS */}
+    <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+      <div>
+        <h1 className="text-4xl font-black text-gray-900 tracking-tighter">
+          Flux Réceptions
+        </h1>
+        <p className="text-gray-400 text-sm font-medium mt-1">
+          Gestion des bons de livraison et entrées en stock
+        </p>
       </div>
 
+      <div className="flex flex-wrap gap-3">
+        {/* Widget 1: Total Reçu */}
+        <div className="bg-white border border-gray-100 p-4 rounded-[2rem] flex items-center gap-4 min-w-[180px] shadow-sm">
+          <div className="h-12 w-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+            <Package className="h-6 w-6" />
+          </div>
+          <div>
+            <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Reçu</span>
+            <span className="text-xl font-black text-gray-900">{stats.totalRecu.toLocaleString()}</span>
+          </div>
+        </div>
+
+        {/* Widget 2: Reliquat */}
+        <div className="bg-white border border-gray-100 p-4 rounded-[2rem] flex items-center gap-4 min-w-[180px] shadow-sm">
+          <div className="h-12 w-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600">
+            <Truck className="h-6 w-6" />
+          </div>
+          <div>
+            <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">En Attente</span>
+            <span className="text-xl font-black text-amber-600">{stats.reliquatGlobal.toLocaleString()}</span>
+          </div>
+        </div>
+
+        {/* Bouton Action */}
+        <button 
+          onClick={() => { setEditing(null); setForm(emptyForm); setIsDrawerOpen(true); }}
+          className="bg-indigo-600 hover:bg-gray-900 text-white px-8 py-4 rounded-[2rem] flex items-center gap-3 transition-all hover:scale-105 shadow-xl shadow-indigo-100 group"
+        >
+          <Plus className="h-5 w-5 stroke-[3px] group-hover:rotate-90 transition-transform" />
+          <span className="text-xs font-black uppercase tracking-[0.15em]">Nouveau BL</span>
+        </button>
+      </div>
+    </div>   
+    
+
       {/* TABLEAU DESIGN */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
+<div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden">        <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gray-50/50">
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400">Référence BL</th>

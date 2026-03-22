@@ -24,7 +24,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { 
   X, Plus, Search, Edit2, Trash2, Ban, 
   Package, Truck, Calendar, AlertCircle, Info, ArrowRight,
-  ChevronDown, Timer, History
+  ChevronDown, Timer, History, CheckCircle2
 } from "lucide-react";
 
 type Id = string | number;
@@ -271,15 +271,44 @@ export default function CommandesTable({
     } catch (err: any) { setErrorMessage(err.message || "Erreur lors de l'enregistrement"); } finally { setSubmitLoading(false); }
   }
 
-  const filteredRows = useMemo(() => {
-    if (!query.trim()) return rows;
-    const q = query.toLowerCase();
-    return rows.filter(r => 
-      r.numero_commande?.toLowerCase().includes(q) || 
-      fournisseursMap.get(String(r.fournisseur_id))?.toLowerCase().includes(q)
-    );
-  }, [rows, query, fournisseursMap]);
+// 1. Calculer le nombre d'éléments par statut pour les badges
+const statusCounts = useMemo(() => {
+  const counts: Record<string, number> = {
+    EN_ATTENTE: 0,
+    VALIDEE: 0,
+    PARTIELLEMENT_RECEPTIONNEE: 0,
+    RECEPTIONNEE: 0,
+    ANNULEE: 0,
+  };
+  
+  rows.forEach((item) => {
+    if (counts[item.statut] !== undefined) {
+      counts[item.statut]++;
+    }
+  });
+  
+  return counts;
+}, [rows]);
 
+// 2. Mettre à jour la logique de filtrage pour qu'elle comprenne les statuts
+const filteredRows = useMemo(() => {
+  const q = query.trim().toUpperCase();
+  if (!q) return rows;
+
+  // Liste des statuts possibles
+  const statusList = ['EN_ATTENTE', 'VALIDEE', 'PARTIELLEMENT_RECEPTIONNEE', 'RECEPTIONNEE', 'ANNULEE'];
+
+  if (statusList.includes(q)) {
+    // Si on a cliqué sur un bouton de statut
+    return rows.filter(r => r.statut === q);
+  }
+
+  // Sinon, recherche textuelle (Numéro ou Fournisseur)
+  return rows.filter(r => 
+    r.numero_commande?.toLowerCase().includes(query.toLowerCase()) || 
+    fournisseursMap.get(String(r.fournisseur_id))?.toLowerCase().includes(query.toLowerCase())
+  );
+}, [rows, query, fournisseursMap]);
   return (
     <div className="min-h-screen bg-gray-50/50 p-4 lg:p-8 font-sans">
       {/* HEADER SECTION */}
@@ -300,9 +329,96 @@ export default function CommandesTable({
         </div>
       </div>
 
+{/* SECTION ANALYSE RAPIDE */}
+<div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+  {/* Widget 1: Volume Total Attendu */}
+  <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex items-center gap-4">
+    <div className="h-12 w-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+      <Package className="h-6 w-6" />
+    </div>
+    <div>
+      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Flux Total</p>
+      <p className="text-xl font-black text-gray-900">
+        {rows.reduce((acc, curr) => acc + Number(curr.quantite || 0), 0)}
+      </p>
+    </div>
+  </div>
+
+  {/* Widget 2: Reste à recevoir (Somme des reliquats) */}
+  <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex items-center gap-4">
+    <div className="h-12 w-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
+      <ArrowRight className="h-6 w-6" />
+    </div>
+    <div>
+      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Reliquat Total</p>
+      <p className="text-xl font-black text-amber-600">
+        {rows.reduce((acc, curr) => acc + Math.max(0, Number(curr.reste || 0)), 0)}
+      </p>
+    </div>
+  </div>
+
+  {/* Widget 3: Alertes Retards */}
+  <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex items-center gap-4">
+    <div className="h-12 w-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center">
+      <AlertCircle className="h-6 w-6" />
+    </div>
+    <div>
+      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">En Retard</p>
+      <p className="text-xl font-black text-red-600">
+        {rows.filter(r => new Date(r.date_livraison_prevue) < new Date() && r.statut !== 'RECEPTIONNEE').length}
+      </p>
+    </div>
+  </div>
+
+  {/* Widget 4: Taux de Service */}
+  <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex items-center gap-4">
+    <div className="h-12 w-12 rounded-2xl bg-green-50 text-green-600 flex items-center justify-center">
+      <CheckCircle2 className="h-6 w-6" />
+    </div>
+    <div>
+      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Taux Réception</p>
+      <p className="text-xl font-black text-green-600">
+        {Math.round((rows.filter(r => r.statut === 'RECEPTIONNEE').length / rows.length) * 100 || 0)}%
+      </p>
+    </div>
+  </div>
+</div>
+
+{/* FILTRES RAPIDES AVEC BADGES */}
+<div className="flex gap-3 mb-8 overflow-x-auto pb-4 scrollbar-hide items-center">
+  <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-2">Filtrer par :</div>
+  {['TOUT', 'EN_ATTENTE', 'VALIDEE', 'PARTIELLEMENT_RECEPTIONNEE', 'RECEPTIONNEE'].map((s) => {
+    const isActive = s === 'TOUT' ? query === '' : query === s;
+    const count = s === 'TOUT' ? rows.length : (statusCounts[s] || 0);
+
+    return (
+      <button
+        key={s}
+        onClick={() => setQuery(s === 'TOUT' ? '' : s)}
+        className={`group flex items-center gap-3 px-5 py-3 rounded-2xl text-[10px] font-black tracking-widest transition-all whitespace-nowrap border ${
+          isActive 
+          ? 'bg-gray-900 text-white border-gray-900 shadow-xl shadow-gray-200 scale-105' 
+          : 'bg-white text-gray-500 border-gray-100 hover:border-indigo-200 hover:text-indigo-600'
+        }`}
+      >
+        {s.replace(/_/g, ' ')}
+        <span className={`flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[9px] font-bold transition-colors ${
+          isActive 
+          ? 'bg-indigo-500 text-white' 
+          : 'bg-gray-100 text-gray-500 group-hover:bg-indigo-50 group-hover:text-indigo-600'
+        }`}>
+          {count}
+        </span>
+      </button>
+    );
+  })}
+</div>
+
       {/* TABLE SECTION */}
       <div className="overflow-hidden rounded-[2.5rem] border border-gray-100 bg-white shadow-2xl shadow-gray-200/40">
         <div className="overflow-x-auto">
+
+          
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-gray-50 bg-gray-50/30 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">

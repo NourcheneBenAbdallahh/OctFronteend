@@ -65,7 +65,6 @@ console.log(commandes);
 
   return (
     <div>
-      <PageBreadcrumb pageTitle="Bon de livraison" />
       <div className="space-y-6">
           <BonLivraisonsTable
             data={rows}

@@ -76,9 +76,7 @@ export default async function CommandesPage({ searchParams }: PageProps) {
 
   return (
     <div>
-      <PageBreadcrumb pageTitle="Commandes" />
       <div className="space-y-6">
-        <ComponentCard title="Commandes List">
           <CommandesTable
             data={rows}
             pagination={commandesResult.commandes.paginatorInfo}
@@ -87,7 +85,6 @@ export default async function CommandesPage({ searchParams }: PageProps) {
             fournisseurs={fournisseurs}
             contrats={contrats}
           />
-        </ComponentCard>
       </div>
     </div>
   );
