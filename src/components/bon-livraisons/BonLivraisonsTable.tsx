@@ -3,26 +3,74 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Pagination from "@/components/tables/Pagination";
 import {
-  createBonLivraison,
+  createBonLivraisonWithFile,
+  updateBonLivraison,
   deleteBonLivraison,
   normalizeBonLivraison,
-  updateBonLivraison,
-  validateBonLivraisonWithDocument,
 } from "@/lib/bon-livraisons.api";
 import {
-  BonLivraisonStatut,
+  TableBonLivraison,
   BonLivraisonsPaginatorInfo,
-  CommandeOption,
-  CreateBonLivraisonInput,
   EmballageOption,
   EntrepotOption,
-  TableBonLivraison,
-  UpdateBonLivraisonInput,
+  CommandeOption,
 } from "@/types/bon-livraison";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { 
+  X, Plus, FileText, Calendar, Package, MapPin, 
+  Upload, Trash2, Edit2, AlertCircle, ChevronDown, Hash, ShoppingCart, Truck, CheckCircle2
+} from "lucide-react";
 
+// --- SOUS-COMPOSANT : TIMELINE BUS ---
+const CommandeTimeline = ({ total, dejaRecu, actuel }: { total: number; dejaRecu: number; actuel: number }) => {
+  const totalApresSaisie = Math.min(dejaRecu + actuel, total);
+  const pourcentageAncien = (dejaRecu / total) * 100;
+  const pourcentageNouveau = (totalApresSaisie / total) * 100;
+
+  return (
+    <div className="bg-gray-50/80 rounded-[2rem] p-6 border border-gray-100 my-2 animate-in fade-in zoom-in-95 duration-500">
+      <div className="flex justify-between items-end mb-4">
+        <div>
+          <span className="text-[9px] font-black uppercase text-indigo-400 tracking-widest block mb-1">Progression de réception</span>
+          <div className="flex items-baseline gap-1">
+            <span className="text-2xl font-black text-gray-900">{totalApresSaisie}</span>
+            <span className="text-[10px] font-bold text-gray-400 uppercase">/ {total} UNITÉS</span>
+          </div>
+        </div>
+        <div className="text-right">
+          <span className={`text-[9px] font-black px-2 py-1 rounded-lg uppercase ${pourcentageNouveau >= 100 ? 'bg-green-500 text-white' : 'bg-indigo-600 text-white'}`}>
+            {Math.round(pourcentageNouveau)}%
+          </span>
+        </div>
+      </div>
+
+      <div className="relative h-10 flex items-center px-2">
+        {/* Rail */}
+        <div className="absolute left-0 right-0 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+           <div className="h-full bg-indigo-200 transition-all duration-1000" style={{ width: `${pourcentageAncien}%` }} />
+           <div className="h-full bg-indigo-600 absolute top-0 transition-all duration-1000 ease-out" style={{ width: `${pourcentageNouveau}%` }} />
+        </div>
+
+        {/* Le Bus (Camion) */}
+        <div 
+          className="absolute transition-all duration-1000 ease-in-out z-10"
+          style={{ left: `calc(${pourcentageNouveau}% - 18px)` }}
+        >
+          <div className={`p-1.5 rounded-xl shadow-lg transition-colors ${pourcentageNouveau >= 100 ? 'bg-green-600' : 'bg-indigo-600'} text-white animate-bounce`}>
+            <Truck className="h-4 w-4" />
+          </div>
+        </div>
+      </div>
+      <div className="flex justify-between mt-2 text-[8px] font-black text-gray-400 uppercase tracking-tighter">
+        <span>Fournisseur</span>
+        <span>Entrepôt</span>
+      </div>
+    </div>
+  );
+};
+
+// --- COMPOSANT PRINCIPAL ---
 type Id = string | number;
-
 type BonLivraisonForm = {
   date_reception: string;
   emballage_id: string;
@@ -32,40 +80,12 @@ type BonLivraisonForm = {
 };
 
 const emptyForm: BonLivraisonForm = {
-  date_reception: "",
+  date_reception: new Date().toISOString().split("T")[0],
   emballage_id: "",
   quantite_recue: "",
   numero_commande: "",
   entrepot_id: "",
 };
-
-function formatDate(value?: string | null) {
-  if (!value) return "-";
-  return value.includes("T") ? value.split("T")[0] : value;
-}
-
-function getErrorMessage(error: unknown) {
-  if (error instanceof Error) {
-    if (error.message.includes("Commande not found")) {
-      return "La commande sélectionnée est introuvable.";
-    }
-    if (error.message.includes("Entrepot not found")) {
-      return "L'entrepôt sélectionné est introuvable.";
-    }
-    if (error.message.includes("Emballage not found")) {
-      return "L'emballage sélectionné est introuvable.";
-    }
-    if (error.message.includes("Update allowed only if statut is EN_ATTENTE")) {
-      return "La modification est autorisée seulement si le statut est EN_ATTENTE.";
-    }
-    if (error.message.includes("Delete allowed only if statut is EN_ATTENTE")) {
-      return "La suppression est autorisée seulement si le statut est EN_ATTENTE.";
-    }
-    return error.message;
-  }
-
-  return "Une erreur est survenue.";
-}
 
 export default function BonLivraisonsTable({
   data,
@@ -81,597 +101,320 @@ export default function BonLivraisonsTable({
   entrepots: EntrepotOption[];
 }) {
   const [rows, setRows] = useState<TableBonLivraison[]>(data);
-  const [isOpen, setIsOpen] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<TableBonLivraison | null>(null);
   const [form, setForm] = useState<BonLivraisonForm>(emptyForm);
-  const [query, setQuery] = useState("");
   const [submitLoading, setSubmitLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const [commandeDropdownOpen, setCommandeDropdownOpen] = useState(false);
-
-  const [validateOpen, setValidateOpen] = useState(false);
-  const [validatingItem, setValidatingItem] = useState<TableBonLivraison | null>(null);
-  const [validationFile, setValidationFile] = useState<File | null>(null);
-  const [validateLoading, setValidateLoading] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [isCmdOpen, setIsCmdOpen] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const commandeDropdownRef = useRef<HTMLDivElement | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => setRows(data), [data]);
 
   useEffect(() => {
-    setRows(data);
-  }, [data]);
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        commandeDropdownRef.current &&
-        !commandeDropdownRef.current.contains(event.target as Node)
-      ) {
-        setCommandeDropdownOpen(false);
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsCmdOpen(false);
       }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
     };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const emballagesMap = useMemo(() => {
-    return new Map(emballages.map((item) => [String(item.id), item.label]));
-  }, [emballages]);
+  const commandesEnAttente = useMemo(() => {
+    return commandes.filter((c: any) => c.statut !== "RECEPTIONNEE");
+  }, [commandes]);
 
-  const entrepotsMap = useMemo(() => {
-    return new Map(entrepots.map((item) => [String(item.id), item.label]));
-  }, [entrepots]);
+  const selectedCommande = useMemo(
+    () => commandes.find((c) => c.numero_commande === form.numero_commande),
+    [commandes, form.numero_commande]
+  );
 
-  const filteredCommandes = useMemo(() => {
-    const search = form.numero_commande.trim().toLowerCase();
-    if (!search) return commandes;
+  const dejaRecu = useMemo(() => {
+    if (!selectedCommande) return 0;
+    return rows
+      .filter((bl) => bl.numero_commande === selectedCommande.numero_commande && String(bl.id) !== String(editing?.id))
+      .reduce((acc, bl) => acc + (Number(bl.quantite_recue) || 0), 0);
+  }, [selectedCommande, rows, editing]);
 
-    return commandes.filter((commande) =>
-      commande.numero_commande.toLowerCase().includes(search)
-    );
-  }, [commandes, form.numero_commande]);
+  const remainingQuantity = selectedCommande ? (selectedCommande.quantite - dejaRecu) : 0;
 
-  function openNew() {
-    setEditing(null);
-    setForm(emptyForm);
-    setErrorMessage("");
-    setCommandeDropdownOpen(false);
-    setIsOpen(true);
-  }
-
-  function openEdit(item: TableBonLivraison) {
-    setEditing(item);
-    setErrorMessage("");
-    setCommandeDropdownOpen(false);
-    setForm({
-      date_reception: item.date_reception
-        ? item.date_reception.includes("T")
-          ? item.date_reception.split("T")[0]
-          : item.date_reception
-        : "",
-      emballage_id: item.emballage_id ? String(item.emballage_id) : "",
-      quantite_recue:
-        item.quantite_recue !== null && item.quantite_recue !== undefined
-          ? String(item.quantite_recue)
-          : "",
-      numero_commande: item.numero_commande ?? "",
-      entrepot_id: item.entrepot_id ? String(item.entrepot_id) : "",
-    });
-    setIsOpen(true);
-  }
-
-  function closeModal() {
-    if (submitLoading) return;
-    setIsOpen(false);
-    setEditing(null);
-    setForm(emptyForm);
-    setErrorMessage("");
-    setCommandeDropdownOpen(false);
-  }
-
-  function validateForm() {
-    if (!form.date_reception) {
-      return "La date de réception est obligatoire.";
-    }
-
-    if (!form.emballage_id) {
-      return "L'emballage est obligatoire.";
-    }
-
-    if (!form.quantite_recue || Number(form.quantite_recue) <= 0) {
-      return "La quantité reçue doit être supérieure à 0.";
-    }
-
-    if (!form.numero_commande.trim()) {
-      return "Le numéro de commande est obligatoire.";
-    }
-
-    if (!form.entrepot_id) {
-      return "L'entrepôt est obligatoire.";
-    }
-
-    return "";
-  }
-
-  function handleSelectCommande(commande: CommandeOption) {
+  const handleSelectCommande = (c: CommandeOption) => {
     setForm((prev) => ({
       ...prev,
-      numero_commande: commande.numero_commande,
+      numero_commande: c.numero_commande,
+      emballage_id: c.emballage_id ? String(c.emballage_id) : "",
+      entrepot_id: c.entrepot_id ? String(c.entrepot_id) : "",
+      quantite_recue: "" 
     }));
-    setCommandeDropdownOpen(false);
-  }
+    setIsCmdOpen(false);
+    setErrorMessage("");
+  };
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  const handlePageChange = (page: number) => {
+    const params = new URLSearchParams(searchParams?.toString());
+    params.set("page", String(page));
+    router.push(`${pathname}?${params.toString()}`);
+  };
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-
-    const validationError = validateForm();
-    if (validationError) {
-      setErrorMessage(validationError);
-      return;
+    if (!editing && !file) { setErrorMessage("Le document BL est obligatoire"); return; }
+    if (Number(form.quantite_recue) > remainingQuantity) {
+        setErrorMessage(`Quantité dépasse le reste à livrer (${remainingQuantity})`);
+        return;
     }
 
     setSubmitLoading(true);
-    setErrorMessage("");
-
     try {
-      const payloadBase = {
-        date_reception: form.date_reception,
-        emballage_id: form.emballage_id,
-        quantite_recue: Number(form.quantite_recue),
-        numero_commande: form.numero_commande.trim(),
-        entrepot_id: form.entrepot_id,
-      };
-
+      const payload = { ...form, quantite_recue: Number(form.quantite_recue) };
       if (editing) {
-        const updatePayload: UpdateBonLivraisonInput = {
-          ...payloadBase,
-        };
-
-        const res = await updateBonLivraison(editing.id, updatePayload);
-        const updated = normalizeBonLivraison(res.updateBonLivraison);
-
-        setRows((current) =>
-          current.map((item) =>
-            String(item.id) === String(updated.id) ? updated : item
-          )
-        );
+        const res = await updateBonLivraison(editing.id, payload);
+        setRows(prev => prev.map(r => String(r.id) === String(editing.id) ? normalizeBonLivraison(res.updateBonLivraison) : r));
       } else {
-        const createPayload: CreateBonLivraisonInput = payloadBase;
-        const res = await createBonLivraison(createPayload);
-        const created = normalizeBonLivraison(res.createBonLivraison);
-
-        setRows((current) => [created, ...current]);
+        const created = await createBonLivraisonWithFile(payload as any, file!);
+        setRows(prev => [normalizeBonLivraison(created), ...prev]);
       }
-
-      closeModal();
-    } catch (error) {
-      setErrorMessage(getErrorMessage(error));
+      setIsDrawerOpen(false);
+      setForm(emptyForm);
+      setFile(null);
+    } catch (err: any) {
+      setErrorMessage(err.message || "Erreur de serveur");
     } finally {
       setSubmitLoading(false);
     }
   }
 
   async function handleDelete(id: Id) {
-    if (!confirm("Delete this bon de livraison?")) return;
-
+    if (!confirm("Supprimer définitivement ce BL ?")) return;
     try {
       await deleteBonLivraison(id);
-      setRows((current) =>
-        current.filter((item) => String(item.id) !== String(id))
-      );
-    } catch (error) {
-      alert(getErrorMessage(error));
-    }
-  }
-
-  function openValidate(item: TableBonLivraison) {
-    setValidatingItem(item);
-    setValidationFile(null);
-    setErrorMessage("");
-    setValidateOpen(true);
-  }
-
-  function closeValidateModal() {
-    if (validateLoading) return;
-    setValidateOpen(false);
-    setValidatingItem(null);
-    setValidationFile(null);
-    setErrorMessage("");
-  }
-
-  async function handleValidateSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-
-    if (!validatingItem) return;
-
-    if (!validationFile) {
-      setErrorMessage("Le fichier du bon de livraison est obligatoire.");
-      return;
-    }
-
-    setValidateLoading(true);
-    setErrorMessage("");
-
-    try {
-      const validated = await validateBonLivraisonWithDocument(
-        validatingItem.id,
-        validationFile
-      );
-
-      const updated = normalizeBonLivraison(validated);
-
-      setRows((current) =>
-        current.map((item) =>
-          String(item.id) === String(updated.id) ? updated : item
-        )
-      );
-
-      closeValidateModal();
-    } catch (error) {
-      setErrorMessage(getErrorMessage(error));
-    } finally {
-      setValidateLoading(false);
-    }
-  }
-
-  const filteredRows = useMemo(() => {
-    if (!query.trim()) return rows;
-
-    const q = query.toLowerCase();
-
-    return rows.filter((item) => {
-      const emballageLabel = emballagesMap.get(String(item.emballage_id)) || "";
-      const entrepotLabel = entrepotsMap.get(String(item.entrepot_id)) || "";
-
-      return (
-        item.numero_bl?.toLowerCase().includes(q) ||
-        item.numero_commande?.toLowerCase().includes(q) ||
-        item.statut?.toLowerCase().includes(q) ||
-        emballageLabel.toLowerCase().includes(q) ||
-        entrepotLabel.toLowerCase().includes(q)
-      );
-    });
-  }, [rows, query, emballagesMap, entrepotsMap]);
-
-  function handlePageChange(page: number) {
-    const params = new URLSearchParams(searchParams?.toString());
-    params.set("page", String(page));
-    router.push(`${pathname}?${params.toString()}`);
+      setRows(prev => prev.filter(r => String(r.id) !== String(id)));
+    } catch (err: any) { alert(err.message); }
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+      {/* HEADER DU TABLEAU */}
+      <div className="p-6 border-b border-gray-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h3 className="text-lg font-black text-gray-900 tracking-tight">Flux de Réception</h3>
+          <p className="text-xs text-gray-400 font-medium">Visualisez et gérez vos entrées marchandises</p>
+        </div>
         <button
-          onClick={openNew}
-          className="rounded-lg bg-brand-500 px-4 py-2 text-white"
+          onClick={() => { setEditing(null); setForm(emptyForm); setFile(null); setIsDrawerOpen(true); }}
+          className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-2 shadow-lg shadow-indigo-100 active:scale-95"
         >
-          + New Bon Livraison
+          <Plus className="h-4 w-4 stroke-[3px]" /> RÉCEPTIONNER UN BL
         </button>
-
-        <input
-          type="text"
-          placeholder="Search by numero BL, commande, statut..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-brand-300 sm:max-w-sm"
-        />
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1150px] table-auto">
-            <thead>
-              <tr className="text-left text-xs uppercase text-gray-500">
-                <th className="px-4 py-3">Numéro BL</th>
-                <th className="px-4 py-3">Date réception</th>
-                <th className="px-4 py-3">Commande</th>
-                <th className="px-4 py-3">Emballage</th>
-                <th className="px-4 py-3">Quantité</th>
-                <th className="px-4 py-3">Entrepôt</th>
-                <th className="px-4 py-3">Statut</th>
-                <th className="px-4 py-3 text-right">Actions</th>
+      {/* TABLEAU DESIGN */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-gray-50/50">
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400">Référence BL</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400 text-center">Commande</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400 text-center">Quantité Reçue</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {rows.map((bl) => (
+              <tr key={bl.id} className="hover:bg-indigo-50/10 transition-colors group">
+                <td className="px-6 py-5">
+                  <div className="flex items-center gap-4">
+                    <div className="h-10 w-10 rounded-2xl bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-white group-hover:shadow-sm transition-all">
+                      <FileText className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <span className="block text-sm font-black text-gray-800">{bl.numero_bl || "En attente"}</span>
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter italic">{bl.date_reception?.split("T")[0]}</span>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-6 py-5 text-center">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 text-[11px] font-black border border-indigo-100">
+                    <ShoppingCart className="h-3 w-3" /> {bl.numero_commande}
+                  </span>
+                </td>
+                <td className="px-6 py-5 text-center">
+                  <span className="text-sm font-black text-gray-700">{bl.quantite_recue}</span>
+                  <span className="text-[10px] ml-1.5 text-gray-300 font-bold uppercase">Unités</span>
+                </td>
+                <td className="px-6 py-5">
+                  <div className="flex justify-end gap-1">
+                    <button onClick={() => {
+                        setEditing(bl);
+                        setForm({
+                            date_reception: bl.date_reception?.split("T")[0] || "",
+                            emballage_id: String(bl.emballage_id),
+                            quantite_recue: String(bl.quantite_recue),
+                            numero_commande: bl.numero_commande,
+                            entrepot_id: String(bl.entrepot_id),
+                        });
+                        setIsDrawerOpen(true);
+                      }} className="p-2.5 text-gray-400 hover:text-indigo-600 hover:bg-white rounded-xl transition-all">
+                      <Edit2 className="h-4 w-4" />
+                    </button>
+                    <button onClick={() => handleDelete(bl.id)} className="p-2.5 text-gray-400 hover:text-red-500 hover:bg-white rounded-xl transition-all">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </td>
               </tr>
-            </thead>
-
-            <tbody>
-              {filteredRows.length > 0 ? (
-                filteredRows.map((item) => (
-                  <tr key={item.id} className="border-t border-gray-100">
-                    <td className="px-4 py-3 font-medium text-gray-800">
-                      {item.numero_bl}
-                    </td>
-                    <td className="px-4 py-3 text-gray-700">
-                      {formatDate(item.date_reception)}
-                    </td>
-                    <td className="px-4 py-3 text-gray-700">
-                      {item.numero_commande}
-                    </td>
-                    <td className="px-4 py-3 text-gray-700">
-                      {emballagesMap.get(String(item.emballage_id)) || "-"}
-                    </td>
-                    <td className="px-4 py-3 text-gray-700">
-                      {item.quantite_recue}
-                    </td>
-                    <td className="px-4 py-3 text-gray-700">
-                      {entrepotsMap.get(String(item.entrepot_id)) || "-"}
-                    </td>
-                    <td className="px-4 py-3">
-                      {item.statut === "VALIDE" ? (
-                        <span className="font-medium text-green-600">VALIDE</span>
-                      ) : (
-                        <span className="font-medium text-amber-600">
-                          EN_ATTENTE
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => openEdit(item)}
-                        className="mr-3 text-brand-600"
-                      >
-                        Edit
-                      </button>
-
-                      {item.statut === "EN_ATTENTE" && (
-                        <button
-                          onClick={() => openValidate(item)}
-                          className="mr-3 text-green-600"
-                        >
-                          Valider
-                        </button>
-                      )}
-
-                      <button
-                        onClick={() => handleDelete(item.id)}
-                        className="text-red-600"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td
-                    colSpan={8}
-                    className="px-4 py-6 text-center text-sm text-gray-500"
-                  >
-                    No bon de livraisons found.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </tbody>
+        </table>
       </div>
 
-      {pagination.lastPage > 1 && (
-        <div className="flex justify-center py-4">
-          <Pagination
-            currentPage={pagination.currentPage}
-            totalPages={pagination.lastPage}
-            onPageChange={handlePageChange}
-          />
-        </div>
-      )}
+      <div className="p-6 border-t border-gray-50 bg-gray-50/30">
+        <Pagination currentPage={pagination.currentPage} totalPages={pagination.lastPage} onPageChange={handlePageChange} />
+      </div>
 
-      {isOpen && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/40 p-4">
-          <form
-            onSubmit={handleSubmit}
-            className="w-full max-w-2xl space-y-4 rounded-xl bg-white p-6 shadow-lg"
-          >
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-800">
-                {editing ? "Edit Bon Livraison" : "New Bon Livraison"}
-              </h3>
-              <button
-                type="button"
-                onClick={closeModal}
-                className="text-sm text-gray-500"
-              >
-                Close
-              </button>
+      {/* DRAWER DESIGN */}
+      {isDrawerOpen && (
+        <>
+          <div className="fixed inset-0 z-[100] bg-gray-900/30 backdrop-blur-[2px] transition-all" onClick={() => setIsDrawerOpen(false)} />
+          <div className="fixed inset-y-0 right-0 z-[101] w-full max-w-md bg-white shadow-[-20px_0_50px_rgba(0,0,0,0.05)] animate-in slide-in-from-right duration-500 rounded-l-[2.5rem] border-l border-gray-100 flex flex-col">
+            
+            <div className="p-10 pb-6 flex justify-between items-center">
+              <div>
+                <h2 className="text-2xl font-black text-gray-900 tracking-tight leading-none">{editing ? "Modifier" : "Réception"}</h2>
+                <div className="mt-2 h-1 w-8 bg-indigo-600 rounded-full" />
+              </div>
+              <button onClick={() => setIsDrawerOpen(false)} className="h-12 w-12 flex items-center justify-center bg-gray-50 hover:bg-gray-100 rounded-2xl text-gray-400 transition-colors"><X /></button>
             </div>
 
-            {errorMessage ? (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
-                {errorMessage}
-              </div>
-            ) : null}
+            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-10 py-6 space-y-6 scrollbar-hide">
+              {errorMessage && (
+                <div className="p-4 bg-red-50 border border-red-100 text-red-600 text-[11px] font-black flex items-center gap-3 rounded-2xl uppercase tracking-wider">
+                  <AlertCircle className="h-4 w-4" /> {errorMessage}
+                </div>
+              )}
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <input
-                type="date"
-                value={form.date_reception}
-                onChange={(e) =>
-                  setForm({ ...form, date_reception: e.target.value })
-                }
-                className="w-full rounded border p-2"
-                required
-              />
-
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="Quantité reçue"
-                value={form.quantite_recue}
-                onChange={(e) =>
-                  setForm({ ...form, quantite_recue: e.target.value })
-                }
-                className="w-full rounded border p-2"
-                required
-              />
-
-              <select
-                value={form.emballage_id}
-                onChange={(e) =>
-                  setForm({ ...form, emballage_id: e.target.value })
-                }
-                className="w-full rounded border p-2"
-                required
-              >
-                <option value="">Select emballage</option>
-                {emballages.map((emballage) => (
-                  <option key={emballage.id} value={String(emballage.id)}>
-                    {emballage.label}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                value={form.entrepot_id}
-                onChange={(e) =>
-                  setForm({ ...form, entrepot_id: e.target.value })
-                }
-                className="w-full rounded border p-2"
-                required
-              >
-                <option value="">Select entrepot</option>
-                {entrepots.map((entrepot) => (
-                  <option key={entrepot.id} value={String(entrepot.id)}>
-                    {entrepot.label}
-                  </option>
-                ))}
-              </select>
-
-              <div
-                className="relative w-full md:col-span-2"
-                ref={commandeDropdownRef}
-              >
-                <input
-                  type="text"
-                  placeholder="Sélectionner un numéro de commande"
-                  value={form.numero_commande}
-                  onFocus={() => setCommandeDropdownOpen(true)}
-                  onChange={(e) => {
-                    setForm({ ...form, numero_commande: e.target.value });
-                    setCommandeDropdownOpen(true);
-                  }}
-                  className="w-full rounded border p-2"
-                  required
-                />
-
-                {commandeDropdownOpen && (
-                  <div className="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
-                    {filteredCommandes.length > 0 ? (
-                      filteredCommandes.map((commande) => (
-                        <button
-                          key={commande.id}
-                          type="button"
-                          onClick={() => handleSelectCommande(commande)}
-                          className="block w-full border-b border-gray-100 px-3 py-2 text-left text-sm hover:bg-gray-50"
-                        >
-                          {commande.numero_commande}
-                        </button>
-                      ))
-                    ) : (
-                      <div className="px-3 py-2 text-sm text-gray-500">
-                        Aucun numéro de commande trouvé.
+              {/* STEP 1: COMMANDE SELECTION */}
+              <div className="space-y-4" ref={dropdownRef}>
+                <label className="text-[10px] font-black uppercase text-gray-400 tracking-[0.2em] ml-1">Référence Commande</label>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setIsCmdOpen(!isCmdOpen)}
+                    className={`w-full flex items-center justify-between rounded-2xl border-2 p-4 text-sm font-black transition-all ${
+                      form.numero_commande ? "border-indigo-600 bg-indigo-50/20 text-indigo-900" : "border-gray-100 text-gray-300"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Hash className={`h-4 w-4 ${form.numero_commande ? "text-indigo-600" : "text-gray-200"}`} />
+                      {form.numero_commande || "Choisir Commande"}
+                    </div>
+                    <ChevronDown className={`h-4 w-4 transition-transform ${isCmdOpen ? "rotate-180" : ""}`} />
+                  </button>
+                  {isCmdOpen && (
+                    <div className="absolute z-[110] mt-3 w-full bg-white border border-gray-100 rounded-[2rem] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                      <div className="max-h-64 overflow-y-auto p-3 space-y-1">
+                        {commandesEnAttente.map((c) => (
+                          <button key={c.id} type="button" onClick={() => handleSelectCommande(c)} className="w-full text-left p-4 hover:bg-indigo-600 hover:text-white rounded-[1.2rem] transition-all group">
+                            <div className="font-black text-sm">#{c.numero_commande}</div>
+                            <div className="text-[10px] opacity-60 font-bold uppercase mt-1">Total: {c.quantite} Unités</div>
+                          </button>
+                        ))}
                       </div>
-                    )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* VISUELLE PAR COMMANDE (TIMELINE) */}
+              {selectedCommande && (
+                <CommandeTimeline 
+                  total={selectedCommande.quantite} 
+                  dejaRecu={dejaRecu} 
+                  actuel={Number(form.quantite_recue) || 0} 
+                />
+              )}
+
+              {/* FORM FIELDS */}
+              <div className={`space-y-6 transition-all duration-700 ${!selectedCommande ? "opacity-20 pointer-events-none" : ""}`}>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-[0.2em] ml-1">Emballage</label>
+                    <select value={form.emballage_id} onChange={(e) => setForm({...form, emballage_id: e.target.value})} className="w-full rounded-2xl border-2 border-gray-50 bg-gray-50 p-4 text-xs font-black outline-none focus:border-indigo-200 focus:bg-white transition-all appearance-none cursor-pointer">
+                      <option value="">N/A</option>
+                      {emballages.map(e => <option key={e.id} value={String(e.id)}>{e.label}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-[0.2em] ml-1">Destination</label>
+                    <select value={form.entrepot_id} onChange={(e) => setForm({...form, entrepot_id: e.target.value})} className="w-full rounded-2xl border-2 border-gray-50 bg-gray-50 p-4 text-xs font-black outline-none focus:border-indigo-200 focus:bg-white transition-all appearance-none cursor-pointer">
+                      <option value="">N/A</option>
+                      {entrepots.map(e => <option key={e.id} value={String(e.id)}>{e.label}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-[0.2em] ml-1">Date d'Arrivée</label>
+                    <input type="date" value={form.date_reception} onChange={(e) => setForm({...form, date_reception: e.target.value})} className="w-full rounded-2xl border-2 border-gray-50 bg-gray-50 p-4 text-xs font-black outline-none focus:border-indigo-200 focus:bg-white transition-all" required />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-[0.2em] ml-1">Quantité (Max: {remainingQuantity})</label>
+                    <input type="number" value={form.quantite_recue} onChange={(e) => setForm({...form, quantite_recue: e.target.value})} className="w-full rounded-2xl border-2 border-gray-100 p-4 text-xs font-black outline-none focus:border-indigo-600 transition-all placeholder:text-gray-200" placeholder="00" required />
+                  </div>
+                </div>
+
+                {/* DRAG & DROP ZONE */}
+                {!editing && (
+                  <div className="space-y-4">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-[0.2em] ml-1 text-center block">Justificatif Numérique</label>
+                    <div
+                      onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                      onDragLeave={() => setIsDragging(false)}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setIsDragging(false);
+                        const droppedFile = e.dataTransfer.files[0];
+                        if (droppedFile) setFile(droppedFile);
+                      }}
+                      className={`relative flex flex-col items-center justify-center w-full h-36 border-2 border-dashed rounded-[2.5rem] cursor-pointer transition-all group overflow-hidden ${
+                        isDragging ? "border-indigo-500 bg-indigo-50 scale-[1.02]" : file ? "border-green-500 bg-green-50/30" : "border-gray-100 hover:bg-gray-50 hover:border-indigo-300"
+                      }`}
+                    >
+                      <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+                      <div className="z-10 flex flex-col items-center text-center px-4">
+                        <div className={`p-3 rounded-xl mb-2 transition-all ${file ? "bg-green-600 text-white" : "bg-white shadow-sm text-indigo-600"}`}>
+                          <Upload className={`h-5 w-5 stroke-[3px] ${isDragging ? "animate-bounce" : ""}`} />
+                        </div>
+                        <p className="text-[9px] font-black text-gray-600 uppercase tracking-tighter">
+                          {file ? file.name : isDragging ? "Lâchez ici" : "Glisser le scan"}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
-            </div>
+            </form>
 
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={closeModal}
-                className="rounded px-4 py-2 text-gray-700"
-                disabled={submitLoading}
+            <div className="p-10 border-t border-gray-50 bg-white flex gap-4 mt-auto">
+              <button onClick={() => setIsDrawerOpen(false)} className="flex-1 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest hover:text-gray-900 transition-colors">Fermer</button>
+              <button 
+                onClick={(e) => handleSubmit(e as any)}
+                disabled={submitLoading || !selectedCommande}
+                className="flex-[2] bg-gray-900 text-white py-5 rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] shadow-2xl shadow-gray-200 hover:bg-indigo-600 disabled:bg-gray-100 disabled:text-gray-300 transition-all active:scale-95"
               >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="rounded bg-brand-500 px-4 py-2 text-white disabled:opacity-60"
-                disabled={submitLoading}
-              >
-                {submitLoading ? "Saving..." : "Save"}
+                {submitLoading ? "En cours..." : editing ? "Modifier le BL" : "Confirmer l'Entrée"}
               </button>
             </div>
-          </form>
-        </div>
-      )}
-
-      {validateOpen && validatingItem && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/40 p-4">
-          <form
-            onSubmit={handleValidateSubmit}
-            className="w-full max-w-lg space-y-4 rounded-xl bg-white p-6 shadow-lg"
-          >
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-800">
-                Valider le Bon de Livraison
-              </h3>
-              <button
-                type="button"
-                onClick={closeValidateModal}
-                className="text-sm text-gray-500"
-              >
-                Close
-              </button>
-            </div>
-
-            {errorMessage ? (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
-                {errorMessage}
-              </div>
-            ) : null}
-
-            <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
-              <div>
-                <strong>Numéro BL :</strong> {validatingItem.numero_bl}
-              </div>
-              <div>
-                <strong>Commande :</strong> {validatingItem.numero_commande}
-              </div>
-              <div>
-                <strong>Quantité reçue :</strong> {validatingItem.quantite_recue}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">
-                Upload du bon de livraison papier
-              </label>
-              <input
-                type="file"
-                accept=".pdf,.jpg,.jpeg,.png"
-                onChange={(e) => setValidationFile(e.target.files?.[0] || null)}
-                className="w-full rounded border p-2"
-                required
-              />
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={closeValidateModal}
-                className="rounded px-4 py-2 text-gray-700"
-                disabled={validateLoading}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="rounded bg-green-600 px-4 py-2 text-white disabled:opacity-60"
-                disabled={validateLoading}
-              >
-                {validateLoading ? "Validation..." : "Valider"}
-              </button>
-            </div>
-          </form>
-        </div>
+          </div>
+        </>
       )}
     </div>
   );

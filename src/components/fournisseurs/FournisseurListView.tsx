@@ -1,4 +1,4 @@
-import { Edit3, Trash2, Phone, MapPin, Hash } from "lucide-react";
+import { Edit3, Trash2, Phone, MapPin, Hash, Globe2 } from "lucide-react";
 import { TableFournisseur } from "@/lib/fournisseurs.api";
 
 interface Props {
@@ -8,55 +8,99 @@ interface Props {
 }
 
 export const FournisseurListView = ({ rows, onEdit, onDelete }: Props) => (
-  <div className="flex-1 overflow-auto p-4">
-    <div className="bg-white shadow-md border border-gray-200 rounded-sm overflow-hidden">
+  <div className="flex-1 overflow-auto">
+    <div className="bg-white shadow-md border border-gray-200 rounded-2xl overflow-hidden">
       <table className="w-full text-left border-collapse text-[13px]">
         <thead>
-          <tr className="bg-[#F8F9FA] border-b border-gray-300 text-gray-800 uppercase text-[11px] font-bold">
-            <th className="px-4 py-3">Raison Sociale</th>
+          <tr className="bg-[#F8F9FA] border-b border-gray-200 text-gray-800 uppercase text-[11px] font-bold">
+            <th className="px-4 py-3">Fournisseur</th>
             <th className="px-4 py-3">Matricule Fiscale</th>
             <th className="px-4 py-3">Contact</th>
             <th className="px-4 py-3">Adresse</th>
+            <th className="px-4 py-3">Géolocalisation</th>
             <th className="px-4 py-3 text-center">Statut</th>
             <th className="px-4 py-3 text-center">Actions</th>
           </tr>
         </thead>
+
         <tbody className="divide-y divide-gray-100">
           {rows.map((f) => (
             <tr key={f.id} className="hover:bg-[#F2F7F7] group transition-colors">
-              <td className="px-4 py-3 font-bold text-[#00A09D] uppercase tracking-tight">
-                {f.raison_sociale}
+              <td className="px-4 py-4">
+                <div className="flex items-center gap-3">
+                  <LogoAvatar logo={f.logo} raisonSociale={f.raison_sociale} />
+
+                  <div>
+                    <div className="font-bold text-[#00A09D] uppercase tracking-tight">
+                      {f.raison_sociale}
+                    </div>
+                
+                  </div>
+                </div>
               </td>
+
               <td className="px-4 py-3 font-mono text-gray-600">
                 <div className="flex items-center gap-2">
                   <Hash size={12} className="text-gray-400" />
                   {f.matricule_fiscale}
                 </div>
               </td>
+
               <td className="px-4 py-3 text-gray-700">
                 <div className="flex items-center gap-2">
                   <Phone size={12} className="text-gray-400" />
                   {f.telephone || "—"}
                 </div>
               </td>
-              <td className="px-4 py-3 text-gray-500 italic max-w-xs truncate">
-                <div className="flex items-center gap-2">
-                  <MapPin size={12} className="text-gray-400" />
-                  {f.adresse || "—"}
+
+              <td className="px-4 py-3 text-gray-500 italic max-w-xs">
+                <div className="flex items-start gap-2">
+                  <MapPin size={12} className="text-gray-400 mt-0.5 shrink-0" />
+                  <span className="line-clamp-2">{f.adresse || "—"}</span>
                 </div>
               </td>
+
+              <td className="px-4 py-3 text-gray-600">
+                <div className="flex items-start gap-2">
+                  <Globe2 size={12} className="text-gray-400 mt-0.5 shrink-0" />
+                  {f.latitude != null && f.longitude != null ? (
+                    <div className="text-xs">
+                      <div>{f.latitude}, {f.longitude}</div>
+                      <div className="text-gray-400 mt-1">
+                        {f.adresse_geocodee || "Coordonnées manuelles"}
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-gray-400">Non renseignée</span>
+                  )}
+                </div>
+              </td>
+
               <td className="px-4 py-3 text-center">
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border
-                  ${f.statut === 'ACTIF' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
+                    f.statut === "ACTIF"
+                      ? "bg-green-50 text-green-700 border-green-200"
+                      : "bg-red-50 text-red-700 border-red-200"
+                  }`}
+                >
                   {f.statut}
                 </span>
               </td>
+
               <td className="px-4 py-3 text-center">
                 <div className="flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => onEdit(f)} className="p-1.5 text-gray-600 hover:text-[#00A09D] hover:bg-white rounded border border-transparent hover:border-gray-200 transition-all">
+                  <button
+                    onClick={() => onEdit(f)}
+                    className="p-1.5 text-gray-600 hover:text-[#00A09D] hover:bg-white rounded border border-transparent hover:border-gray-200 transition-all"
+                  >
                     <Edit3 size={14} />
                   </button>
-                  <button onClick={() => onDelete(f.id)} className="p-1.5 text-gray-600 hover:text-red-600 hover:bg-white rounded border border-transparent hover:border-gray-200 transition-all">
+
+                  <button
+                    onClick={() => onDelete(f.id)}
+                    className="p-1.5 text-gray-600 hover:text-red-600 hover:bg-white rounded border border-transparent hover:border-gray-200 transition-all"
+                  >
                     <Trash2 size={14} />
                   </button>
                 </div>
@@ -68,3 +112,30 @@ export const FournisseurListView = ({ rows, onEdit, onDelete }: Props) => (
     </div>
   </div>
 );
+
+function LogoAvatar({
+  logo,
+  raisonSociale,
+}: {
+  logo?: string | null;
+  raisonSociale: string;
+}) {
+  const letter = raisonSociale?.charAt(0)?.toUpperCase() || "F";
+
+  if (logo) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return (
+      <img
+        src={logo}
+        alt={raisonSociale}
+        className="h-11 w-11 rounded-full object-cover border border-gray-200 bg-white shrink-0"
+      />
+    );
+  }
+
+  return (
+    <div className="h-11 w-11 rounded-full bg-[#00A09D] text-white flex items-center justify-center font-black text-sm border border-[#00A09D]/20 shrink-0">
+      {letter}
+    </div>
+  );
+}

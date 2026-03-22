@@ -47,23 +47,26 @@ export default async function BonLivraisonsPage({
       id: item.id,
       label: `${item.code} - ${item.name}`,
     }));
-
   const commandes: CommandeOption[] =
     commandesResult.commandes.data.map((item: any) => ({
       id: item.id,
       numero_commande: item.numero_commande,
+      quantite: item.quantite,
+      emballage_id: item.emballage_id,
+      entrepot_id: item.entrepot_id,
+      statut: item.statut,
     }));
 
   const entrepots: EntrepotOption[] = entrepotsResult.map((item) => ({
     id: item.id,
     label: item.nom || `Entrepot #${item.id}`,
   }));
+console.log(commandes);
 
   return (
     <div>
       <PageBreadcrumb pageTitle="Bon de livraison" />
       <div className="space-y-6">
-        <ComponentCard title="Bon de livraison List">
           <BonLivraisonsTable
             data={rows}
             pagination={bonLivraisonsResult.bonLivraisons.paginatorInfo}
@@ -71,7 +74,6 @@ export default async function BonLivraisonsPage({
             commandes={commandes}
             entrepots={entrepots}
           />
-        </ComponentCard>
       </div>
     </div>
   );

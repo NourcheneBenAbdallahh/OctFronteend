@@ -21,9 +21,15 @@ import {
   UpdateCommandeInput,
 } from "@/types/commandes";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { 
+  X, Plus, Search, Edit2, Trash2, Ban, 
+  Package, Truck, Calendar, AlertCircle, Info, ArrowRight,
+  ChevronDown, Timer, History
+} from "lucide-react";
 
 type Id = string | number;
 
+// --- AJUSTEMENT DES TYPES POUR TES DONNÉES RÉELLES ---
 type CommandeForm = {
   date_livraison_prevue: string;
   emballage_id: string;
@@ -39,7 +45,15 @@ const emptyForm: CommandeForm = {
   quantite: "",
   fournisseur_id: "",
   entrepot_id: "",
-  statut: "BROUILLON",
+  statut: "EN_ATTENTE",
+};
+
+const STATUT_STYLES: Record<string, string> = {
+  EN_ATTENTE: "bg-amber-50 text-amber-700 border-amber-200",
+  VALIDEE: "bg-blue-50 text-blue-700 border-blue-200",
+  RECEPTIONNEE: "bg-green-50 text-green-700 border-green-200",
+  ANNULEE: "bg-gray-100 text-gray-600 border-gray-200",
+  PARTIELLEMENT_RECEPTIONNEE: "bg-purple-50 text-purple-700 border-purple-200",
 };
 
 function formatDate(value?: string | null) {
@@ -47,25 +61,92 @@ function formatDate(value?: string | null) {
   return value.includes("T") ? value.split("T")[0] : value;
 }
 
-function getErrorMessage(error: unknown) {
-  if (error instanceof Error) {
-    if (error.message.includes("No contract found for this fournisseur")) {
-      return "Aucun contrat trouvé pour ce fournisseur.";
-    }
-    if (error.message.includes("quantite must be > 0")) {
-      return "La quantité doit être supérieure à 0.";
-    }
-    if (error.message.includes("date_livraison_prevue must be >=")) {
-      return "La date de livraison prévue doit être supérieure ou égale à la date du jour.";
-    }
-    if (error.message.includes("Only BROUILLON commandes can be dropped")) {
-      return "Seules les commandes BROUILLON peuvent être supprimées.";
-    }
-    return error.message;
-  }
+// --- COMPOSANT TIMELINE MIS À JOUR AVEC TES CHAMPS ---
+const OrderTimelineDetail = ({ item, emballageLabel }: { item: TableCommande; emballageLabel?: string }) => {
+  const dateCrea = new Date(item.date_commande || new Date());
+  const datePrevue = new Date(item.date_livraison_prevue);
+  const aujourdhui = new Date();
 
-  return "Une erreur est survenue.";
-}
+  // Calcul des jours
+  const joursRestants = Math.ceil((datePrevue.getTime() - aujourdhui.getTime()) / (1000 * 60 * 60 * 24));
+  
+  // Utilisation de tes champs : quantite_recue_total et reste
+  const qteTotale = Number(item.quantite || 0);
+  const qteRecue = Number((item as any).quantite_recue_total || 0); 
+  const resteARecevoir = Number((item as any).reste || 0);
+  
+  const ratio = qteTotale > 0 ? Math.min((qteRecue / qteTotale) * 100, 100) : 0;
+  const estEnRetard = joursRestants < 0 && item.statut !== "RECEPTIONNEE";
+
+  return (
+    <div className="bg-gray-50/80 p-8 border-t border-gray-100 animate-in slide-in-from-top duration-300">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+        
+        {/* COL 1: ANALYSE TEMPS */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 text-[10px] font-black uppercase text-gray-400 tracking-widest">
+            <History className="h-3 w-3" /> État du délai
+          </div>
+          <div className={`p-5 rounded-[2rem] border-2 shadow-sm flex items-center gap-4 ${estEnRetard ? 'bg-red-50 border-red-100' : 'bg-white border-white'}`}>
+            <div className={`h-12 w-12 rounded-2xl flex items-center justify-center ${estEnRetard ? 'bg-red-500 text-white' : 'bg-indigo-600 text-white'}`}>
+               <Timer className="h-6 w-6" />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Échéance</p>
+              <p className={`text-lg font-black ${estEnRetard ? 'text-red-600' : 'text-gray-900'}`}>
+                {joursRestants > 0 ? `${joursRestants} Jours restants` : estEnRetard ? `${Math.abs(joursRestants)} J. de retard` : "Échéance atteinte"}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* COL 2: PROGRESSION RÉELLE (Tes données) */}
+        <div className="space-y-4">
+          <div className="flex justify-between items-center text-[10px] font-black uppercase text-gray-400 tracking-widest">
+            <span>Progression Réception</span>
+            <span className="text-indigo-600 font-black">{ratio.toFixed(1)}%</span>
+          </div>
+          <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm space-y-3">
+             <div className="flex justify-between text-xs font-black">
+                <span className="text-gray-400">Total attendu:</span>
+                <span className="text-gray-900">{qteTotale} {emballageLabel}</span>
+             </div>
+             <div className="h-3 w-full bg-gray-100 rounded-full overflow-hidden">
+                <div className={`h-full transition-all duration-1000 ${resteARecevoir < 0 ? 'bg-amber-500' : 'bg-indigo-600'}`} style={{ width: `${ratio}%` }} />
+             </div>
+             <div className="flex justify-between items-center">
+                <p className="text-[10px] font-bold text-gray-400 uppercase">Déjà reçu: <span className="text-indigo-600">{qteRecue}</span></p>
+                {resteARecevoir > 0 ? (
+                    <p className="text-[10px] font-bold text-amber-600 uppercase italic">Reste: {resteARecevoir}</p>
+                ) : resteARecevoir < 0 ? (
+                    <p className="text-[10px] font-bold text-red-600 uppercase italic">Surplus: {Math.abs(resteARecevoir)}</p>
+                ) : (
+                    <p className="text-[10px] font-bold text-green-600 uppercase">Complet</p>
+                )}
+             </div>
+          </div>
+        </div>
+
+        {/* COL 3: DATES CLÉS */}
+        <div className="space-y-4">
+           <div className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Dates de suivi</div>
+           <div className="space-y-3 bg-white/50 p-4 rounded-2xl border border-dashed border-gray-200">
+              <div className="flex items-center justify-between">
+                 <span className="text-[10px] font-bold text-gray-400 uppercase">Création</span>
+                 <span className="text-xs font-black text-gray-900">{formatDate(item.date_commande)}</span>
+              </div>
+              <div className="h-px bg-gray-100 w-full" />
+              <div className="flex items-center justify-between">
+                 <span className="text-[10px] font-bold text-gray-400 uppercase">Livraison Prévue</span>
+                 <span className="text-xs font-black text-gray-900">{formatDate(item.date_livraison_prevue)}</span>
+              </div>
+           </div>
+        </div>
+
+      </div>
+    </div>
+  );
+};
 
 export default function CommandesTable({
   data,
@@ -83,7 +164,8 @@ export default function CommandesTable({
   contrats: ContratForCommande[];
 }) {
   const [rows, setRows] = useState<TableCommande[]>(data);
-  const [isOpen, setIsOpen] = useState(false);
+  const [expandedId, setExpandedId] = useState<Id | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<TableCommande | null>(null);
   const [form, setForm] = useState<CommandeForm>(emptyForm);
   const [query, setQuery] = useState("");
@@ -91,119 +173,81 @@ export default function CommandesTable({
   const [errorMessage, setErrorMessage] = useState("");
 
   const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
 
-  useEffect(() => {
-    setRows(data);
-  }, [data]);
+  useEffect(() => { setRows(data); }, [data]);
 
-  const emballagesMap = useMemo(
-    () => new Map(emballages.map((x) => [String(x.id), x.label])),
-    [emballages]
-  );
+  const emballagesMap = useMemo(() => new Map(emballages.map((x) => [String(x.id), x.label])), [emballages]);
+  const entrepotsMap = useMemo(() => new Map(entrepots.map((x) => [String(x.id), x.label])), [entrepots]);
+  const fournisseursMap = useMemo(() => new Map(fournisseurs.map((x) => [String(x.id), x.label])), [fournisseurs]);
 
-  const entrepotsMap = useMemo(
-    () => new Map(entrepots.map((x) => [String(x.id), x.label])),
-    [entrepots]
-  );
-
-  const fournisseursMap = useMemo(
-    () => new Map(fournisseurs.map((x) => [String(x.id), x.label])),
-    [fournisseurs]
-  );
-
-  const activeContractForSelectedFournisseur = useMemo(() => {
-    if (!form.fournisseur_id) return null;
-
-    return (
-      contrats.find(
-        (c) =>
-          String(c.fournisseur_id) === String(form.fournisseur_id) &&
-          String(c.statut).toUpperCase() === "ACTIF"
-      ) || null
+  // --- LOGIQUE FILTRAGE ET CONTRAT ---
+  const filteredFournisseurs = useMemo(() => {
+    if (!form.emballage_id) return [];
+    const supplierIds = new Set(
+      contrats
+        .filter(c => String(c.emballage_id) === String(form.emballage_id) && c.statut.toUpperCase() === "ACTIF")
+        .map(c => String(c.fournisseur_id))
     );
-  }, [contrats, form.fournisseur_id]);
+    return fournisseurs.filter(f => supplierIds.has(String(f.id)));
+  }, [form.emballage_id, contrats, fournisseurs]);
 
-  const quantiteRestante = useMemo(() => {
-    if (!activeContractForSelectedFournisseur) return null;
+  const activeContract = useMemo(() => {
+    if (!form.fournisseur_id || !form.emballage_id) return null;
+    return contrats.find(c => 
+      String(c.fournisseur_id) === String(form.fournisseur_id) && 
+      String(c.emballage_id) === String(form.emballage_id) &&
+      c.statut.toUpperCase() === "ACTIF"
+    ) || null;
+  }, [form.fournisseur_id, form.emballage_id, contrats]);
 
-    return (
-      Number(activeContractForSelectedFournisseur.quantite_contractuelle || 0) -
-      Number(activeContractForSelectedFournisseur.quantite_realisee || 0)
-    );
-  }, [activeContractForSelectedFournisseur]);
+  const contractStats = useMemo(() => {
+    if (!activeContract) return null;
+    const total = Number(activeContract.quantite_contractuelle || 0);
+    const realise = Number(activeContract.quantite_realisee || 0);
+    const saisie = Number(form.quantite || 0);
+    const restant = total - realise;
+    const pourcentage = Math.min(((realise + saisie) / total) * 100, 100);
+    return { total, realise, restant, pourcentage, depasse: saisie > restant };
+  }, [activeContract, form.quantite]);
 
-  function openNew() {
-    setEditing(null);
-    setForm(emptyForm);
-    setErrorMessage("");
-    setIsOpen(true);
-  }
-
-  function openEdit(item: TableCommande) {
+  // --- ACTIONS ---
+  const openNew = () => { setEditing(null); setForm(emptyForm); setErrorMessage(""); setIsDrawerOpen(true); };
+  const openEdit = (item: TableCommande) => {
     setEditing(item);
-    setErrorMessage("");
     setForm({
-      date_livraison_prevue: item.date_livraison_prevue
-        ? item.date_livraison_prevue.includes("T")
-          ? item.date_livraison_prevue.split("T")[0]
-          : item.date_livraison_prevue
-        : "",
+      date_livraison_prevue: formatDate(item.date_livraison_prevue),
       emballage_id: String(item.emballage_id ?? ""),
       quantite: String(item.quantite ?? ""),
       fournisseur_id: String(item.fournisseur_id ?? ""),
       entrepot_id: String(item.entrepot_id ?? ""),
       statut: item.statut,
     });
-    setIsOpen(true);
+    setIsDrawerOpen(true);
+  };
+
+  const closeDrawer = () => { if (!submitLoading) { setIsDrawerOpen(false); setErrorMessage(""); } };
+
+  async function handleCancel(id: Id) {
+    if (!confirm("Annuler cette commande ?")) return;
+    try {
+      const res = await cancelCommande(id);
+      const updated = normalizeCommande(res.cancelCommande);
+      setRows(prev => prev.map(r => String(r.id) === String(updated.id) ? updated : r));
+    } catch (err: any) { alert(err.message); }
   }
 
-  function closeModal() {
-    if (submitLoading) return;
-    setIsOpen(false);
-    setEditing(null);
-    setForm(emptyForm);
-    setErrorMessage("");
+  async function handleDrop(id: Id) {
+    if (!confirm("Supprimer cette commande ?")) return;
+    try {
+      await dropCommande(id);
+      setRows(prev => prev.filter(r => String(r.id) !== String(id)));
+    } catch (err: any) { alert(err.message); }
   }
 
-  function validateForm() {
-    if (!form.date_livraison_prevue) {
-      return "La date de livraison prévue est obligatoire.";
-    }
-    if (!form.emballage_id) {
-      return "L'emballage est obligatoire.";
-    }
-    if (!form.fournisseur_id) {
-      return "Le fournisseur est obligatoire.";
-    }
-    if (!form.entrepot_id) {
-      return "L'entrepôt est obligatoire.";
-    }
-    if (!form.quantite || Number(form.quantite) <= 0) {
-      return "La quantité doit être supérieure à 0.";
-    }
-    if (!activeContractForSelectedFournisseur) {
-      return "Aucun contrat ACTIF trouvé pour ce fournisseur.";
-    }
-    if (quantiteRestante !== null && Number(form.quantite) > quantiteRestante) {
-      return "La quantité dépasse la quantité restante du contrat.";
-    }
-    return "";
-  }
-
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-
-    const validationError = validateForm();
-    if (validationError) {
-      setErrorMessage(validationError);
-      return;
-    }
-
+    if (contractStats?.depasse) { setErrorMessage("Quantité supérieure au reste du contrat !"); return; }
     setSubmitLoading(true);
-    setErrorMessage("");
-
     try {
       const payloadBase = {
         date_livraison_prevue: form.date_livraison_prevue,
@@ -214,366 +258,216 @@ export default function CommandesTable({
       };
 
       if (editing) {
-        const updatePayload: UpdateCommandeInput = {
-          ...payloadBase,
-          statut: form.statut,
-        };
-
+        const updatePayload: UpdateCommandeInput = { ...payloadBase, statut: form.statut };
         const res = await updateCommande(editing.id, updatePayload);
         const updated = normalizeCommande(res.updateCommande);
-
-        setRows((current) =>
-          current.map((item) =>
-            String(item.id) === String(updated.id) ? updated : item
-          )
-        );
+        setRows((prev) => prev.map((r) => String(r.id) === String(updated.id) ? updated : r));
       } else {
-        const createPayload: CreateCommandeInput = payloadBase;
-        const res = await createCommande(createPayload);
+        const res = await createCommande(payloadBase as any);
         const created = normalizeCommande(res.createCommande);
-
-        setRows((current) => [created, ...current]);
+        setRows((prev) => [created, ...prev]);
       }
-
-      closeModal();
-    } catch (error) {
-      setErrorMessage(getErrorMessage(error));
-    } finally {
-      setSubmitLoading(false);
-    }
-  }
-
-  async function handleCancel(id: Id) {
-    if (!confirm("Cancel this commande?")) return;
-
-    try {
-      const res = await cancelCommande(id);
-      const updated = normalizeCommande(res.cancelCommande);
-
-      setRows((current) =>
-        current.map((item) =>
-          String(item.id) === String(updated.id) ? updated : item
-        )
-      );
-    } catch (error) {
-      alert(getErrorMessage(error));
-    }
-  }
-
-  async function handleDrop(id: Id) {
-    if (!confirm("Delete this commande?")) return;
-
-    try {
-      await dropCommande(id);
-      setRows((current) =>
-        current.filter((item) => String(item.id) !== String(id))
-      );
-    } catch (error) {
-      alert(getErrorMessage(error));
-    }
+      closeDrawer();
+    } catch (err: any) { setErrorMessage(err.message || "Erreur lors de l'enregistrement"); } finally { setSubmitLoading(false); }
   }
 
   const filteredRows = useMemo(() => {
     if (!query.trim()) return rows;
     const q = query.toLowerCase();
-
-    return rows.filter((item) => {
-      const fournisseur = fournisseursMap.get(String(item.fournisseur_id)) || "";
-      const emballage = emballagesMap.get(String(item.emballage_id)) || "";
-      const entrepot = entrepotsMap.get(String(item.entrepot_id)) || "";
-
-      return (
-        item.numero_commande?.toLowerCase().includes(q) ||
-        item.statut?.toLowerCase().includes(q) ||
-        fournisseur.toLowerCase().includes(q) ||
-        emballage.toLowerCase().includes(q) ||
-        entrepot.toLowerCase().includes(q)
-      );
-    });
-  }, [rows, query, fournisseursMap, emballagesMap, entrepotsMap]);
-
-  function handlePageChange(page: number) {
-    const params = new URLSearchParams(searchParams?.toString());
-    params.set("page", String(page));
-    router.push(`${pathname}?${params.toString()}`);
-  }
+    return rows.filter(r => 
+      r.numero_commande?.toLowerCase().includes(q) || 
+      fournisseursMap.get(String(r.fournisseur_id))?.toLowerCase().includes(q)
+    );
+  }, [rows, query, fournisseursMap]);
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <button
-          onClick={openNew}
-          className="rounded-lg bg-brand-500 px-4 py-2 text-white"
-        >
-          + New Commande
-        </button>
-
-        <input
-          type="text"
-          placeholder="Search by numero, statut, fournisseur..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-brand-300 sm:max-w-sm"
-        />
+    <div className="min-h-screen bg-gray-50/50 p-4 lg:p-8 font-sans">
+      {/* HEADER SECTION */}
+      <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-3xl font-black text-gray-900 tracking-tight">Flux Commandes</h1>
+          <p className="text-sm text-gray-500 font-medium italic">Suivi des réceptions et délais</p>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <div className="relative group">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-600 transition-colors" />
+            <input type="text" placeholder="Rechercher une commande..." value={query} onChange={(e) => setQuery(e.target.value)} className="w-full rounded-2xl border border-gray-200 bg-white pl-10 pr-4 py-3 text-sm outline-none focus:ring-4 focus:ring-indigo-600/5 focus:border-indigo-600 md:w-80 transition-all shadow-sm" />
+          </div>
+          <button onClick={openNew} className="flex items-center gap-2 rounded-2xl bg-indigo-600 px-6 py-3 text-sm font-black text-white shadow-xl shadow-indigo-200 hover:bg-indigo-700 active:scale-95 transition-all">
+            <Plus className="h-4 w-4" /> NOUVEAU
+          </button>
+        </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+      {/* TABLE SECTION */}
+      <div className="overflow-hidden rounded-[2.5rem] border border-gray-100 bg-white shadow-2xl shadow-gray-200/40">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1200px] table-auto">
+          <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="text-left text-xs uppercase text-gray-500">
-                <th className="px-4 py-3">Numéro</th>
-                <th className="px-4 py-3">Date commande</th>
-                <th className="px-4 py-3">Date livraison</th>
-                <th className="px-4 py-3">Fournisseur</th>
-                <th className="px-4 py-3">Emballage</th>
-                <th className="px-4 py-3">Entrepôt</th>
-                <th className="px-4 py-3">Quantité</th>
-                <th className="px-4 py-3">Statut</th>
-                <th className="px-4 py-3 text-right">Actions</th>
+              <tr className="border-b border-gray-50 bg-gray-50/30 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
+                <th className="px-8 py-6 w-10"></th>
+                <th className="px-6 py-6">Référence</th>
+                <th className="px-6 py-6">Logistique</th>
+                <th className="px-6 py-6 text-center">Quantité</th>
+                <th className="px-6 py-6">Statut</th>
+                <th className="px-6 py-6 text-right">Actions</th>
               </tr>
             </thead>
-
-            <tbody>
-              {filteredRows.length > 0 ? (
-                filteredRows.map((item) => (
-                  <tr key={item.id} className="border-t border-gray-100">
-                    <td className="px-4 py-3 font-medium text-gray-800">
-                      {item.numero_commande}
+            <tbody className="divide-y divide-gray-50">
+              {filteredRows.map((item) => (
+                <React.Fragment key={item.id}>
+                  <tr 
+                    onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
+                    className={`group cursor-pointer transition-all ${expandedId === item.id ? 'bg-indigo-50/40' : 'hover:bg-gray-50/50'}`}
+                  >
+                    <td className="px-8 py-5">
+                       <ChevronDown className={`h-4 w-4 text-gray-300 transition-transform duration-500 ${expandedId === item.id ? 'rotate-180 text-indigo-600' : ''}`} />
                     </td>
-                    <td className="px-4 py-3">{formatDate(item.date_commande)}</td>
-                    <td className="px-4 py-3">
-                      {formatDate(item.date_livraison_prevue)}
+                    <td className="px-6 py-5">
+                      <div className="font-black text-gray-900 group-hover:text-indigo-600 transition-colors">{item.numero_commande}</div>
+                      <div className="text-[10px] text-gray-400 font-bold tracking-tighter uppercase">{formatDate(item.date_commande)}</div>
                     </td>
-                    <td className="px-4 py-3">
-                      {fournisseursMap.get(String(item.fournisseur_id)) || "-"}
+                    <td className="px-6 py-5">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-black text-gray-700">{fournisseursMap.get(String(item.fournisseur_id))}</span>
+                        <span className="text-[10px] text-gray-400 font-bold uppercase flex items-center gap-1 italic">📍 {entrepotsMap.get(String(item.entrepot_id))}</span>
+                      </div>
                     </td>
-                    <td className="px-4 py-3">
-                      {emballagesMap.get(String(item.emballage_id)) || "-"}
+                    <td className="px-6 py-5 text-center">
+                      <div className="inline-flex items-center gap-2 rounded-xl bg-gray-100 px-3 py-1 font-black text-sm text-gray-800">
+                        {item.quantite}
+                      </div>
+                      <div className="text-[10px] mt-1 text-gray-400 font-bold uppercase">{emballagesMap.get(String(item.emballage_id))}</div>
                     </td>
-                    <td className="px-4 py-3">
-                      {entrepotsMap.get(String(item.entrepot_id)) || "-"}
+                    <td className="px-6 py-5">
+                      <span className={`inline-flex items-center rounded-full border px-4 py-1 text-[9px] font-black uppercase tracking-widest shadow-sm ${STATUT_STYLES[item.statut]}`}>
+                        {item.statut}
+                      </span>
                     </td>
-                    <td className="px-4 py-3">{item.quantite}</td>
-                    <td className="px-4 py-3">{item.statut}</td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => openEdit(item)}
-                        className={`mr-3 ${
-                          item.statut !== "LIVREC"
-                            ? "text-brand-600"
-                            : "cursor-not-allowed text-gray-400"
-                        }`}
-                        disabled={item.statut === "LIVREC"}
-                      >
-                        Edit
-                      </button>
-
-                      <button
-                        onClick={() => handleCancel(item.id)}
-                        className={`mr-3 ${
-                          item.statut === "VALIDEE"
-                            ? "text-amber-600"
-                            : "cursor-not-allowed text-gray-400"
-                        }`}
-                        disabled={item.statut !== "VALIDEE"}
-                      >
-                        Cancel
-                      </button>
-
-                      <button
-                        onClick={() => handleDrop(item.id)}
-                        className={
-                          item.statut === "BROUILLON"
-                            ? "text-red-600"
-                            : "cursor-not-allowed text-gray-400"
-                        }
-                        disabled={item.statut !== "BROUILLON"}
-                      >
-                        Delete
-                      </button>
+                    <td className="px-8 py-5 text-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex justify-end gap-1">
+                        <button onClick={() => openEdit(item)} className="p-3 text-gray-400 hover:bg-white hover:text-indigo-600 rounded-2xl shadow-none hover:shadow-md transition-all">
+                          <Edit2 className="h-4 w-4" />
+                        </button>
+                        {item.statut === "VALIDEE" && (
+                          <button onClick={() => handleCancel(item.id)} className="p-3 text-gray-400 hover:bg-white hover:text-amber-600 rounded-2xl transition-all">
+                            <Ban className="h-4 w-4" />
+                          </button>
+                        )}
+                        {item.statut === "EN_ATTENTE" && (
+                          <button onClick={() => handleDrop(item.id)} className="p-3 text-gray-400 hover:bg-white hover:text-red-600 rounded-2xl transition-all">
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td
-                    colSpan={9}
-                    className="px-4 py-6 text-center text-sm text-gray-500"
-                  >
-                    No commandes found.
-                  </td>
-                </tr>
-              )}
+
+                  {/* TIMELINE DETAIL RÉEL */}
+                  {expandedId === item.id && (
+                    <tr>
+                      <td colSpan={6} className="p-0 border-none bg-white">
+                         <OrderTimelineDetail 
+                            item={item} 
+                            emballageLabel={emballagesMap.get(String(item.emballage_id))} 
+                          />
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              ))}
             </tbody>
           </table>
         </div>
       </div>
 
-      {pagination.lastPage > 1 && (
-        <div className="flex justify-center py-4">
-          <Pagination
-            currentPage={pagination.currentPage}
-            totalPages={pagination.lastPage}
-            onPageChange={handlePageChange}
-          />
-        </div>
-      )}
-
-      {isOpen && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/40 p-4">
-          <form
-            onSubmit={handleSubmit}
-            className="w-full max-w-2xl space-y-4 rounded-xl bg-white p-6 shadow-lg"
-          >
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-800">
-                {editing ? "Edit Commande" : "New Commande"}
-              </h3>
-              <button
-                type="button"
-                onClick={closeModal}
-                className="text-sm text-gray-500"
-              >
-                Close
-              </button>
-            </div>
-
-            {errorMessage ? (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
-                {errorMessage}
+      {/* DRAWER SECTION */}
+      {isDrawerOpen && (
+        <>
+          <div className="fixed inset-0 z-[1000] bg-gray-900/40 backdrop-blur-sm transition-opacity" onClick={closeDrawer} />
+          <div className="fixed inset-y-0 right-0 z-[1001] w-full max-w-md transform border-l border-gray-100 bg-white shadow-[-30px_0_80px_rgba(0,0,0,0.1)] transition-transform duration-500 ease-out rounded-l-[3.5rem] overflow-hidden">
+            <div className="flex h-full flex-col">
+              <div className="border-b border-gray-50 p-10 pb-6 flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-black text-gray-900">{editing ? "Mise à jour" : "Nouvelle commande"}</h2>
+                  <div className="h-1.5 w-12 bg-indigo-600 rounded-full mt-2 shadow-lg shadow-indigo-100" />
+                </div>
+                <button onClick={closeDrawer} className="rounded-2xl h-12 w-12 flex items-center justify-center bg-gray-50 text-gray-400 hover:bg-gray-100 transition-all"><X /></button>
               </div>
-            ) : null}
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <input
-                type="date"
-                value={form.date_livraison_prevue}
-                onChange={(e) =>
-                  setForm({ ...form, date_livraison_prevue: e.target.value })
-                }
-                className="w-full rounded border p-2"
-                required
-              />
+              <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-10 space-y-8 scrollbar-hide">
+                {errorMessage && (
+                  <div className="flex items-center gap-3 rounded-3xl border-2 border-red-100 bg-red-50 p-5 text-[11px] font-black text-red-600 uppercase tracking-wider animate-shake">
+                    <AlertCircle className="h-5 w-5 shrink-0" /> {errorMessage}
+                  </div>
+                )}
 
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="Quantité"
-                value={form.quantite}
-                onChange={(e) => setForm({ ...form, quantite: e.target.value })}
-                className="w-full rounded border p-2"
-                required
-              />
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 ml-1">📦 Type d'emballage</label>
+                  <select value={form.emballage_id} onChange={(e) => setForm({ ...form, emballage_id: e.target.value, fournisseur_id: "" })} className="w-full rounded-2xl border-2 border-gray-50 bg-gray-50 p-4 text-sm font-black focus:bg-white focus:border-indigo-600 outline-none transition-all cursor-pointer shadow-sm appearance-none" required>
+                    <option value="">Sélectionner...</option>
+                    {emballages.map(e => <option key={e.id} value={String(e.id)}>{e.label}</option>)}
+                  </select>
+                </div>
 
-              <select
-                value={form.emballage_id}
-                onChange={(e) =>
-                  setForm({ ...form, emballage_id: e.target.value })
-                }
-                className="w-full rounded border p-2"
-                required
-              >
-                <option value="">Select emballage</option>
-                {emballages.map((item) => (
-                  <option key={item.id} value={String(item.id)}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
+                <div className={`space-y-3 transition-all duration-500 ${!form.emballage_id ? "opacity-30 pointer-events-none scale-95" : "opacity-100 scale-100"}`}>
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 ml-1">🤝 Fournisseur autorisé</label>
+                  <select value={form.fournisseur_id} disabled={!form.emballage_id} onChange={(e) => setForm({ ...form, fournisseur_id: e.target.value })} className="w-full rounded-2xl border-2 border-gray-50 bg-gray-50 p-4 text-sm font-black focus:bg-white focus:border-indigo-600 transition-all cursor-pointer shadow-sm" required>
+                    <option value="">{form.emballage_id ? "Choisir le fournisseur..." : "En attente de l'emballage"}</option>
+                    {filteredFournisseurs.map(f => <option key={f.id} value={String(f.id)}>{f.label}</option>)}
+                  </select>
+                </div>
 
-              <select
-                value={form.entrepot_id}
-                onChange={(e) =>
-                  setForm({ ...form, entrepot_id: e.target.value })
-                }
-                className="w-full rounded border p-2"
-                required
-              >
-                <option value="">Select entrepot</option>
-                {entrepots.map((item) => (
-                  <option key={item.id} value={String(item.id)}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
+                {activeContract && contractStats && (
+                  <div className="rounded-[2.5rem] border-2 border-indigo-50 bg-indigo-50/30 p-8 space-y-4 shadow-inner">
+                    <div className="flex justify-between items-end">
+                      <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Capacité du contrat</span>
+                      <span className={`text-2xl font-black ${contractStats.depasse ? "text-red-600" : "text-indigo-900"}`}>{contractStats.pourcentage.toFixed(0)}%</span>
+                    </div>
+                    <div className="h-3 w-full overflow-hidden rounded-full bg-white border border-indigo-100/50">
+                      <div className={`h-full transition-all duration-1000 ${contractStats.depasse ? "bg-red-500" : "bg-indigo-600"}`} style={{ width: `${contractStats.pourcentage}%` }} />
+                    </div>
+                    <div className="flex justify-between text-[9px] font-black text-gray-400 uppercase">
+                        <span>Reste: {contractStats.restant}</span>
+                        <span>Total: {contractStats.total}</span>
+                    </div>
+                  </div>
+                )}
 
-              <select
-                value={form.fournisseur_id}
-                onChange={(e) =>
-                  setForm({ ...form, fournisseur_id: e.target.value })
-                }
-                className="w-full rounded border p-2 md:col-span-2"
-                required
-              >
-                <option value="">Select fournisseur</option>
-                {fournisseurs.map((item) => (
-                  <option key={item.id} value={String(item.id)}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 ml-1">🗓️ Livraison Prévue</label>
+                    <input type="date" value={form.date_livraison_prevue} onChange={(e) => setForm({ ...form, date_livraison_prevue: e.target.value })} className="w-full rounded-2xl border-2 border-gray-50 p-4 text-sm font-black outline-none focus:border-indigo-600 transition-all shadow-sm" required />
+                  </div>
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 ml-1">🔢 Quantité</label>
+                    <input type="number" value={form.quantite} onChange={(e) => setForm({ ...form, quantite: e.target.value })} className="w-full rounded-2xl border-2 border-gray-50 p-4 text-sm font-black outline-none focus:border-indigo-600 transition-all shadow-sm font-mono" required />
+                  </div>
+                </div>
 
-              <input
-                readOnly
-                value={
-                  activeContractForSelectedFournisseur
-                    ? activeContractForSelectedFournisseur.numero_contrat
-                    : ""
-                }
-                placeholder="Contrat actif"
-                className="w-full rounded border bg-gray-50 p-2 text-gray-500"
-              />
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 ml-1">🏠 Entrepôt de destination</label>
+                  <select value={form.entrepot_id} onChange={(e) => setForm({ ...form, entrepot_id: e.target.value })} className="w-full rounded-2xl border-2 border-gray-50 p-4 text-sm font-black outline-none focus:border-indigo-600 transition-all shadow-sm" required>
+                    <option value="">Sélectionner...</option>
+                    {entrepots.map(en => <option key={en.id} value={String(en.id)}>{en.label}</option>)}
+                  </select>
+                </div>
+              </form>
 
-              <input
-                readOnly
-                value={
-                  quantiteRestante !== null ? String(quantiteRestante) : ""
-                }
-                placeholder="Quantité restante"
-                className="w-full rounded border bg-gray-50 p-2 text-gray-500"
-              />
-
-              {editing && (
-                <select
-                  value={form.statut}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      statut: e.target.value as CommandeStatut,
-                    })
-                  }
-                  className="w-full rounded border p-2 md:col-span-2"
+              <div className="border-t border-gray-50 p-10 flex gap-4 bg-white/80 backdrop-blur-md">
+                <button type="button" onClick={closeDrawer} className="flex-1 rounded-2xl py-4 text-[11px] font-black text-gray-400 hover:text-gray-900 transition-all uppercase tracking-[0.2em]">Annuler</button>
+                <button
+                  onClick={(e) => { e.preventDefault(); handleSubmit(e as any); }}
+                  disabled={submitLoading || contractStats?.depasse || !form.fournisseur_id}
+                  className="flex-[2] rounded-2xl bg-gray-900 py-5 text-[11px] font-black text-white shadow-2xl shadow-gray-200 hover:bg-indigo-600 disabled:bg-gray-100 disabled:text-gray-300 transition-all uppercase tracking-[0.2em]"
                 >
-                  <option value="BROUILLON">BROUILLON</option>
-                  <option value="VALIDEE">VALIDEE</option>
-                  <option value="LIVREP">LIVREP</option>
-                  <option value="LIVREC">LIVREC</option>
-                  <option value="ANNULEE">ANNULEE</option>
-                </select>
-              )}
+                  {submitLoading ? "Envoi en cours..." : editing ? "Confirmer la modification" : "Lancer la commande"}
+                </button>
+              </div>
             </div>
-
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={closeModal}
-                className="rounded px-4 py-2 text-gray-700"
-                disabled={submitLoading}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="rounded bg-brand-500 px-4 py-2 text-white disabled:opacity-60"
-                disabled={submitLoading}
-              >
-                {submitLoading ? "Saving..." : "Save"}
-              </button>
-            </div>
-          </form>
-        </div>
+          </div>
+        </>
       )}
     </div>
   );

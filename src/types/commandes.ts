@@ -1,8 +1,8 @@
 export type CommandeStatut =
-  | "BROUILLON"
+  | "EN_ATTENTE"
   | "VALIDEE"
-  | "LIVREP"
-  | "LIVREC"
+  | "PARTIELLEMENT_RECEPTIONNEE"
+  | "RECEPTIONNEE"
   | "ANNULEE";
 
 export type Commande = {
@@ -16,6 +16,9 @@ export type Commande = {
   fournisseur_id: string | number;
   contrat_id: string | number;
   entrepot_id: string | number;
+  quantite_recue_total?: number;
+  quantite_receptionnee?: number;
+  reste: number;
   created_by: string | number;
   created_at?: string | null;
   updated_at?: string | null;

@@ -1,4 +1,3 @@
-import ComponentCard from "@/components/common/ComponentCard";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import FournisseursTable from "@/components/fournisseurs/FournisseursTable";
 import {
@@ -15,7 +14,7 @@ export default async function FournisseursPage() {
     <div className="p-6">
       <PageBreadcrumb pageTitle="Gestion des Partenaires" />
       <div className="mt-8">
-         <FournisseursTable data={rows} />
+        <FournisseursTable data={rows} />
       </div>
     </div>
   );

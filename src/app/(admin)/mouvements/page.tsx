@@ -1,26 +1,30 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
-import Button from "@/components/ui/button/Button";
-import { toast } from "sonner";
-
-import MouvementsModal from "@/components/mouvements/MouvementsModal";
-import MouvementsTable from "@/components/mouvements/MouvementsTable";
-
+import { useEffect, useMemo, useState } from "react";
 import {
   createMouvementDraft,
   deleteMouvementDraft,
-  fetchEntrepots,
-  fetchLots,
-  fetchMouvements,
   fetchEmballages,
+  fetchEntrepots,
+  fetchMouvements,
   validateMouvement,
 } from "@/lib/mouvement.api";
-
-import type { MouvementStock, MouvementType } from "@/types/mouvement";
-import type { Lot } from "@/types/mouvement";
-import type { EmballageRef as Emballage } from "@/types/emballage";
-import type { Entrepot } from "@/types/entrepot";
+import {
+  computeStats,
+  emptyForm,
+  filterMouvements,
+  formatGraphQLDateTime,
+} from "@/lib/mouvement.helpers";
+import {
+  EmballageRef,
+  EntrepotRef,
+  MouvementFormState,
+  MouvementStock,
+} from "@/types/mouvement";
+import MouvementsHeader from "@/components/mouvements/MouvementsHeader";
+import MouvementsStats from "@/components/mouvements/MouvementsStats";
+import MouvementsTable from "@/components/mouvements/MouvementsTable";
+import MouvementDrawer from "@/components/mouvements/MouvementDrawer";
 
 export default function MouvementsPage() {
   const [loading, setLoading] = useState(true);
@@ -28,149 +32,170 @@ export default function MouvementsPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [items, setItems] = useState<MouvementStock[]>([]);
-  const [entrepots, setEntrepots] = useState<Entrepot[]>([]);
-const [lots, setLots] = useState<any[]>([]);
-  const [emballages, setEmballages] = useState<Emballage[]>([]);
+  const [emballages, setEmballages] = useState<EmballageRef[]>([]);
+  const [entrepots, setEntrepots] = useState<EntrepotRef[]>([]);
 
-  const [page, setPage] = useState(1);
-  const [first] = useState(10);
-  const [lastPage, setLastPage] = useState(1);
-  const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState("ALL");
+  const [statutFilter, setStatutFilter] = useState("ALL");
 
-  const [isOpen, setIsOpen] = useState(false);
-  const [form, setForm] = useState({
-    type: "ENT" as MouvementType,
-    emballageId: "",
-    lotId: "",
-    sourceId: "",
-    destId: "",
-    quantite: 0,
-  });
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [form, setForm] = useState<MouvementFormState>(emptyForm());
 
-  const load = useCallback(async () => {
-  setLoading(true);
-  setError(null);
-  try {
-    const [m, e, l, embs] = await Promise.all([
-      fetchMouvements(page, first),
-      fetchEntrepots(),
-      fetchLots(),
-      fetchEmballages(1, 200),
-    ]);
+  async function load() {
+    setLoading(true);
+    setError(null);
 
-    setItems(m.mouvementStocks.data);
-    setLastPage(m.mouvementStocks.paginatorInfo.lastPage);
-    setTotal(m.mouvementStocks.paginatorInfo.total);
-    setEntrepots(e);
-    setLots(l);
+    try {
+      const [mouvements, emballagesData, entrepotsData] = await Promise.all([
+        fetchMouvements(),
+        fetchEmballages(),
+        fetchEntrepots(),
+      ]);
 
-    setEmballages(embs);
-
-  } catch (err: any) {
-    setError(err?.message || "Erreur de chargement des données");
-  } finally {
-    setLoading(false);
+      setItems(mouvements);
+      setEmballages(emballagesData);
+      setEntrepots(entrepotsData);
+    } catch (e: any) {
+      setError(e?.message || "Erreur de chargement.");
+    } finally {
+      setLoading(false);
+    }
   }
-}, [page, first]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, []);
 
-  const filtered = useMemo(() => {
-    const s = search.trim().toLowerCase();
-    if (!s) return items;
-    return items.filter((x) => 
-      x.lot?.code_lot?.toLowerCase().includes(s) ||
-      x.entrepotSource?.adresse?.toLowerCase().includes(s) ||
-      x.entrepotDestination?.adresse?.toLowerCase().includes(s) ||
-      x.code_mouvement?.toLowerCase().includes(s) ||
-      x.statut.toLowerCase().includes(s)
-    );
-  }, [items, search]);
+  const filtered = useMemo(
+    () => filterMouvements(items, search, typeFilter, statutFilter),
+    [items, search, typeFilter, statutFilter]
+  );
 
-  // ----- Actions CRUD -----
-  async function handleAction(promise: Promise<any>, successMsg: string) {
+  const stats = useMemo(() => computeStats(items), [items]);
+
+  async function handleCreateDraft() {
     setSaving(true);
     setError(null);
+
     try {
-      await promise;
+      await createMouvementDraft({
+        type_mouvement: form.type,
+        emballage_id: form.emballageId,
+        lot_id: form.lotId || null,
+        entrepot_source_id: form.sourceId || null,
+        entrepot_destination_id: form.destId || null,
+        quantite: Number(form.quantite),
+        date_mouvement: form.dateMouvement
+          ? formatGraphQLDateTime(form.dateMouvement)
+          : null,
+      });
+
+      setDrawerOpen(false);
+      setForm(emptyForm());
       await load();
-      setIsOpen(false);
-      toast.success(successMsg);
-    } catch (err: any) {
-      setError(err?.message || "Une erreur est survenue");
+    } catch (e: any) {
+      setError(e?.message || "Erreur lors de la création.");
     } finally {
       setSaving(false);
     }
   }
 
-  const onCreateDraft = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (form.quantite <= 0) return setError("La quantité doit être supérieure à 0");
-    if (form.type === "CDD" && form.sourceId === form.destId) return setError("Source et destination identiques");
+  async function handleValidate(id: string) {
+    try {
+      setError(null);
+      await validateMouvement(id);
+      await load();
+    } catch (e: any) {
+      setError(e?.message || "Erreur lors de la validation.");
+    }
+  }
 
-    handleAction(createMouvementDraft({
-      type_mouvement: form.type,
-      emballage_id: form.emballageId,
-      lot_id: form.lotId || null,
-      entrepot_source_id: form.sourceId || null,
-      entrepot_destination_id: form.destId || null,
-      quantite: form.quantite,
-    }), "Brouillon créé avec succès");
-  };
+  async function handleDelete(id: string) {
+    try {
+      setError(null);
+      await deleteMouvementDraft(id);
+      await load();
+    } catch (e: any) {
+      setError(e?.message || "Erreur lors de la suppression.");
+    }
+  }
 
   return (
-    <div className="space-y-6 p-4">
-
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white dark:bg-gray-900 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
-        <div>
-          <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">Flux de Stock</h1>
-          <p className="text-sm text-gray-500">Gestion de la traçabilité des denrées alimentaires.</p>
-        </div>
-        <Button variant="primary" onClick={() => { setForm({ type: "ENT", emballageId: "", lotId: "", sourceId: "", destId: "", quantite: 0 }); setIsOpen(true); }}>
-          + Nouveau mouvement
-        </Button>
-      </div>
-
-      <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Rechercher un code, lot, entrepôt..."
-          className="w-full sm:w-96 pl-4 pr-10 py-3 rounded-xl border border-gray-200 bg-white focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 outline-none transition-all dark:bg-gray-900 dark:border-gray-800"
+    <div className="min-h-screen bg-[#f4f6fb] px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[1500px] space-y-6">
+        <MouvementsHeader
+          onCreate={() => {
+            setForm(emptyForm());
+            setDrawerOpen(true);
+          }}
         />
-        <div className="px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg text-xs font-bold uppercase tracking-widest text-gray-500">
-          Total: {total}
+
+        <MouvementsStats stats={stats} />
+
+        <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="grid flex-1 grid-cols-1 gap-3 md:grid-cols-3">
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Rechercher un code, un lot, un entrepôt..."
+                className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+              />
+
+              <select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+              >
+                <option value="ALL">Tous les types</option>
+                <option value="PRD">Production</option>
+                <option value="CDD">Transfert</option>
+                <option value="PTE">Perte</option>
+                <option value="SPL">Surplus</option>
+              </select>
+
+              <select
+                value={statutFilter}
+                onChange={(e) => setStatutFilter(e.target.value)}
+                className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+              >
+                <option value="ALL">Tous les statuts</option>
+                <option value="BROUILLON">Brouillon</option>
+                <option value="VALIDE">Validé</option>
+              </select>
+            </div>
+
+            <div className="rounded-2xl bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-600">
+              {filtered.length} mouvement(s) affiché(s)
+            </div>
+          </div>
         </div>
+
+        {error ? (
+          <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-medium text-red-700">
+            {error}
+          </div>
+        ) : null}
+
+        <MouvementsTable
+          items={filtered}
+          loading={loading}
+          onValidate={handleValidate}
+          onDelete={handleDelete}
+        />
       </div>
 
-      {error && <div className="p-4 rounded-xl bg-red-50 border border-red-100 text-red-600 text-sm font-medium animate-pulse">⚠️ {error}</div>}
-
-      <MouvementsTable 
-        items={filtered} 
-        loading={loading} 
-        onValidate={(id) => handleAction(validateMouvement(id), "Validé")} 
-        onDelete={(id) => handleAction(deleteMouvementDraft(id), "Supprimé")} 
-      />
-
-      <div className="p-6 flex items-center justify-between text-xs font-bold text-gray-400">
-        <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Précédent</Button>
-        <span>Page {page} sur {lastPage}</span>
-        <Button variant="outline" size="sm" disabled={page >= lastPage} onClick={() => setPage(p => p + 1)}>Suivant</Button>
-      </div>
-
-      <MouvementsModal 
-        isOpen={isOpen} 
+      <MouvementDrawer
+        open={drawerOpen}
         saving={saving}
-        form={form} 
-        setForm={setForm} 
-        lots={lots} 
-        emballages={emballages} 
-        entrepots={entrepots} 
-        onClose={() => setIsOpen(false)} 
-        onSubmit={onCreateDraft} 
+        form={form}
+        setForm={setForm}
+        emballages={emballages}
+        entrepots={entrepots}
+        onClose={() => setDrawerOpen(false)}
+        onSubmit={handleCreateDraft}
       />
-
     </div>
   );
 }

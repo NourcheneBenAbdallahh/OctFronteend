@@ -9,11 +9,11 @@ import {
 
 export function normalizeCommande(item: Commande): TableCommande {
   const allowed = [
-    "BROUILLON",
-    "VALIDEE",
-    "LIVREP",
-    "LIVREC",
-    "ANNULEE",
+    "EN_ATTENTE",
+  "VALIDEE",
+  "PARTIELLEMENT_RECEPTIONNEE",
+  "RECEPTIONNEE",
+  "ANNULEE",
   ] as const;
 
   return {
@@ -21,7 +21,7 @@ export function normalizeCommande(item: Commande): TableCommande {
     id: item.id,
     statut: allowed.includes(item.statut as any)
       ? (item.statut as TableCommande["statut"])
-      : "BROUILLON",
+      : "EN_ATTENTE",
   };
 }
 
@@ -33,6 +33,8 @@ const COMMANDE_FIELDS = `
   statut
   emballage_id
   quantite
+  quantite_recue_total
+  reste
   fournisseur_id
   contrat_id
   entrepot_id

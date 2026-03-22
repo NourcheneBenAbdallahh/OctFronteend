@@ -1,4 +1,4 @@
-import type { MouvementType } from "@/types/mouvement";
+/*import type { MouvementType } from "@/types/mouvement";
 import type { Emballage } from "@/types/mouvement";// Types de mouvements pour UI
 export const TYPES: { value: MouvementType; label: string; hint: string; color: string }[] = [
   { value: "ENT", label: "ENT (Entrée)", hint: "Ajoute stock (destination)", color: "text-blue-600 bg-blue-50" },
@@ -21,4 +21,4 @@ export function formatEmballageLabel(
   return emballage.code && emballage.name
     ? `${emballage.code} — ${emballage.name}`
     : emballage.name || emballage.code || `#${emballage.id}`;
-}
+}*/

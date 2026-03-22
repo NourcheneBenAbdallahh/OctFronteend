@@ -145,13 +145,7 @@ export default function StockCard({ stock, onView, onEdit, onDelete }: Props) {
             Voir
           </button>
 
-          <button
-            onClick={() => onEdit?.(stock)}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-sm border border-gray-200 text-gray-700 hover:bg-gray-50 transition text-sm"
-          >
-            <Pencil size={15} />
-            Modifier
-          </button>
+       
 
           <button
             onClick={() => onDelete?.(stock)}
