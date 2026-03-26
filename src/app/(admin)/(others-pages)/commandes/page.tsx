@@ -5,9 +5,11 @@ import { listCommandes, normalizeCommande } from "@/lib/commandes.api";
 import { listEmballages } from "@/lib/emballages.api";
 import { fetchEntrepots } from "@/lib/entrepot.api";
 import {
-  listFournisseurs,
-  normalizeFournisseur,
+  listFournisseurs
 } from "@/lib/fournisseurs.api";
+
+import {normalizeFournisseur } from "@/types/fournisseur";
+
 import { listContrats } from "@/lib/contrats.api";
 import {
   ContratForCommande,
@@ -76,9 +78,7 @@ export default async function CommandesPage({ searchParams }: PageProps) {
 
   return (
     <div>
-      <PageBreadcrumb pageTitle="Commandes" />
       <div className="space-y-6">
-        <ComponentCard title="Commandes List">
           <CommandesTable
             data={rows}
             pagination={commandesResult.commandes.paginatorInfo}
@@ -87,7 +87,6 @@ export default async function CommandesPage({ searchParams }: PageProps) {
             fournisseurs={fournisseurs}
             contrats={contrats}
           />
-        </ComponentCard>
       </div>
     </div>
   );

@@ -1,64 +1,199 @@
-// app/inventaire/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
-import { listInventaires, updateInventaire } from "@/lib/inventaire.api";
-import InventaireAuditBoard from "@/components/inventaire/InventaireAuditBoard";
-import { InventaireStats } from "@/components/inventaire/InventaireStats";
-import { Search, Filter, RefreshCw } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  createInventaire,
+  deleteInventaire,
+  listInventaires,
+  normalizeInventaire,
+  updateInventaire,
+} from "@/lib/inventaire.api";
+import { TableInventaire, InventaireFilters } from "@/types/inventaire";
+import InventaireHeader from "@/components/inventaire/InventaireHeader";
+import InventaireStats from "@/components/inventaire/InventaireStats";
+import InventaireFiltersBar from "@/components/inventaire/InventaireFilters";
+import InventaireCriticalPanel from "@/components/inventaire/InventaireCriticalPanel";
+import InventaireAuditCards from "@/components/inventaire/InventaireAuditCards";
+import InventaireDetailDrawer from "@/components/inventaire/InventaireDetailDrawer";
+import InventaireFormDrawer from "@/components/inventaire/InventaireFormDrawer";
+
+import { listEmballages } from "@/lib/emballages.api"; 
+import { fetchEntrepots } from "@/lib/entrepot.api";   
 
 export default function InventairePage() {
-  const [data, setData] = useState<any[]>([]);
+  const [data, setData] = useState<TableInventaire[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  const [allEntrepots, setAllEntrepots] = useState<{id: string, label: string}[]>([]);
+  const [allEmballages, setAllEmballages] = useState<{id: string, label: string}[]>([]);
+
+  const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<TableInventaire | null>(null);
+
+  const [selected, setSelected] = useState<TableInventaire | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+
+  const [filters, setFilters] = useState<InventaireFilters>({
+    search: "",
+    status: "all",
+    entrepot: "",
+  });
 
   const load = async () => {
     setLoading(true);
     try {
-      const res = await listInventaires();
-      setData(res);
+      const [resInventaires, resEntrepots, resEmballages] = await Promise.all([
+        listInventaires(),
+        fetchEntrepots(),
+        listEmballages(1, 100) 
+      ]);
+
+      setData(resInventaires.map(normalizeInventaire));
+      
+      setAllEntrepots(resEntrepots.map(e => ({ id: String(e.id), label: e.nom })));
+      setAllEmballages(resEmballages.emballages.data.map(e => ({ id: String(e.id), label: e.name })));
+      
+    } catch (err) {
+      console.error("Erreur lors du chargement des données:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
-  const handleQuickAdjust = async (id: string, newVal: number) => {
-    // Logique d'ajustement instantané
-    await updateInventaire(id, { stock_physique: newVal });
-    load(); // Recharger pour voir l'écart mis à jour
+  const handleNewAudit = () => {
+    setEditing(null); 
+    setFormOpen(true);
+  };
+
+  const filtered = useMemo(() => {
+    let rows = [...data];
+    if (filters.search.trim()) {
+      const q = filters.search.toLowerCase();
+      rows = rows.filter(
+        (r) =>
+          r.emballage_name.toLowerCase().includes(q) ||
+          r.entrepot_name.toLowerCase().includes(q)
+      );
+    }
+    if (filters.entrepot) {
+      rows = rows.filter((r) => r.entrepot_id === filters.entrepot);
+    }
+    if (filters.status === "perfect") {
+      rows = rows.filter((r) => r.ecart === 0);
+    } else if (filters.status === "negative") {
+      rows = rows.filter((r) => r.ecart < 0);
+    } else if (filters.status === "positive") {
+      rows = rows.filter((r) => r.ecart > 0);
+    }
+    return rows.sort((a, b) => Math.abs(b.ecart) - Math.abs(a.ecart));
+  }, [data, filters]);
+
+  const criticalCount = data.filter((i) => Math.abs(i.ecart) > 0).length;
+
+
+  const handleCreate = async (payload: any) => {
+    try {
+      await createInventaire(payload);
+      setFormOpen(false);
+      await load();
+    } catch (err) {
+      alert("Erreur lors de la création de l'inventaire.");
+    }
+  };
+
+  const handleEdit = async (payload: any) => {
+    if (!editing) return;
+    try {
+      const { entrepot_id, emballage_id, ...payloadPourUpdate } = payload;
+      
+      await updateInventaire(editing.id, payloadPourUpdate);
+      setFormOpen(false);
+      setEditing(null);
+      await load();
+    } catch (err) {
+      console.error("Erreur update:", err);
+      alert("Erreur lors de la mise à jour.");
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm("Supprimer cet inventaire ?")) return;
+    try {
+      await deleteInventaire(id);
+      await load();
+    } catch (err) {
+      alert("Erreur lors de la suppression.");
+    }
   };
 
   return (
-    <div className="min-h-screen bg-[#F0F2F5] p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-2xl font-black text-gray-800 uppercase tracking-tighter">Ajustement d'Inventaire</h1>
-            <p className="text-sm text-gray-400 font-medium">Réconciliation des stocks théoriques et physiques</p>
-          </div>
-          <button onClick={load} className="p-2 bg-white border border-gray-300 rounded-sm text-gray-500 hover:text-[#00A09D]">
-            <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
-          </button>
-        </div>
+    <div className="space-y-6">
+      
+      <InventaireHeader
+        loading={loading}
+        onRefresh={load}
+        onNew={handleNewAudit}
+        total={data.length}
+        criticalCount={criticalCount}
+      />
 
-        <InventaireStats data={data} />
+      <InventaireStats data={data} />
 
-        <div className="bg-white p-2 border border-gray-300 border-b-0 rounded-t-sm flex gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-2.5 text-gray-300" size={16} />
-            <input 
-              className="w-full pl-10 pr-4 py-2 bg-gray-50 border-none text-sm outline-none rounded-sm" 
-              placeholder="Rechercher un produit ou un entrepôt..." 
-            />
-          </div>
-          <button className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-gray-500 uppercase hover:bg-gray-100">
-            <Filter size={14} /> Filtrer
-          </button>
-        </div>
+      <InventaireFiltersBar
+        data={data}
+        filters={filters}
+        onChange={setFilters}
+      />
 
-        <InventaireAuditBoard data={data} onAdjust={handleQuickAdjust} />
-      </div>
+      <InventaireCriticalPanel
+        data={filtered}
+        onSelect={(item) => {
+          setSelected(item);
+          setDetailOpen(true);
+        }}
+      />
+
+      <InventaireAuditCards
+        data={filtered}
+        onAdjust={async (id, val) => { 
+          await updateInventaire(id, { stock_physique: val }); 
+          await load(); 
+        }}
+        onView={(item) => {
+          setSelected(item);
+          setDetailOpen(true);
+        }}
+        onEdit={(item) => {
+          setEditing(item);
+          setFormOpen(true);
+        }}
+        onDelete={handleDelete}
+      />
+
+      <InventaireDetailDrawer
+        item={selected}
+        open={detailOpen}
+        onClose={() => {
+          setDetailOpen(false);
+          setSelected(null);
+        }}
+      />
+
+      <InventaireFormDrawer
+        open={formOpen}
+        item={editing}
+        entrepots={allEntrepots}   
+        emballages={allEmballages} 
+        onClose={() => {
+          setFormOpen(false);
+          setEditing(null);
+        }}
+        onSubmit={editing ? handleEdit : handleCreate}
+      />
     </div>
   );
 }

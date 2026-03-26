@@ -1,67 +1,49 @@
 import { graphqlRequest } from "./graphqlClient";
+import { Fournisseur} from "@/types/fournisseur";
 
-export type Fournisseur = {
-  id: string;
-  raison_sociale: string;
-  matricule_fiscale: string;
-  telephone?: string | null;
-  adresse?: string | null;
-  statut?: "ACTIF" | "INACTIF" | null;
-  created_at?: string | null;
-  updated_at?: string | null;
-};
 
-export type TableFournisseur = Omit<Fournisseur, "statut"> & {
-  id: string | number;
-  statut: "ACTIF" | "INACTIF";
-};
-
-export function normalizeFournisseur(f: Fournisseur): TableFournisseur {
-  return {
-    ...f,
-    id: f.id,
-    statut: f.statut === "INACTIF" ? "INACTIF" : "ACTIF",
-  };
-}
+const FOURNISSEUR_FIELDS = `
+id
+  raison_sociale
+  logo
+  matricule_fiscale
+  registre_entreprise
+  telephone
+  email
+  adresse
+  representant_nom
+  representant_role
+  statut
+  latitude
+  longitude
+  adresse_geocodee
+  geocoded_at
+  created_at
+  updated_at
+`;
 
 const LIST_FOURNISSEURS = `
   query {
     fournisseurs {
-      id
-      raison_sociale
-      matricule_fiscale
-      telephone
-      adresse
-      statut
-      created_at
-      updated_at
+      ${FOURNISSEUR_FIELDS}
     }
   }
 `;
 
 export async function listFournisseurs() {
-  return graphqlRequest<{ fournisseurs: Fournisseur[] }>(
-    LIST_FOURNISSEURS
-  );
+  return graphqlRequest<{ fournisseurs: Fournisseur[] }>(LIST_FOURNISSEURS);
 }
 
 const CREATE_FOURNISSEUR = `
   mutation CreateFournisseur($input: FournisseurCreateInput!) {
     createFournisseur(input: $input) {
-      id
-      raison_sociale
-      matricule_fiscale
-      telephone
-      adresse
-      statut
-      created_at
-      updated_at
+      ${FOURNISSEUR_FIELDS}
     }
   }
 `;
 
 export async function createFournisseur(
-  input: Omit<Fournisseur, "id" | "created_at" | "updated_at">
+  input: Omit<Fournisseur, "id" | "created_at" | "updated_at" | "geocoded_at">
 ) {
   return graphqlRequest<{ createFournisseur: Fournisseur }>(
     CREATE_FOURNISSEUR,
@@ -72,29 +54,49 @@ export async function createFournisseur(
 const UPDATE_FOURNISSEUR = `
   mutation UpdateFournisseur($id: ID!, $input: FournisseurUpdateInput!) {
     updateFournisseur(id: $id, input: $input) {
-      id
-      raison_sociale
-      matricule_fiscale
-      telephone
-      adresse
-      statut
-      created_at
-      updated_at
+      ${FOURNISSEUR_FIELDS}
     }
   }
 `;
-function sanitizeFournisseurInput(input: Partial<Fournisseur>) {
-  const { raison_sociale, matricule_fiscale, telephone, adresse, statut } = input;
-  const sanitized: Partial<Fournisseur> = {};
+
+
+export function sanitizeFournisseurInput(input: Partial<Fournisseur>) {
+  const {
+    raison_sociale,
+    logo,
+    matricule_fiscale,
+    registre_entreprise,
+    telephone,
+    adresse,
+    representant_nom,
+    representant_role,
+    statut,
+    latitude,
+    longitude,
+    adresse_geocodee,
+    geocoded_at,
+  } = input;
+
+  const sanitized: Record<string, unknown> = {};
 
   if (raison_sociale !== undefined) sanitized.raison_sociale = raison_sociale;
+  if (logo !== undefined) sanitized.logo = logo || null;
   if (matricule_fiscale !== undefined) sanitized.matricule_fiscale = matricule_fiscale;
-  if (telephone !== undefined) sanitized.telephone = telephone;
-  if (adresse !== undefined) sanitized.adresse = adresse;
-  if (statut !== undefined) sanitized.statut = statut;
+  if (registre_entreprise !== undefined) sanitized.registre_entreprise = registre_entreprise || null;
+  if (telephone !== undefined) sanitized.telephone = telephone || null;
+  if (adresse !== undefined) sanitized.adresse = adresse || null;
+  if (representant_nom !== undefined) sanitized.representant_nom = representant_nom || null;
+  if (representant_role !== undefined) sanitized.representant_role = representant_role || null;
+  if (statut !== undefined) sanitized.statut = statut === "INACTIF" ? "INACTIF" : "ACTIF";
+
+  if (latitude !== undefined) sanitized.latitude = latitude === null ? null : Number(latitude);
+  if (longitude !== undefined) sanitized.longitude = longitude === null ? null : Number(longitude);
+  if (adresse_geocodee !== undefined) sanitized.adresse_geocodee = adresse_geocodee || null;
+  if (geocoded_at !== undefined) sanitized.geocoded_at = geocoded_at || null;
 
   return sanitized;
 }
+
 export async function updateFournisseur(
   id: string | number,
   input: Partial<Fournisseur>
@@ -106,6 +108,7 @@ export async function updateFournisseur(
     { id, input: sanitizedInput }
   );
 }
+
 const DELETE_FOURNISSEUR = `
   mutation DeleteFournisseur($id: ID!) {
     deleteFournisseur(id: $id)

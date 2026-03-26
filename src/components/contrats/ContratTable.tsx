@@ -1,33 +1,14 @@
 "use client";
-
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  listContrats,
-  createContrat,
-  updateContrat,
-  deleteContrat,
-} from "@/lib/contrats.api";
-import { TableContrat, normalizeContrat } from "@/types/contrat";
-import { 
-  listFournisseurs, 
-  TableFournisseur, 
-  normalizeFournisseur 
-} from "@/lib/fournisseurs.api";
-import { 
-  listEmballages, 
-} from "@/lib/emballages.api";
-import {TableEmballages ,  Emballages as APIEmballages,  normalizeEmballages 
-
-  } from "@/types/emballage";
-// Importation de nos sous-composants séparés
 import { ContratHeader } from "./ContratHeader";
 import { ContratListView } from "./ContratListView";
 import { ContratForm } from "./ContratForm";
-import Pagination from "@/components/tables/Pagination";
-
-type Status = "ACTIF" | "EXPIRE" | "SUSPENDU";
-
-const ITEMS_PER_PAGE = 10;
+import { listContrats, createContrat, updateContrat, deleteContrat } from "@/lib/contrats.api";
+import { listFournisseurs } from "@/lib/fournisseurs.api";
+import { listEmballages } from "@/lib/emballages.api";
+import { normalizeContrat, TableContrat } from "@/types/contrat";
+import { TableEmballages } from "@/types/emballage";
+import { TableFournisseur } from "@/types/fournisseur";
 
 export default function ContratTable({ data }: { data?: TableContrat[] }) {
   const [rows, setRows] = useState<TableContrat[]>(data ? data.map(normalizeContrat) : []);
@@ -35,9 +16,6 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
   const [isOpen, setIsOpen] = useState(false);
   const [editing, setEditing] = useState<TableContrat | null>(null);
   const [query, setQuery] = useState("");
-  
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
 
   const [fournisseurs, setFournisseurs] = useState<TableFournisseur[]>([]);
   const [emballages, setEmballages] = useState<TableEmballages[]>([]);
@@ -49,164 +27,116 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
     quantite_contractuelle: 0,
     taux_depassement_autorise: 0.2,
     quantite_realisee: 0,
-    statut: "ACTIF" as Status,
+    statut: "ACTIF",
     fournisseur_id: "",
     emballage_id: "",
   };
-
   const [form, setForm] = useState<Partial<TableContrat>>(emptyForm);
 
   useEffect(() => {
-    const fetchAllData = async () => {
-      setLoading(true);
+    const loadRefs = async () => {
       try {
-        if (!data) {
-          const resContrats = await listContrats();
-          setRows(resContrats.contrats.map(normalizeContrat));
-        }
-        const resFourn = await listFournisseurs();
-        setFournisseurs(resFourn.fournisseurs.map(normalizeFournisseur));
-
-        const resEmb = await listEmballages(1, 100);
-        setEmballages(resEmb.emballages.data.map(normalizeEmballages));
-      } catch (error) {
-        console.error("Erreur chargement:", error);
-      } finally {
-        setLoading(false);
+        const [resF, resE] = await Promise.all([
+          listFournisseurs(),
+          listEmballages(1, 100)
+        ]);
+        setFournisseurs(resF.fournisseurs || []);
+        setEmballages(resE.emballages.data || []);
+      } catch (err) {
+        console.error("Erreur de chargement des références", err);
       }
     };
-    fetchAllData();
-  }, [data]);
+    loadRefs();
+  }, []);
 
-  async function handleSubmit(e?: React.FormEvent) {
-    e?.preventDefault();
+  const stats = useMemo(() => {
+    const total = rows.length;
+    const totalV = rows.reduce((acc, c) => acc + (c.quantite_contractuelle || 0), 0);
+    const totalR = rows.reduce((acc, c) => acc + (c.quantite_realisee || 0), 0);
+    return {
+      total,
+      actifs: rows.filter(r => r.statut === "ACTIF").length,
+      realisation: totalV > 0 ? Math.round((totalR / totalV) * 100) : 0
+    };
+  }, [rows]);
+
+  const filteredRows = rows.filter(r =>
+    r.numero_contrat.toLowerCase().includes(query.toLowerCase()) ||
+    r.fournisseur?.raison_sociale?.toLowerCase().includes(query.toLowerCase())
+  );
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setLoading(true);
 
     try {
-      const input = {
+      // Nettoyage et typage forcé pour l'API
+      const payload = {
+        ...form,
         numero_contrat: form.numero_contrat || "",
         date_debut: form.date_debut || "",
         date_fin: form.date_fin || "",
         quantite_contractuelle: Number(form.quantite_contractuelle) || 0,
-        taux_depassement_autorise: Number(form.taux_depassement_autorise) || 0,
-        quantite_realisee: Number(form.quantite_realisee) || 0,
-        statut: form.statut || "ACTIF",
         fournisseur_id: form.fournisseur_id || "",
         emballage_id: form.emballage_id || "",
-      };
+      } as any;
 
-      let finalContrat: TableContrat;
-
-      if (editing) {
-        const res = await updateContrat(editing.id, input);
-        finalContrat = normalizeContrat(res.updateContrat);
-      } else {
-        const res = await createContrat(input);
-        finalContrat = normalizeContrat(res.createContrat);
-      }
-      const updatedWithRefs: TableContrat = {
-        ...finalContrat,
-        fournisseur: fournisseurs.find(f => String(f.id) === String(input.fournisseur_id)),
-        emballage: emballages.find(e => String(e.id) === String(input.emballage_id))
-      };
+      let updated: TableContrat;
 
       if (editing) {
-        setRows((r) => r.map((x) => (String(x.id) === String(updatedWithRefs.id) ? updatedWithRefs : x)));
+        const res = await updateContrat(editing.id, payload);
+        updated = normalizeContrat(res.updateContrat);
       } else {
-        setRows((r) => [updatedWithRefs, ...r]);
+        const res = await createContrat(payload);
+        updated = normalizeContrat(res.createContrat);
       }
-      
+
+      // Liaison manuelle des objets pour l'affichage instantané
+      updated.fournisseur = fournisseurs.find(f => String(f.id) === String(payload.fournisseur_id));
+      updated.emballage = emballages.find(em => String(em.id) === String(payload.emballage_id));
+
+      setRows(prev => editing ? prev.map(r => r.id === updated.id ? updated : r) : [updated, ...prev]);
+
       setIsOpen(false);
       setEditing(null);
       setForm(emptyForm);
+
     } catch (err) {
-      alert("Erreur lors de l'enregistrement");
+      console.error(err);
+      alert("Erreur de sauvegarde : Vérifiez les champs obligatoires.");
     } finally {
       setLoading(false);
     }
-  }
-
-  async function handleDelete(id: string | number) {
-    if (!confirm("Supprimer ce contrat ?")) return;
-    try {
-      await deleteContrat(id);
-      setRows((r) => r.filter((x) => x.id !== id));
-    } catch {
-      alert("Erreur suppression");
-    }
-  }
-
-  const filteredRows = useMemo(() => {
-    return rows.filter((c) => 
-      c.numero_contrat.toLowerCase().includes(query.toLowerCase()) ||
-      c.fournisseur?.raison_sociale?.toLowerCase().includes(query.toLowerCase())
-    );
-  }, [rows, query]);
-
-  // Pagination calculations
-  const totalPages = Math.ceil(filteredRows.length / ITEMS_PER_PAGE);
-  const paginatedRows = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredRows.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredRows, currentPage]);
-
-  // Reset to page 1 when search query changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [query]);
-
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
   };
 
   return (
-    <div className="flex flex-col">
-     
-
-      {/* Barre d'outils */}
-      <ContratHeader 
-        query={query} 
-        setQuery={setQuery} 
-        onOpenNew={() => { 
-          setEditing(null); 
-          setForm(emptyForm); 
-          setIsOpen(true); 
-        }} 
+    <div className="flex flex-col gap-4">
+      <ContratHeader
+        query={query}
+        setQuery={setQuery}
+        onOpenNew={() => { setEditing(null); setForm(emptyForm); setIsOpen(true); }}
+        stats={stats}
       />
 
-      {/* Zone scrollable pour la liste */}
-      <div className="overflow-auto">
-        <ContratListView 
-          rows={paginatedRows} 
-          onEdit={(c) => { 
-            setEditing(c); 
-            setForm(c); 
-            setIsOpen(true); 
-          }} 
-          onDelete={handleDelete} 
-        />
-      </div>
+      <ContratListView
+        rows={filteredRows}
+        onEdit={(c) => { setEditing(c); setForm(c); setIsOpen(true); }}
+        onDelete={async (id) => {
+          if (confirm("Supprimer ?")) {
+            await deleteContrat(id);
+            setRows(r => r.filter(x => x.id !== id));
+          }
+        }}
+      />
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex justify-center py-4">
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={handlePageChange}
-          />
-        </div>
-      )}
-
-      {/* Formulaire Modal */}
-      <ContratForm 
-        isOpen={isOpen} 
-        editing={!!editing} 
-        form={form} 
-        setForm={setForm} 
-        onClose={() => setIsOpen(false)} 
-        onSubmit={handleSubmit} 
-        loading={loading} 
+      <ContratForm
+        isOpen={isOpen}
+        editing={!!editing}
+        form={form}
+        setForm={setForm}
+        onClose={() => setIsOpen(false)}
+        onSubmit={handleSubmit}
+        loading={loading}
         fournisseurs={fournisseurs}
         emballages={emballages}
       />

@@ -10,63 +10,70 @@ interface Props {
 const StatCard = ({
   title,
   value,
-  sub,
   icon,
+  colorClass,
+  iconBg,
 }: {
   title: string;
   value: string;
-  sub?: string;
   icon: React.ReactNode;
+  colorClass: string;
+  iconBg: string;
 }) => (
-  <div className="bg-white border border-gray-200 rounded-sm shadow-sm p-4">
-    <div className="flex items-center justify-between">
-      <span className="text-[12px] uppercase font-bold tracking-wide text-gray-500">
+  /* Style Pilule : rounded-2xl, border léger, padding ajusté */
+  <div className="bg-white border border-gray-100 rounded-2xl p-3 pr-8 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
+    {/* Cercle d'icône parfait à gauche */}
+    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${iconBg} ${colorClass}`}>
+      {icon}
+    </div>
+    
+    <div className="flex flex-col">
+      {/* Label en haut : petit, noir, uppercase, espacé */}
+      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
         {title}
       </span>
-      <div className="w-9 h-9 rounded-sm bg-[#F2F7F7] border border-[#DDF2F1] flex items-center justify-center text-[#00A09D]">
-        {icon}
-      </div>
-    </div>
-
-    <div className="mt-4 text-[28px] font-bold text-gray-800">{value}</div>
-    {sub ? <div className="text-[12px] text-gray-400 mt-1">{sub}</div> : null}
-
-    <div className="mt-4 h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
-      <div className="h-full w-2/3 bg-[#00A09D]" />
+      {/* Valeur : Grande, noire, grasse */}
+      <span className="text-2xl font-black text-[#1C2434]">
+        {value}
+      </span>
     </div>
   </div>
 );
 
 export default function StocksStats({ stats }: Props) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+    /* Flexbox au lieu de Grid pour un alignement plus naturel comme sur ta capture */
+    <div className="flex flex-wrap items-center gap-4 mb-8">
       <StatCard
-        title="Total mouvements"
+        title="Mouvements"
         value={String(stats.totalMouvements)}
-        sub="Historique des écritures de stock"
-        icon={<Boxes size={18} />}
+        icon={<Boxes size={22} />}
+        colorClass="text-indigo-600"
+        iconBg="bg-indigo-50"
       />
+      
       <StatCard
         title="Entrées"
-        value={stats.totalEntrees.toLocaleString("fr-FR", {
-          maximumFractionDigits: 2,
-        })}
-        sub="Volume des mouvements entrants"
-        icon={<ArrowDownToLine size={18} />}
+        value={stats.totalEntrees.toLocaleString("fr-FR")}
+        icon={<ArrowDownToLine size={22} />}
+        colorClass="text-emerald-600"
+        iconBg="bg-emerald-50"
       />
+
       <StatCard
         title="Sorties"
-        value={stats.totalSorties.toLocaleString("fr-FR", {
-          maximumFractionDigits: 2,
-        })}
-        sub="Volume des mouvements sortants"
-        icon={<ArrowUpFromLine size={18} />}
+        value={stats.totalSorties.toLocaleString("fr-FR")}
+        icon={<ArrowUpFromLine size={22} />}
+        colorClass="text-orange-600"
+        iconBg="bg-orange-50"
       />
+
       <StatCard
-        title="Aujourd’hui"
+        title="Aujourd'hui"
         value={String(stats.mouvementsToday)}
-        sub="Mouvements enregistrés ce jour"
-        icon={<CalendarDays size={18} />}
+        icon={<CalendarDays size={22} />}
+        colorClass="text-sky-600"
+        iconBg="bg-sky-50"
       />
     </div>
   );

@@ -9,6 +9,7 @@ export interface StockEmballage {
   id: string | number;
   name?: string | null;
   code?: string | null;
+  min_stock?: number | null;
 }
 
 export interface StockLot {
@@ -30,10 +31,10 @@ export interface Stock {
   emballage_id: string | number;
   lot_id?: string | number | null;
   date_stock: string;
-  quantite_init: number;
+  //quantite_init: number;
   quantite: number;
   sens: StockSens;
-  quantite_finale: number;
+  //quantite_finale: number;
   user_id?: string | number | null;
   created_at?: string | null;
   updated_at?: string | null;

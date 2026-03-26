@@ -7,13 +7,13 @@ type GraphQLResponse<T> = {
   data?: T;
   errors?: Array<{ message: string }>;
 };
-
 async function graphqlFetch<T>(
   query: string,
   variables?: Record<string, unknown>,
   init?: RequestInit
 ): Promise<T> {
   const res = await fetch(GRAPHQL_URL, {
+    ...init,
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -21,16 +21,29 @@ async function graphqlFetch<T>(
     },
     body: JSON.stringify({ query, variables }),
     cache: "no-store",
-    ...init,
   });
 
+  const rawText = await res.text();
+
+  let json: GraphQLResponse<T>;
+  try {
+    json = JSON.parse(rawText) as GraphQLResponse<T>;
+  } catch {
+    console.error("Invalid JSON response:", rawText);
+    throw new Error("Réponse serveur invalide.");
+  }
+
   if (!res.ok) {
+    console.error("GraphQL HTTP error:", {
+      status: res.status,
+      statusText: res.statusText,
+      body: json,
+    });
     throw new Error(`GraphQL HTTP error: ${res.status}`);
   }
 
-  const json: GraphQLResponse<T> = await res.json();
-
   if (json.errors?.length) {
+    console.error("GraphQL errors detailed:", JSON.stringify(json.errors, null, 2));
     throw new Error(json.errors.map((e) => e.message).join(" | "));
   }
 
@@ -40,6 +53,7 @@ async function graphqlFetch<T>(
 
   return json.data;
 }
+
 
 type StocksQueryResponse = {
   stocks: {
@@ -71,10 +85,8 @@ export async function getStocks(page = 1, first = 50): Promise<Stock[]> {
           emballage_id
           lot_id
           date_stock
-          quantite_init
  quantite
           sens
-          quantite_finale
           user_id
           created_at
           updated_at
@@ -88,6 +100,7 @@ export async function getStocks(page = 1, first = 50): Promise<Stock[]> {
             id
             name
             code
+            min_stock
           }
           lot {
             id
@@ -120,7 +133,7 @@ export async function updateStock(
     emballage_id?: string | number;
     lot_id?: string | number | null;
     date_stock?: string;
-     quantite?: number;
+    quantite?: number;
     sens?: "entree" | "sortie";
     user_id?: string | number | null;
   }
@@ -133,10 +146,8 @@ export async function updateStock(
         emballage_id
         lot_id
         date_stock
-        quantite_init
         quantite
         sens
-        quantite_finale
         user_id
         created_at
         updated_at
@@ -150,6 +161,7 @@ export async function updateStock(
           id
           name
           code
+          
         }
         lot {
           id

@@ -1,30 +1,47 @@
 "use client";
 
-import { Boxes, LayoutGrid } from "lucide-react";
+import { LayoutGrid, CheckCircle2, Box } from "lucide-react";
 
 export default function StocksHeader() {
   return (
-    <div className="bg-white border border-gray-200 rounded-sm shadow-sm px-6 py-5">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-sm bg-[#E8F7F6] border border-[#CDEEEE] flex items-center justify-center">
-            <Boxes className="text-[#00A09D]" size={22} />
-          </div>
+    <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+      {/* TITRE STYLE CONTRATS */}
+      <div className="flex items-center">
+        <h1 className="text-[48px] font-black text-[#1C2434] tracking-tighter flex items-center gap-1">
+          Stocks<span className="text-[#00A09D]">.</span>
+        </h1>
+      </div>
 
-          <div>
-            <h1 className="text-[28px] font-bold tracking-tight text-gray-800">
-              Gestion du Stock
-            </h1>
-            <p className="text-sm text-gray-500 mt-1">
-              Consultation et administration des mouvements de stock générés par les lots
-            </p>
+      {/* STATS COMPACTES (À DROITE COMME SUR LA CAPTURE) */}
+      <div className="flex items-center gap-4">
+        {/* Stat 1 */}
+        <div className="bg-white rounded-2xl border border-gray-100 p-3 pr-8 flex items-center gap-3 shadow-sm">
+          <div className="w-10 h-10 rounded-full bg-[#F5F3FF] flex items-center justify-center text-[#7C3AED]">
+            <Box size={20} />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Mouvements</span>
+            <span className="text-xl font-black text-[#1C2434]">154</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 px-4 py-2.5 rounded-sm border border-gray-200 bg-[#F2F7F7] text-[#00A09D] text-sm font-medium">
-          <LayoutGrid size={16} />
-          Vue analytique
+        {/* Stat 2 */}
+        <div className="bg-white rounded-2xl border border-gray-100 p-3 pr-8 flex items-center gap-3 shadow-sm">
+          <div className="w-10 h-10 rounded-full bg-[#F0FDF4] flex items-center justify-center text-[#16A34A]">
+            <CheckCircle2 size={20} />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Réalisation</span>
+            <span className="text-xl font-black text-[#1C2434]">84%</span>
+          </div>
         </div>
+
+        <button 
+        
+        className="bg-white text-gray-900 border-2 border-gray-900 px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all shadow-[8px_8px_0px_rgba(0,160,157,0.2)]"
+        >
+        Nouveau
+        </button>
       </div>
     </div>
   );

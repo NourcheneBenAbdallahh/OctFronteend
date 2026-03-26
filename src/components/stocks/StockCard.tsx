@@ -7,9 +7,10 @@ import {
   Warehouse,
   ArrowDownToLine,
   ArrowUpFromLine,
-  Pencil,
   Trash2,
   Eye,
+  Hash,
+  ArrowRight
 } from "lucide-react";
 import type { Stock } from "@/types/stock";
 
@@ -22,164 +23,117 @@ interface Props {
 
 function formatDate(date?: string | null) {
   if (!date) return "-";
-  return new Date(date).toLocaleString("fr-FR");
+  return new Date(date).toLocaleString("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
 }
 
-function getEntrepotLabel(stock: Stock) {
-  return stock.entrepot?.nom || stock.entrepot?.name || `Entrepôt #${stock.entrepot_id}`;
-}
-
-function getEmballageLabel(stock: Stock) {
-  return stock.emballage?.name || stock.emballage?.code || `Emballage #${stock.emballage_id}`;
-}
-
-export default function StockCard({ stock, onView, onEdit, onDelete }: Props) {
+export default function StockCard({ stock, onView, onDelete }: Props) {
   const isEntree = stock.sens === "entree";
 
   return (
-    <div className="bg-white border border-gray-200 rounded-sm shadow-sm hover:shadow-md transition-all overflow-hidden">
-      <div className="p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <span
-              className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-bold uppercase border ${
-                isEntree
-                  ? "bg-green-50 text-green-700 border-green-200"
-                  : "bg-red-50 text-red-700 border-red-200"
-              }`}
-            >
-              {isEntree ? <ArrowDownToLine size={13} /> : <ArrowUpFromLine size={13} />}
+    <div className="group bg-white border border-gray-100 rounded-[32px] p-8 hover:shadow-2xl hover:shadow-gray-200/50 transition-all duration-500 relative overflow-hidden">
+      
+      {/* HEADER DE LA CARTE */}
+      <div className="flex justify-between items-start mb-8">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <span className={`px-4 py-1 rounded-full text-[10px] font-[1000] uppercase tracking-[0.2em] border ${
+              isEntree 
+                ? "bg-emerald-50 text-emerald-600 border-emerald-100" 
+                : "bg-orange-50 text-orange-600 border-orange-100"
+            }`}>
               {stock.sens}
             </span>
-
-            <div className="mt-4">
-              <h3 className="text-[30px] leading-none font-bold text-gray-800">
-                {Number(stock.quantite).toLocaleString("fr-FR", {
-                  maximumFractionDigits: 2,
-                })}
-              </h3>
-              <p className="text-sm text-gray-500 mt-2">Quantité du mouvement</p>
-            </div>
+            <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">
+              ID #{stock.id}
+            </span>
           </div>
-
-          <div className="text-right">
-            <div className="text-[11px] uppercase font-bold text-gray-400">
-              Stock final
-            </div>
-            <div className="text-[26px] font-bold text-[#00A09D] mt-1">
-              {Number(stock.quantite_finale).toLocaleString("fr-FR", {
-                maximumFractionDigits: 2,
-              })}
-            </div>
-          </div>
+          <h3 className="text-[13px] font-[1000] text-gray-400 uppercase mt-2 flex items-center gap-2">
+            <Hash size={14} className="text-[#00A09D]" />
+            Lot: <span className="text-[#1C2434]">{stock.lot?.code_lot || "N/A"}</span>
+          </h3>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-5">
-          <div className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-100 rounded-sm">
-            <Warehouse size={16} className="text-gray-400" />
-            <div>
-              <div className="text-[11px] uppercase font-bold text-gray-400">
-                Entrepôt
-              </div>
-              <div className="text-sm font-medium text-gray-700">
-                {getEntrepotLabel(stock)}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-100 rounded-sm">
-            <Package size={16} className="text-gray-400" />
-            <div>
-              <div className="text-[11px] uppercase font-bold text-gray-400">
-                Emballage
-              </div>
-              <div className="text-sm font-medium text-gray-700">
-                {getEmballageLabel(stock)}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-100 rounded-sm">
-            <CalendarDays size={16} className="text-gray-400" />
-            <div>
-              <div className="text-[11px] uppercase font-bold text-gray-400">
-                Date mouvement
-              </div>
-              <div className="text-sm font-medium text-gray-700">
-                {formatDate(stock.date_stock)}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-100 rounded-sm">
-            <User2 size={16} className="text-gray-400" />
-            <div>
-              <div className="text-[11px] uppercase font-bold text-gray-400">
-                Utilisateur
-              </div>
-              <div className="text-sm font-medium text-gray-700">
-                {stock.user?.name || stock.user?.email || "Non renseigné"}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-3 gap-3 mt-4">
-          <div className="p-3 rounded-sm border border-gray-200">
-            <div className="text-[11px] uppercase font-bold text-gray-400">
-              Stock initial
-            </div>
-            <div className="mt-2 text-sm font-semibold text-gray-800">
-              {Number(stock.quantite_init).toLocaleString("fr-FR", {
-                maximumFractionDigits: 2,
-              })}
-            </div>
-          </div>
-
-          <div className="p-3 rounded-sm border border-gray-200">
-            <div className="text-[11px] uppercase font-bold text-gray-400">
-              Lot
-            </div>
-            <div className="mt-2 text-sm font-semibold text-gray-800">
-              {stock.lot?.code_lot || "—"}
-            </div>
-          </div>
-
-          <div className="p-3 rounded-sm border border-gray-200">
-            <div className="text-[11px] uppercase font-bold text-gray-400">
-              ID mouvement
-            </div>
-            <div className="mt-2 text-sm font-semibold text-gray-800">
-              {stock.id}
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-4 flex justify-end gap-2">
+        <div className="flex gap-2">
           <button
             onClick={() => onView?.(stock)}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-sm border border-gray-200 text-gray-700 hover:bg-gray-50 transition text-sm"
+            className="w-12 h-12 flex items-center justify-center rounded-2xl bg-gray-50 text-gray-400 hover:text-[#00A09D] hover:bg-[#F2F7F7] transition-all"
           >
-            <Eye size={15} />
-            Voir
+            <Eye size={20} />
           </button>
-
-          <button
-            onClick={() => onEdit?.(stock)}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-sm border border-gray-200 text-gray-700 hover:bg-gray-50 transition text-sm"
-          >
-            <Pencil size={15} />
-            Modifier
-          </button>
-
           <button
             onClick={() => onDelete?.(stock)}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-sm border border-red-200 text-red-600 hover:bg-red-50 transition text-sm"
+            className="w-12 h-12 flex items-center justify-center rounded-2xl bg-red-50 text-red-300 hover:text-red-600 hover:bg-red-100 transition-all"
           >
-            <Trash2 size={15} />
-            Supprimer
+            <Trash2 size={20} />
           </button>
         </div>
+      </div>
+
+      {/* ZONE QUANTITÉ (TRÈS GRANDE) */}
+      <div className="mb-8">
+        <div className="flex items-baseline gap-2">
+          <span className="text-[52px] font-[1000] text-[#1C2434] tracking-tighter leading-none">
+            {Number(stock.quantite).toLocaleString("fr-FR")}
+          </span>
+          <span className="text-gray-400 font-bold text-lg uppercase tracking-widest">Unités</span>
+        </div>
+        <div className="w-full bg-gray-50 h-[1px] mt-4 relative">
+            <div className={`absolute left-0 top-0 h-full w-24 ${isEntree ? 'bg-emerald-400' : 'bg-orange-400'}`} />
+        </div>
+      </div>
+
+      {/* DETAILS GRID */}
+      <div className="grid grid-cols-2 gap-6">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-gray-400">
+            <Warehouse size={14} />
+            <span className="text-[10px] font-black uppercase tracking-widest">Entrepôt</span>
+          </div>
+          <p className="text-[15px] font-[900] text-[#1C2434] leading-tight">
+            {stock.entrepot?.nom || stock.entrepot?.name || "Non défini"}
+          </p>
+        </div>
+
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-gray-400">
+            <Package size={14} />
+            <span className="text-[10px] font-black uppercase tracking-widest">Emballage</span>
+          </div>
+          <p className="text-[15px] font-[900] text-[#1C2434] leading-tight truncate">
+            {stock.emballage?.name || "Vrac / Aucun"}
+          </p>
+        </div>
+
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-gray-400">
+            <CalendarDays size={14} />
+            <span className="text-[10px] font-black uppercase tracking-widest">Date</span>
+          </div>
+          <p className="text-[13px] font-bold text-gray-600">
+            {formatDate(stock.date_stock)}
+          </p>
+        </div>
+
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-gray-400">
+            <User2 size={14} />
+            <span className="text-[10px] font-black uppercase tracking-widest">Auteur</span>
+          </div>
+          <p className="text-[13px] font-bold text-gray-600 truncate">
+            {stock.user?.name || "Système"}
+          </p>
+        </div>
+      </div>
+
+      {/* DÉCORATION ICON SENS (FOND DE CARTE) */}
+      <div className="absolute -right-4 -bottom-4 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity pointer-events-none">
+        {isEntree ? <ArrowDownToLine size={180} /> : <ArrowUpFromLine size={180} />}
       </div>
     </div>
   );

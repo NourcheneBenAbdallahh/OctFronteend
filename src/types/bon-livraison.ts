@@ -56,6 +56,9 @@ export type EmballageOption = {
 export type CommandeOption = {
   id: string | number;
   numero_commande: string;
+  quantite: number;
+  emballage_id?: string | number;
+  entrepot_id?: string | number; 
 };
 
 export type EntrepotOption = {

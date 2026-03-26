@@ -1,71 +1,120 @@
-"use client";
-import React from "react";
-import Button from "@/components/ui/button/Button";
+import { formatDate, formatEmballageLabel, formatFlow, formatQuantity } from "@/lib/mouvement.helpers";
 import { MouvementStock } from "@/types/mouvement";
-import { TYPES, formatEmballageLabel } from "./utils";
+import { StatusBadge, TypeBadge } from "./mouvement-ui";
 
-interface Props {
+export default function MouvementsTable({
+  items,
+  loading,
+  onValidate,
+  onDelete,
+}: {
   items: MouvementStock[];
   loading: boolean;
   onValidate: (id: string) => void;
   onDelete: (id: string) => void;
-}
-
-export default function MouvementsTable({ items, loading, onValidate, onDelete }: Props) {
+}) {
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
+    <div className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">
+      <div className="border-b border-gray-100 px-6 py-5">
+        <div className="text-lg font-bold text-gray-950">Journal des mouvements</div>
+        <div className="mt-1 text-sm text-gray-500">
+          Brouillons, validations et historique des flux manuels.
+        </div>
+      </div>
+
       <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-gray-50/50 dark:bg-gray-800/50 text-[11px] uppercase tracking-widest text-gray-400 font-black">
+        <table className="min-w-full">
+          <thead className="bg-gray-50/80">
+            <tr className="text-left text-[11px] font-bold uppercase tracking-[0.18em] text-gray-500">
               <th className="px-6 py-4">Mouvement</th>
               <th className="px-6 py-4">Type</th>
               <th className="px-6 py-4">Statut</th>
-              <th className="px-6 py-4">Produit/Lot</th>
+              <th className="px-6 py-4">lot</th>
               <th className="px-6 py-4">Flux</th>
               <th className="px-6 py-4">Quantité</th>
               <th className="px-6 py-4 text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
+
+          <tbody className="divide-y divide-gray-100">
             {loading ? (
-              <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-400 italic">Synchronisation des données...</td></tr>
-            ) : items.map(m => (
-              <tr key={m.id} className="hover:bg-gray-50/50 transition-colors">
-                <td className="px-6 py-4 font-mono text-xs font-bold text-[#00A09D]">{m.code_mouvement ?? `#${m.id}`}</td>
-                <td className="px-6 py-4">
-                  <span className={`px-2 py-1 rounded-md text-[10px] font-black uppercase ${TYPES.find(t => t.value === m.type_mouvement)?.color}`}>
-                    {m.type_mouvement}
-                  </span>
-                </td>
-                <td className="px-6 py-4">
-                  <span className={`px-3 py-1 rounded-full text-[10px] font-bold ${m.statut === "VALIDE" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
-                    {m.statut}
-                  </span>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="text-sm font-bold text-gray-700 dark:text-gray-200">{formatEmballageLabel(m.emballage)}</div>
-                  <div className="text-[10px] text-gray-400 font-medium">Lot: {m.lot?.code_lot || "N/A"}</div>
-                </td>
-                <td className="px-6 py-4 text-[11px]">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-red-400">De: {m.entrepotSource?.adresse || "-"}</span>
-                    <span className="text-emerald-500">Vers: {m.entrepotDestination?.adresse || "-"}</span>
-                  </div>
-                </td>
-                <td className="px-6 py-4 font-black text-gray-900 dark:text-white">{m.quantite}</td>
-                <td className="px-6 py-4">
-                  <div className="flex justify-end gap-2">
-                    {m.statut !== "VALIDE" && (
-                      <>
-                        <Button variant="outline" size="sm" onClick={() => onValidate(m.id)} className="text-emerald-600 border-emerald-100 hover:bg-emerald-50">Valider</Button>
-                        <Button variant="outline" size="sm" onClick={() => onDelete(m.id)} className="text-red-500 border-red-100 hover:bg-red-50">Supprimer</Button>
-                      </>
-                    )}
-                  </div>
+              <tr>
+                <td colSpan={7} className="px-6 py-16 text-center text-sm text-gray-500">
+                  Chargement des mouvements...
                 </td>
               </tr>
-            ))}
+            ) : items.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-6 py-16 text-center text-sm text-gray-500">
+                  Aucun mouvement trouvé.
+                </td>
+              </tr>
+            ) : (
+              items.map((m) => (
+                <tr key={m.id} className="transition hover:bg-gray-50/70">
+                  <td className="px-6 py-5">
+                    <div className="font-mono text-sm font-bold text-gray-950">
+                      {m.code_mouvement ?? `#${m.id}`}
+                    </div>
+                    <div className="mt-1 text-xs text-gray-500">{formatDate(m.date_mouvement)}</div>
+                  </td>
+
+                  <td className="px-6 py-5">
+                    <TypeBadge type={m.type_mouvement} />
+                  </td>
+
+                  <td className="px-6 py-5">
+                    <StatusBadge statut={m.statut} />
+                  </td>
+
+                  <td className="px-6 py-5">
+                    <div className="text-sm font-semibold text-gray-900">
+                      {formatEmballageLabel(m.emballage)}
+                    </div>
+                    <div className="mt-1 text-xs text-gray-500">
+                      Lot : {m.lot?.code_lot ?? "-"}
+                    </div>
+                  </td>
+
+                  <td className="px-6 py-5">
+                    <div className="rounded-2xl bg-gray-50 px-4 py-3 text-sm font-medium text-gray-700">
+                      {formatFlow(m)}
+                    </div>
+                  </td>
+
+                  <td className="px-6 py-5">
+                    <div className="text-lg font-black tracking-tight text-gray-950">
+                      {formatQuantity(m.quantite)}
+                    </div>
+                  </td>
+
+                  <td className="px-6 py-5">
+                    <div className="flex justify-end gap-2">
+                      {m.statut !== "VALIDE" ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => onValidate(m.id)}
+                            className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
+                          >
+                            Valider
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onDelete(m.id)}
+                            className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 transition hover:bg-red-100"
+                          >
+                            Supprimer
+                          </button>
+                        </>
+                      ) : (
+                        <span className="text-xs font-semibold text-gray-400">Aucune action</span>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>

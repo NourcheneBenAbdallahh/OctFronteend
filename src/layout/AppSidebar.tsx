@@ -18,7 +18,11 @@ import {
   UserCircleIcon,
 } from "../icons/index";
 import SidebarWidget from "./SidebarWidget";
-
+import { Receipt } from "lucide-react";
+import { Truck } from "lucide-react";
+import { Boxes } from "lucide-react";
+import { ShoppingCart } from "lucide-react";
+import { ArrowLeftRight } from "lucide-react";
 type NavItem = {
   name: string;
   icon: React.ReactNode;
@@ -30,22 +34,22 @@ const navItems: NavItem[] = [
   {
     icon: <GridIcon />,
     name: "Dashboard",
-    subItems: [{ name: "Ecommerce", path: "/", pro: false }],
+    path: "/",
   },
     {
   icon: <BoxCubeIcon />,
   name: "Emballages",
-  subItems: [{ name: "Emballages", path: "/emballages", pro: false }],
+  path: "/emballages"
 },
 {
   icon: <UserCircleIcon />,
   name: "Fournisseurs",
-  subItems: [{ name: "Fournisseurs", path: "/fournisseurs", pro: false }],
+  path: "/fournisseurs"
 },
 {
   icon: <PageIcon />,
   name: "Contrats",
-  subItems: [{ name: "Contrats", path: "/contrats", pro: false }],
+  path: "/contrats"
 }, {
   icon: <BoxCubeIcon />,
   name: "Entrepots",
@@ -61,33 +65,31 @@ const navItems: NavItem[] = [
   ],
 },
 {
-  icon: <BoxCubeIcon />,
+  icon: <Boxes />,
   name: "Lots",
   path: "/lot",
 },
 
 {
-  icon: <PageIcon />,
+  icon: <ShoppingCart />,
   name: "Commandes",
-  subItems: [{ name: "Commandes", path: "/commandes", pro: false }],
+  path: "/commandes"
 },
 {
-  icon: <PageIcon />,
+  icon: <Truck />,
   name: "Bon Livraisons",
-  subItems: [
-    { name: "Bon Livraisons", path: "/bon-livraisons", pro: false },
-  ],
+  path: "/bon-livraisons"
+
 },
 {
-  icon: <PageIcon />,
+  icon: <Receipt  />,
   name: "Factures",
-  subItems: [{ name: "Factures", path: "/factures", pro: false }],
+   path: "/factures",
 },
 {
-  icon: <PageIcon />,
+  icon: <ArrowLeftRight />,
   name: "Mouvements de stock",
-  
-  subItems: [{ name: "Mouvements de stock ", path: "/mouvements", pro: false }],
+   path: "/mouvements"
 
 },
   {
@@ -102,20 +104,9 @@ const navItems: NavItem[] = [
   },
 
   {
-    name: "Forms",
-    icon: <ListIcon />,
-    subItems: [{ name: "Form Elements", path: "/form-elements", pro: false }],
-  },
-  {
-    name: "Tables",
-    icon: <TableIcon />,
-    subItems: [{ name: "Basic Tables", path: "/basic-tables", pro: false }],
-  },
-  {
     name: "Pages",
     icon: <PageIcon />,
     subItems: [
-      { name: "Blank Page", path: "/blank", pro: false },
       { name: "404 Error", path: "/error-404", pro: false },
     ],
   },
@@ -130,26 +121,8 @@ const othersItems: NavItem[] = [
       { name: "Bar Chart", path: "/bar-chart", pro: false },
     ],
   },
-  {
-    icon: <BoxCubeIcon />,
-    name: "UI Elements",
-    subItems: [
-      { name: "Alerts", path: "/alerts", pro: false },
-      { name: "Avatar", path: "/avatars", pro: false },
-      { name: "Badge", path: "/badge", pro: false },
-      { name: "Buttons", path: "/buttons", pro: false },
-      { name: "Images", path: "/images", pro: false },
-      { name: "Videos", path: "/videos", pro: false },
-    ],
-  },
-  {
-    icon: <PlugInIcon />,
-    name: "Authentication",
-    subItems: [
-      { name: "Sign In", path: "/signin", pro: false },
-      { name: "Sign Up", path: "/signup", pro: false },
-    ],
-  },
+ 
+ 
 ];
 
 const AppSidebar: React.FC = () => {

@@ -1,17 +1,31 @@
-// src/types/mouvement.ts
-import { TableEmballages } from "./emballage";
-
-export type MouvementType = "ENT" | "PRD" | "CDD" | "PTE" | "SPL";
+export type MouvementType = "PRD" | "CDD" | "PTE" | "SPL" | "EMC";
 export type MouvementStatut = "BROUILLON" | "VALIDE";
 
-import type { Entrepot } from "@/types/entrepot";
-
-export type Lot = {
+export type EmballageRef = {
   id: string;
-  code_lot: string;
+  code: string;
+  name: string;
 };
 
-export type Emballage = Pick<TableEmballages, "id" | "code" | "name">;
+export type EntrepotRef = {
+  id: string;
+  adresse: string;
+};
+
+export type LotRef = {
+  id: string;
+  code_lot: string;
+  emballage_id: string;
+  quantite?: number | null;
+};
+
+export type LotDisponible = {
+  lot_id: string | null;
+  entrepot_id: string;
+  emballage_id: string;
+  stock_disponible: number;
+  code_lot?: string | null;
+};
 
 export type MouvementStock = {
   id: string;
@@ -23,11 +37,30 @@ export type MouvementStock = {
   entrepot_destination_id?: string | null;
   quantite: number;
   date_mouvement?: string | null;
-  user_id?: string | null;
   statut: MouvementStatut;
 
-  emballage?: Emballage | null;
-  lot?: Lot | null;
-  entrepotSource?: Entrepot | null;
-  entrepotDestination?: Entrepot | null;
+  emballage?: EmballageRef | null;
+  lot?: LotRef | null;
+  entrepotSource?: EntrepotRef | null;
+  entrepotDestination?: EntrepotRef | null;
+};
+
+export type MouvementFormState = {
+  type: MouvementType;
+  emballageId: string;
+  lotId: string;
+  sourceId: string;
+  destId: string;
+  quantite: number | "";
+  dateMouvement: string;
+};
+
+export type MouvementsPageStats = {
+  total: number;
+  brouillons: number;
+  valides: number;
+  transferts: number;
+  sortiesProduction: number;
+  pertes: number;
+  surplus: number;
 };
