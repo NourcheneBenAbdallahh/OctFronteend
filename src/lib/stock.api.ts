@@ -100,6 +100,7 @@ export async function getStocks(page = 1, first = 50): Promise<Stock[]> {
             id
             name
             code
+            min_stock
           }
           lot {
             id
@@ -160,6 +161,7 @@ export async function updateStock(
           id
           name
           code
+          
         }
         lot {
           id

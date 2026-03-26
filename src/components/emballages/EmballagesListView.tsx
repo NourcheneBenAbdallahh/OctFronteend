@@ -1,63 +1,61 @@
-import { Edit3, Trash2, Box, Layers, Weight } from "lucide-react";
+import React from "react";
+import { Edit3, Trash2, Maximize2, Weight, Layers } from "lucide-react";
 import { TableEmballages } from "@/types/emballage";
 
-interface Props {
-  rows: TableEmballages[];
-  onEdit: (item: TableEmballages) => void;
-  onDelete: (id: string | number) => void;
-}
-
-export const EmballagesListView = ({ rows, onEdit, onDelete }: Props) => (
-  <div className="overflow-hidden">
-    <table className="w-full text-left border-collapse text-[13px]">
+export const EmballagesListView = ({ rows, onEdit, onDelete }: any) => (
+  <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
+    <table className="w-full text-left border-collapse">
       <thead>
-        <tr className="bg-[#F8F9FA] border-b border-gray-300 text-gray-800 uppercase text-[11px] font-bold">
-          <th className="px-4 py-3">Code</th>
-          <th className="px-4 py-3">Nom / Désignation</th>
-          <th className="px-4 py-3">Type & Matière</th>
-          <th className="px-4 py-3 text-right">Capacité</th>
-          <th className="px-4 py-3 text-center">Statut</th>
-          <th className="px-4 py-3 text-center">Actions</th>
+        <tr className="border-b border-gray-50 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
+          <th className="px-8 py-6">Code</th>
+          <th className="px-8 py-6">Désignation & Matière</th>
+          <th className="px-8 py-6">Specs Techniques</th>
+          <th className="px-8 py-6 text-center">Statut</th>
+          <th className="px-8 py-6 text-center">Actions</th>
         </tr>
       </thead>
-      <tbody className="divide-y divide-gray-100">
-        {rows.map((row) => (
-          <tr key={row.id} className="hover:bg-[#F2F7F7] group transition-colors">
-            <td className="px-4 py-3 font-mono font-bold text-gray-600">{row.code}</td>
-            <td className="px-4 py-3 font-bold text-[#00A09D] uppercase tracking-tight">
-              {row.name}
+      <tbody className="divide-y divide-gray-50">
+        {rows.map((row: TableEmballages) => (
+          <tr key={row.id} className="hover:bg-gray-50/50 group transition-all">
+            <td className="px-8 py-6">
+              <span className="text-sm font-black text-gray-900 tracking-tighter uppercase">{row.code}</span>
+              <div className="text-[10px] font-bold text-gray-400 mt-1 uppercase italic">{row.type}</div>
             </td>
-            <td className="px-4 py-3">
-              <div className="flex flex-col">
-                <span className="text-gray-700 flex items-center gap-1"><Layers size={12}/> {row.type}</span>
-                <span className="text-[11px] text-gray-400">{row.material || "Matière non spécifiée"}</span>
+            <td className="px-8 py-6">
+              <div className="font-black text-gray-800 text-sm uppercase">{row.name}</div>
+              <div className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mt-0.5">
+                {row.material || "MATÉRIAU NON DÉFINI"}
               </div>
             </td>
-            <td className="px-4 py-3 text-right font-medium">
-              <div className="flex items-center justify-end gap-1">
-                <Weight size={12} className="text-gray-400"/>
-                {row.capacity_value} <span className="text-gray-400 text-[11px]">{row.capacity_unit}</span>
+            <td className="px-8 py-6">
+              <div className="flex gap-4">
+                <SpecItem icon={<Weight size={10}/>} value={`${row.poids ?? 0}kg`} label="Poids" />
+                <SpecItem icon={<Maximize2 size={10}/>} value={`${row.largeur ?? 0}cm`} label="Largeur" />
+                <SpecItem icon={<Layers size={10}/>} value={`${row.epaisseur_pp ?? 0}μ`} label="Épaisseur" />
               </div>
             </td>
-            <td className="px-4 py-3 text-center">
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border
-                ${row.status === 'ACTIVE' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+            <td className="px-8 py-6 text-center">
+              <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border
+                ${row.status === 'ACTIVE' ? 'bg-green-50 text-green-600 border-green-100' : 'bg-red-50 text-red-600 border-red-100'}`}>
                 {row.status}
               </span>
             </td>
-            <td className="px-4 py-3 text-center">
-              <div className="flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onClick={() => onEdit(row)} className="p-1.5 text-gray-600 hover:text-[#00A09D] hover:bg-white rounded border border-transparent hover:border-gray-200 transition-all">
-                  <Edit3 size={14} />
-                </button>
-                <button onClick={() => onDelete(row.id)} className="p-1.5 text-gray-600 hover:text-red-600 hover:bg-white rounded border border-transparent hover:border-gray-200 transition-all">
-                  <Trash2 size={14} />
-                </button>
+            <td className="px-8 py-6 text-center">
+              <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                <button onClick={() => onEdit(row)} className="h-9 w-9 flex items-center justify-center bg-white border border-gray-100 text-gray-400 hover:text-indigo-600 rounded-xl transition-all shadow-sm"><Edit3 size={14} /></button>
+                <button onClick={() => onDelete(row.id)} className="h-9 w-9 flex items-center justify-center bg-white border border-gray-100 text-gray-400 hover:text-red-600 rounded-xl transition-all shadow-sm"><Trash2 size={14} /></button>
               </div>
             </td>
           </tr>
         ))}
       </tbody>
     </table>
+  </div>
+);
+
+const SpecItem = ({ icon, value, label }: any) => (
+  <div>
+    <div className="flex items-center gap-1 text-gray-900 font-black text-[11px]">{icon} {value}</div>
+    <div className="text-[8px] font-bold text-gray-400 uppercase tracking-tighter">{label}</div>
   </div>
 );

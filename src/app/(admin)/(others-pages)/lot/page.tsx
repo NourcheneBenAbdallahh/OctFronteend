@@ -12,8 +12,12 @@ export default async function LotsPage() {
   }
 
   return (
-    <div className="p-4 md:p-6 bg-[#F6F8FA] min-h-screen">
-      <LotsClient initialLots={lots} />
-    </div>
+ <div className="space-y-6">
+      
+      <div className="mt-8">       
+         <LotsClient initialLots={lots} />
+    </div>   
+     </div>
+
   );
 }

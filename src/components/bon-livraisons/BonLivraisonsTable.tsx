@@ -250,7 +250,7 @@ export default function BonLivraisonsTable({
         {/* Bouton Action */}
         <button 
           onClick={() => { setEditing(null); setForm(emptyForm); setIsDrawerOpen(true); }}
-          className="bg-indigo-600 hover:bg-gray-900 text-white px-8 py-4 rounded-[2rem] flex items-center gap-3 transition-all hover:scale-105 shadow-xl shadow-indigo-100 group"
+        className="bg-white text-gray-900 border-2 border-gray-900 px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all shadow-[8px_8px_0px_rgba(0,160,157,0.2)]"
         >
           <Plus className="h-5 w-5 stroke-[3px] group-hover:rotate-90 transition-transform" />
           <span className="text-xs font-black uppercase tracking-[0.15em]">Nouveau BL</span>

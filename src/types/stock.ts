@@ -9,6 +9,7 @@ export interface StockEmballage {
   id: string | number;
   name?: string | null;
   code?: string | null;
+  min_stock?: number | null;
 }
 
 export interface StockLot {

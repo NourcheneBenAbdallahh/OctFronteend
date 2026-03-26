@@ -12,8 +12,10 @@ export default async function StocksPage() {
   }
 
   return (
-    <div className="p-4 md:p-6 bg-[#F6F8FA] min-h-screen">
-      <StocksClient initialStocks={stocks} />
-    </div>
+ <div className="space-y-6">
+      
+      <div className="mt-8">      
+        <StocksClient initialStocks={stocks} />
+    </div> </div>
   );
 }

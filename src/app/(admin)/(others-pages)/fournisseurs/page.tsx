@@ -2,9 +2,8 @@ import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import FournisseursTable from "@/components/fournisseurs/FournisseursTable";
 import {
   listFournisseurs,
-  normalizeFournisseur,
-  TableFournisseur,
 } from "@/lib/fournisseurs.api";
+import { TableFournisseur,normalizeFournisseur } from "@/types/fournisseur";
 
 export default async function FournisseursPage() {
   const result = await listFournisseurs();
@@ -12,7 +11,6 @@ export default async function FournisseursPage() {
 
   return (
     <div className="p-6">
-      <PageBreadcrumb pageTitle="Gestion des Partenaires" />
       <div className="mt-8">
         <FournisseursTable data={rows} />
       </div>

@@ -323,8 +323,10 @@ const filteredRows = useMemo(() => {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-600 transition-colors" />
             <input type="text" placeholder="Rechercher une commande..." value={query} onChange={(e) => setQuery(e.target.value)} className="w-full rounded-2xl border border-gray-200 bg-white pl-10 pr-4 py-3 text-sm outline-none focus:ring-4 focus:ring-indigo-600/5 focus:border-indigo-600 md:w-80 transition-all shadow-sm" />
           </div>
-          <button onClick={openNew} className="flex items-center gap-2 rounded-2xl bg-indigo-600 px-6 py-3 text-sm font-black text-white shadow-xl shadow-indigo-200 hover:bg-indigo-700 active:scale-95 transition-all">
-            <Plus className="h-4 w-4" /> NOUVEAU
+          <button onClick={openNew}
+          
+        className="bg-white text-gray-900 border-2 border-gray-900 px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all shadow-[8px_8px_0px_rgba(0,160,157,0.2)]"
+             > NOUVEAU
           </button>
         </div>
       </div>

@@ -5,10 +5,10 @@ import {
   MessageSquareText,
   Package,
   User2,
-  MoreVertical,
   Pencil,
   Trash2,
   Eye,
+  ArrowRight
 } from "lucide-react";
 import { Lot } from "@/types/lot";
 
@@ -22,152 +22,111 @@ interface Props {
 
 function formatDate(date?: string | null) {
   if (!date) return "-";
-  return new Date(date).toLocaleString();
+  return new Date(date).toLocaleDateString('fr-FR', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
 }
 
-function getEmballageLabel(lot: Lot) {
+export default function LotCard({ lot, compact = false, onView, onEdit, onDelete }: Props) {
   return (
-    lot.emballage?.name ||
-    lot.emballage?.code ||
-    `Emballage #${lot.emballage_id}`
-  );
-}
+    /* AJOUT : flex flex-col h-full pour que toutes les cartes aient la même hauteur */
+    <div className="group relative bg-white border-2 border-gray-50 rounded-[40px] p-8 flex flex-col h-full transition-all duration-500 hover:border-[#DDF2F1] hover:shadow-[20px_20px_60px_rgba(0,160,157,0.05)]">
+      
+      {/* HEADER */}
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-8">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 shrink-0 rounded-[20px] bg-[#F2F7F7] border border-[#DDF2F1] flex items-center justify-center text-[#00A09D] group-hover:scale-110 transition-transform duration-500">
+            <Package size={24} />
+          </div>
+          <div className="min-w-0"> {/* min-w-0 permet le truncate */}
+            <span className="text-[9px] font-[1000] text-[#00A09D] uppercase tracking-[0.2em] block">Lot Identifiant</span>
+            <h3 className="text-2xl font-[1000] text-[#1C2434] uppercase tracking-tighter leading-tight truncate">
+              {lot.code_lot}
+            </h3>
+          </div>
+        </div>
+        
+        <div className="shrink-0">
+          <div className="px-3 py-1.5 bg-[#F8FAFA] rounded-xl border border-gray-100">
+             <span className="text-[10px] font-black text-[#1C2434] uppercase tracking-wider">
+               {lot.emballage?.name || "Standard"}
+             </span>
+          </div>
+        </div>
+      </div>
 
-function getCommentBadge(comment?: string | null) {
-  if (!comment) {
-    return {
-      label: "Sans commentaire",
-      className: "bg-gray-100 text-gray-600 border-gray-200",
-    };
-  }
+      {/* BODY : flex-1 pousse le footer vers le bas */}
+      <div className="flex-1 space-y-8">
+        <div className="relative">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-1.5 h-1.5 rounded-full bg-[#00A09D] animate-pulse" />
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Stock Actuel</span>
+          </div>
+          <div className="text-5xl font-[1000] text-[#1C2434] tracking-tighter flex items-baseline gap-2">
+            {Number(lot.quantite).toLocaleString()}
+            <span className="text-lg text-gray-200 font-black uppercase">PCS</span>
+          </div>
+        </div>
 
-  if (comment.length > 35) {
-    return {
-      label: "Commentaire détaillé",
-      className: "bg-orange-50 text-orange-700 border-orange-200",
-    };
-  }
+        <div className="pt-6 border-t border-gray-50">
+           <div className="flex items-center gap-2 mb-1">
+             <CalendarDays size={14} className="text-[#00A09D]" />
+             <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Dernière Mise à jour</span>
+           </div>
+           <div className="text-[12px] font-[900] text-[#1C2434] uppercase">
+             {formatDate(lot.date_mvt)}
+           </div>
+        </div>
+      </div>
 
-  return {
-    label: "Commenté",
-    className: "bg-green-50 text-green-700 border-green-200",
-  };
-}
+      {/* FOOTER */}
+      <div className="mt-8 pt-6 border-t border-gray-50 flex flex-col gap-4">
+        {/* Ligne Infos */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-[#F2F7F7] rounded-full">
+            <User2 size={12} className="text-[#00A09D]" />
+            <span className="text-[9px] font-[1000] text-[#1C2434] uppercase tracking-widest truncate max-w-[80px]">
+              {lot.user?.name || "Admin"}
+            </span>
+          </div>
 
-export default function LotCard({
-  lot,
-  compact = false,
-  onView,
-  onEdit,
-  onDelete,
-}: Props) {
-  const badge = getCommentBadge(lot.commentaire);
-
-  return (
-    <div className="bg-white border border-gray-200 rounded-sm shadow-sm hover:shadow-md transition-all overflow-hidden">
-      <div className="p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center justify-center w-10 h-10 rounded-sm bg-[#F2F7F7] border border-[#DDF2F1]">
-                <Package size={18} className="text-[#00A09D]" />
+          {lot.commentaire && (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-50/50 rounded-full border border-orange-100 flex-1 min-w-0">
+              <MessageSquareText size={12} className="text-orange-400 shrink-0" />
+              <span className="text-[9px] font-bold text-orange-700 uppercase truncate">
+                {lot.commentaire}
               </span>
-              <div>
-                <h3 className="text-[28px] leading-none font-bold text-gray-800 tracking-tight">
-                  {lot.code_lot}
-                </h3>
-                <p className="text-sm text-gray-500 mt-2">{getEmballageLabel(lot)}</p>
-              </div>
             </div>
-          </div>
-
-          <button className="text-gray-400 hover:text-gray-700 transition">
-            <MoreVertical size={18} />
-          </button>
+          )}
         </div>
 
-        <div className={`grid ${compact ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2"} gap-4 mt-5`}>
-          <div className="space-y-3">
-            <div className="flex items-center gap-3 text-gray-600">
-              <Package size={16} className="text-gray-400" />
-              <span className="text-sm">Quantité</span>
-            </div>
-            <div className="text-[34px] font-bold text-[#00A09D]">
-              {Number(lot.quantite).toLocaleString(undefined, {
-                maximumFractionDigits: 2,
-              })}
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <div className="flex items-center gap-3 text-gray-600">
-              <CalendarDays size={16} className="text-gray-400" />
-              <span className="text-sm">Date mouvement</span>
-            </div>
-            <div className="text-[15px] font-semibold text-gray-800">
-              {formatDate(lot.date_mvt)}
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-5">
-          <div className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-100 rounded-sm">
-            <User2 size={16} className="text-gray-400" />
-            <div>
-              <div className="text-[11px] uppercase font-bold text-gray-400">
-                Utilisateur
-              </div>
-              <div className="text-sm font-medium text-gray-700">
-                {lot.user?.name || lot.user?.email || "Non affecté"}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-100 rounded-sm">
-            <MessageSquareText size={16} className="text-gray-400" />
-            <div className="min-w-0">
-              <div className="text-[11px] uppercase font-bold text-gray-400">
-                Commentaire
-              </div>
-              <div className="text-sm font-medium text-gray-700 truncate">
-                {lot.commentaire || "Aucun commentaire"}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-4 flex items-center justify-between gap-3 flex-wrap">
-          <span
-            className={`inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold uppercase border ${badge.className}`}
+        {/* Ligne Boutons : Utilisation de justify-end pour coller à droite */}
+        <div className="flex items-center justify-end gap-2">
+          <button 
+            onClick={() => onView?.(lot)}
+            className="w-10 h-10 shrink-0 flex items-center justify-center rounded-full bg-white border border-gray-200 text-gray-400 hover:text-[#00A09D] hover:border-[#00A09D] transition-all"
           >
-            {badge.label}
-          </span>
+            <Eye size={18} />
+          </button>
+          
+          <button 
+            onClick={() => onEdit?.(lot)}
+            className="w-10 h-10 shrink-0 flex items-center justify-center rounded-full bg-white border border-gray-200 text-gray-400 hover:text-[#1C2434] hover:border-[#1C2434] transition-all"
+          >
+            <Pencil size={18} />
+          </button>
 
-          <div className="flex gap-2">
-            <button
-              onClick={() => onView?.(lot)}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-sm border border-gray-200 text-gray-700 hover:bg-gray-50 transition text-sm"
-            >
-              <Eye size={15} />
-              Voir
-            </button>
-
-            <button
-              onClick={() => onEdit?.(lot)}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-sm border border-gray-200 text-gray-700 hover:bg-gray-50 transition text-sm"
-            >
-              <Pencil size={15} />
-              Modifier
-            </button>
-
-            <button
-              onClick={() => onDelete?.(lot)}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-sm border border-red-200 text-red-600 hover:bg-red-50 transition text-sm"
-            >
-              <Trash2 size={15} />
-              Supprimer
-            </button>
-          </div>
+          <button 
+            onClick={() => onDelete?.(lot)}
+            className="h-10 px-4 shrink-0 flex items-center gap-2 rounded-full bg-red-50 text-red-600 hover:bg-red-500 hover:text-white transition-all font-black text-[9px] uppercase tracking-widest"
+          >
+            <Trash2 size={14} />
+            <span>Suppr.</span>
+          </button>
         </div>
       </div>
     </div>

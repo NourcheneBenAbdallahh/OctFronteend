@@ -1,172 +1,114 @@
 import React from "react";
-import { TableContrat } from "@/types/contrat";
-import { TableFournisseur } from "@/lib/fournisseurs.api";
-import {TableEmballages 
-  } from "@/types/emballage";
-interface Props {
-  isOpen: boolean;
-  editing: boolean;
-  form: Partial<TableContrat>;
-  setForm: React.Dispatch<React.SetStateAction<Partial<TableContrat>>>;
-  onClose: () => void;
-  onSubmit: (e: React.FormEvent) => void;
-  loading: boolean;
-  // AJOUT DES PROPS ICI POUR RÉGLER L'ERREUR TS(2322)
-  fournisseurs: TableFournisseur[];
-  emballages: TableEmballages[];
-}
+import { X, Save, AlertCircle } from "lucide-react";
 
-export const ContratForm = ({ 
-  isOpen, editing, form, setForm, onClose, onSubmit, loading,
-  fournisseurs, emballages 
-}: Props) => {
+export const ContratForm = ({ isOpen, editing, form, setForm, onClose, onSubmit, loading, fournisseurs, emballages }: any) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-      <form onSubmit={onSubmit} className="bg-white rounded shadow-2xl w-full max-w-3xl flex flex-col max-h-[90vh]">
+    <>
+      <div className="fixed inset-0 z-[100] bg-gray-900/40 backdrop-blur-sm animate-in fade-in duration-300" onClick={onClose} />
+      <div className="fixed inset-y-0 right-0 z-[101] w-full max-w-xl bg-white shadow-[-30px_0_60px_rgba(0,0,0,0.1)] animate-in slide-in-from-right duration-500 rounded-l-[3rem] flex flex-col">
         
-        {/* Header Modal */}
-        <div className="flex justify-between items-center px-6 py-4 border-b">
-          <h2 className="text-xl font-bold text-gray-800">
-            {editing ? "Modifier le Contrat" : "Nouveau Contrat de Stock"}
-          </h2>
-          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl">×</button>
+        {/* Header */}
+        <div className="p-12 pb-6 flex justify-between items-start">
+          <div>
+            <span className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.3em] block mb-2">Workspace</span>
+            <h2 className="text-3xl font-black text-gray-900 tracking-tighter leading-none">
+              {editing ? "Modifier Contrat" : "Nouvel Engagement"}
+            </h2>
+          </div>
+          <button onClick={onClose} className="h-12 w-12 bg-gray-50 hover:bg-gray-100 rounded-[1.2rem] flex items-center justify-center text-gray-400 transition-colors"><X /></button>
         </div>
-        
-        <div className="flex-1 overflow-y-auto p-8 bg-[#F8F9FA]">
-          <div className="bg-white p-8 shadow-sm border border-gray-200 rounded-sm space-y-8">
-            
-            {/* Style Odoo : Numéro du Contrat */}
-            <div className="border-b border-gray-200 pb-6">
-              <label className="text-[10px] font-bold text-[#00A09D] uppercase tracking-widest mb-1 block">
-                Numéro du Contrat
-              </label>
-              <input 
+
+        <form onSubmit={onSubmit} className="flex-1 overflow-y-auto px-12 py-6 space-y-10 scrollbar-hide">
+          
+          {/* LARGE PLACEHOLDER DESIGN */}
+          <div className="border-b-4 border-gray-50 focus-within:border-indigo-500 pb-4 transition-all">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2 ml-1">Référence du Contrat</label>
+            <input 
+              required
+              className="w-full text-5xl font-black text-gray-900 placeholder:text-gray-100 bg-transparent outline-none tracking-tighter"
+              placeholder="CONTRAT/2026/00"
+              value={form.numero_contrat ?? ""}
+              onChange={(e) => setForm({ ...form, numero_contrat: e.target.value })}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-8">
+            <div className="space-y-3">
+              <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Fournisseur</label>
+              <select 
                 required
-                type="text"
-                placeholder="ex: CONTRAT/2026/001"
-                className="w-full text-4xl font-extrabold border-none p-0 focus:ring-0 placeholder:text-gray-300 text-gray-800 bg-transparent outline-none"
-                value={form.numero_contrat ?? ""}
-                onChange={(e) => setForm({ ...form, numero_contrat: e.target.value })}
-              />
+                className="w-full rounded-2xl border-2 border-gray-50 bg-gray-50 p-4 text-xs font-black text-gray-900 outline-none focus:border-indigo-500/20 focus:bg-white transition-all appearance-none"
+                value={form.fournisseur_id ?? ""}
+                onChange={(e) => setForm({...form, fournisseur_id: e.target.value})}
+              >
+                <option value="">Sélectionner...</option>
+                {fournisseurs.map((f: any) => <option key={f.id} value={f.id}>{f.raison_sociale}</option>)}
+              </select>
             </div>
 
-            <div className="grid grid-cols-2 gap-x-12 gap-y-6">
-              <div className="space-y-6">
-                {/* SÉLECTION FOURNISSEUR */}
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Fournisseur</label>
-                  <select 
-                    required
-                    className="border-b border-gray-300 py-1 focus:border-[#00A09D] outline-none text-sm bg-transparent"
-                    value={form.fournisseur_id ?? ""}
-                    onChange={(e) => setForm({...form, fournisseur_id: e.target.value})}
-                  >
-                    <option value="">Choisir un fournisseur...</option>
-                    {fournisseurs.map((f) => (
-                      <option key={f.id} value={f.id}>{f.raison_sociale}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* SÉLECTION EMBALLAGE */}
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Type d'Emballage</label>
-                  <select 
-                    required
-                    className="border-b border-gray-300 py-1 focus:border-[#00A09D] outline-none text-sm bg-transparent"
-                    value={form.emballage_id ?? ""}
-                    onChange={(e) => setForm({...form, emballage_id: e.target.value})}
-                  >
-                    <option value="">Choisir un emballage...</option>
-                    {emballages.map((e) => (
-                      <option key={e.id} value={e.id}>{e.name} ({e.type})</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Statut</label>
-                  <select 
-                    className="border-b border-gray-300 py-1 text-sm bg-transparent outline-none" 
-                    value={form.statut} 
-                    onChange={(e) => setForm({...form, statut: e.target.value as any})}
-                  >
-                    <option value="ACTIF">ACTIF</option>
-                    <option value="EXPIRE">EXPIRE</option>
-                    <option value="SUSPENDU">SUSPENDU</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="space-y-6">
-                <Field label="Date Début" type="date" value={form.date_debut} onChange={(v: string) => setForm({...form, date_debut: v})} />
-                <Field label="Date Fin" type="date" value={form.date_fin} onChange={(v: string) => setForm({...form, date_fin: v})} />
-              </div>
-            </div>
-
-            {/* SECTION QUANTITÉS */}
-            <div className="bg-gray-50 p-6 rounded grid grid-cols-3 gap-6 border border-gray-100">
-              <NumberField 
-                label="Qté Contractuelle" 
-                value={form.quantite_contractuelle} 
-                onChange={(v: number) => setForm({...form, quantite_contractuelle: v})} 
-              />
-              <NumberField 
-                label="Qté Réalisée" 
-                value={form.quantite_realisee} 
-                onChange={(v: number) => setForm({...form, quantite_realisee: v})} 
-              />
-              <NumberField 
-                label="Taux Dépassement (%)" 
-                value={form.taux_depassement_autorise} 
-                onChange={(v: number) => setForm({...form, taux_depassement_autorise: v})} 
-              />
+            <div className="space-y-3">
+              <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Type Emballage</label>
+              <select 
+                required
+                className="w-full rounded-2xl border-2 border-gray-50 bg-gray-50 p-4 text-xs font-black text-gray-900 outline-none focus:border-indigo-500/20 focus:bg-white transition-all appearance-none"
+                value={form.emballage_id ?? ""}
+                onChange={(e) => setForm({...form, emballage_id: e.target.value})}
+              >
+                <option value="">Sélectionner...</option>
+                {emballages.map((e: any) => <option key={e.id} value={e.id}>{e.name}</option>)}
+              </select>
             </div>
           </div>
-        </div>
 
-        {/* Footer Actions */}
-        <div className="px-8 py-4 border-t flex justify-end gap-3 bg-white">
-          <button type="button" onClick={onClose} className="px-6 py-2 border rounded font-bold text-gray-600 uppercase text-xs hover:bg-gray-50">
-            Annuler
-          </button>
+          <div className="grid grid-cols-2 gap-8">
+             <InputField label="Début" type="date" value={form.date_debut} onChange={(v:any) => setForm({...form, date_debut:v})} />
+             <InputField label="Fin" type="date" value={form.date_fin} onChange={(v:any) => setForm({...form, date_fin:v})} />
+          </div>
+
+          <div className="bg-gray-50/80 p-10 rounded-[2.5rem] space-y-8">
+            <div className="flex items-center gap-3 mb-2 text-indigo-600">
+               <AlertCircle size={18} />
+               <span className="text-[10px] font-black uppercase tracking-[0.2em]">Paramètres de Volume</span>
+            </div>
+            <div className="grid grid-cols-2 gap-10">
+               <div className="space-y-2">
+                 <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Qté Contractuelle</label>
+                 <input type="number" className="w-full bg-transparent border-b-2 border-gray-200 py-2 text-3xl font-black outline-none focus:border-indigo-500 transition-all" value={form.quantite_contractuelle} onChange={(e) => setForm({...form, quantite_contractuelle: Number(e.target.value)})} />
+               </div>
+               <div className="space-y-2">
+                 <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Marge (%)</label>
+                 <input type="number" step="0.01" className="w-full bg-transparent border-b-2 border-gray-200 py-2 text-3xl font-black outline-none focus:border-indigo-500 transition-all" value={form.taux_depassement_autorise} onChange={(e) => setForm({...form, taux_depassement_autorise: Number(e.target.value)})} />
+               </div>
+            </div>
+          </div>
+        </form>
+
+        <div className="p-12 border-t border-gray-50 bg-white flex items-center gap-6">
+          <button onClick={onClose} className="text-[11px] font-black text-gray-300 uppercase tracking-widest hover:text-gray-900 transition-colors">Annuler</button>
           <button 
-            type="submit" 
-            disabled={loading} 
-            className="px-8 py-2 bg-[#00A09D] text-white rounded font-bold uppercase text-xs shadow-md hover:bg-[#008784] disabled:opacity-50"
+            type="button"
+            onClick={onSubmit}
+            disabled={loading}
+            className="flex-1 bg-gray-900 hover:bg-indigo-600 text-white py-6 rounded-2xl font-black text-[12px] uppercase tracking-[0.25em] shadow-2xl transition-all active:scale-[0.98] flex justify-center items-center gap-2"
           >
-            {loading ? "Enregistrement..." : "Sauvegarder"}
+            {loading ? "Traitement..." : <><Save size={18} /> Enregistrer l'engagement</>}
           </button>
         </div>
-      </form>
-    </div>
+      </div>
+    </>
   );
 };
 
-// --- SOUS-COMPOSANTS TYPÉS ---
-
-const Field = ({ label, value, onChange, type = "text" }: any) => (
-  <div className="flex flex-col gap-1">
-    <label className="text-xs font-bold text-gray-500 uppercase">{label}</label>
+const InputField = ({ label, type, value, onChange }: any) => (
+  <div className="space-y-3">
+    <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">{label}</label>
     <input 
       type={type} 
-      className="border-b border-gray-300 py-1 focus:border-[#00A09D] outline-none text-sm bg-transparent" 
       value={value ?? ""} 
-      onChange={(e) => onChange(e.target.value)} 
-    />
-  </div>
-);
-
-const NumberField = ({ label, value, onChange }: any) => (
-  <div className="flex flex-col gap-1">
-    <label className="text-[10px] font-bold text-gray-400 uppercase">{label}</label>
-    <input 
-      type="number" 
-      className="bg-transparent border-b border-gray-300 font-bold text-lg outline-none focus:border-[#00A09D]" 
-      value={value ?? 0} 
-      onChange={(e) => onChange(Number(e.target.value))} 
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full rounded-2xl border-2 border-gray-50 bg-gray-50 p-4 text-xs font-black text-gray-900 outline-none focus:border-indigo-500/20 focus:bg-white transition-all" 
     />
   </div>
 );

@@ -1,46 +1,18 @@
 import { graphqlRequest } from "./graphqlClient";
+import { Fournisseur} from "@/types/fournisseur";
 
-export type Fournisseur = {
-  id: string;
-  raison_sociale: string;
-  logo?: string | null;
-  matricule_fiscale: string;
-  telephone?: string | null;
-  adresse?: string | null;
-  statut?: "ACTIF" | "INACTIF" | null;
-  latitude?: number | null;
-  longitude?: number | null;
-  adresse_geocodee?: string | null;
-  geocoded_at?: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
-};
-
-export type TableFournisseur = Omit<Fournisseur, "statut"> & {
-  id: string | number;
-  statut: "ACTIF" | "INACTIF";
-};
-
-export function normalizeFournisseur(f: Fournisseur): TableFournisseur {
-  return {
-    ...f,
-    id: f.id,
-    statut: f.statut === "INACTIF" ? "INACTIF" : "ACTIF",
-    logo: f.logo ?? null,
-    latitude: f.latitude ?? null,
-    longitude: f.longitude ?? null,
-    adresse_geocodee: f.adresse_geocodee ?? null,
-    geocoded_at: f.geocoded_at ?? null,
-  };
-}
 
 const FOURNISSEUR_FIELDS = `
-  id
+id
   raison_sociale
   logo
   matricule_fiscale
+  registre_entreprise
   telephone
+  email
   adresse
+  representant_nom
+  representant_role
   statut
   latitude
   longitude
@@ -87,17 +59,22 @@ const UPDATE_FOURNISSEUR = `
   }
 `;
 
-function sanitizeFournisseurInput(input: Partial<Fournisseur>) {
+
+export function sanitizeFournisseurInput(input: Partial<Fournisseur>) {
   const {
     raison_sociale,
     logo,
     matricule_fiscale,
+    registre_entreprise,
     telephone,
     adresse,
+    representant_nom,
+    representant_role,
     statut,
     latitude,
     longitude,
     adresse_geocodee,
+    geocoded_at,
   } = input;
 
   const sanitized: Record<string, unknown> = {};
@@ -105,21 +82,17 @@ function sanitizeFournisseurInput(input: Partial<Fournisseur>) {
   if (raison_sociale !== undefined) sanitized.raison_sociale = raison_sociale;
   if (logo !== undefined) sanitized.logo = logo || null;
   if (matricule_fiscale !== undefined) sanitized.matricule_fiscale = matricule_fiscale;
+  if (registre_entreprise !== undefined) sanitized.registre_entreprise = registre_entreprise || null;
   if (telephone !== undefined) sanitized.telephone = telephone || null;
   if (adresse !== undefined) sanitized.adresse = adresse || null;
-  if (statut !== undefined) sanitized.statut = statut;
+  if (representant_nom !== undefined) sanitized.representant_nom = representant_nom || null;
+  if (representant_role !== undefined) sanitized.representant_role = representant_role || null;
+  if (statut !== undefined) sanitized.statut = statut === "INACTIF" ? "INACTIF" : "ACTIF";
 
-if (latitude !== undefined) {
-  sanitized.latitude = latitude === null ? null : Number(latitude);
-}
-
-if (longitude !== undefined) {
-  sanitized.longitude = longitude === null ? null : Number(longitude);
-}
-
-  if (adresse_geocodee !== undefined) {
-    sanitized.adresse_geocodee = adresse_geocodee || null;
-  }
+  if (latitude !== undefined) sanitized.latitude = latitude === null ? null : Number(latitude);
+  if (longitude !== undefined) sanitized.longitude = longitude === null ? null : Number(longitude);
+  if (adresse_geocodee !== undefined) sanitized.adresse_geocodee = adresse_geocodee || null;
+  if (geocoded_at !== undefined) sanitized.geocoded_at = geocoded_at || null;
 
   return sanitized;
 }

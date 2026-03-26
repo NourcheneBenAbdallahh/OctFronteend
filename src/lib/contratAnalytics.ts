@@ -21,3 +21,8 @@ export function getContratStatus(contrat: any) {
     color: "text-green-600",
   };
 }
+export const getProgressColor = (percent: number) => {
+  if (percent >= 100) return "bg-red-500";
+  if (percent >= 80) return "bg-orange-500";
+  return "bg-indigo-600";
+};

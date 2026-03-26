@@ -24,7 +24,7 @@ export default function MouvementsHeader({
 <button
   type="button"
   onClick={onCreate}
-  className="inline-flex items-center gap-2 rounded-full border border-indigo-300 bg-indigo-50 px-5 py-2 text-sm font-semibold text-indigo-600 transition hover:bg-indigo-100"
+        className="bg-white text-gray-900 border-2 border-gray-900 px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all shadow-[8px_8px_0px_rgba(0,160,157,0.2)]"
 >
   <Plus size={16} />
   Nouveau mouvement

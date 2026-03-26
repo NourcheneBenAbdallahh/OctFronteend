@@ -1,9 +1,8 @@
 "use client";
 
-import ComponentCard from "@/components/common/ComponentCard";
-import PageBreadcrumb from "@/components/common/PageBreadCrumb";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import { listEmballages } from "@/lib/emballages.api";
 import EmballagesTable from "@/components/emballages/EmballagesTable";
 import { TableEmballages, normalizeEmballages } from "@/types/emballage";
@@ -12,7 +11,6 @@ export default function EmballagesPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   
-  // Lecture de la page depuis l'URL
   const pageParam = searchParams?.get("page");
   const currentPage = pageParam ? parseInt(pageParam) : 1;
   const limit = 10;
@@ -21,52 +19,38 @@ export default function EmballagesPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  async function fetchData(page: number) {
+  // Utilisation de useCallback pour éviter de recréer la fonction à chaque render
+  const fetchData = useCallback(async (page: number) => {
     setLoading(true);
     try {
       const res = await listEmballages(page, limit);
-      const normalized = res.emballages.data.map(normalizeEmballages);
+      // Vérification de la structure de réponse pour éviter les crashs
+      const dataArray = res?.emballages?.data || [];
+      const normalized = dataArray.map(normalizeEmballages);
+      
       setEmballages(normalized);
-      setTotal(res.emballages.paginatorInfo.total);
+      setTotal(res?.emballages?.paginatorInfo?.total || 0);
     } catch (error) {
-      console.error("Erreur lors du chargement des emballages:", error);
+      console.error("Erreur chargement:", error);
     } finally {
       setLoading(false);
     }
-  }
+  }, [limit]);
 
-  // Charger les données quand la page change
   useEffect(() => {
     fetchData(currentPage);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage]);
+  }, [currentPage, fetchData]);
 
   const handlePageChange = (newPage: number) => {
-    router.push(`/emballages?page=${newPage}`);
+    // Utilisation de scroll: false pour éviter le saut de page désagréable
+    router.push(`/emballages?page=${newPage}`, { scroll: false });
   };
 
-  if (loading) {
-    return (
-      <div>
-        <PageBreadcrumb pageTitle="Emballages" />
-        <div className="space-y-6">
-          <ComponentCard title="Emballages List">
-            <div className="flex h-64 items-center justify-center">
-              <div className="text-[#00A09D] font-bold animate-pulse uppercase tracking-widest">
-                Chargement...
-              </div>
-            </div>
-          </ComponentCard>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div>
-      <PageBreadcrumb pageTitle="Emballages" />
-      <div className="space-y-6">
-        <ComponentCard title="Emballages List">
+    <div className="space-y-6">
+      
+      <div className="mt-8">
+        <div className={`transition-opacity duration-300 ${loading ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
           <EmballagesTable
             data={emballages}
             total={total}
@@ -74,9 +58,18 @@ export default function EmballagesPage() {
             limit={limit}
             onPageChange={handlePageChange}
           />
-        </ComponentCard>
+        </div>
+
+     
+        {loading && emballages.length === 0 && (
+          <div className="flex h-64 items-center justify-center">
+             <div className="flex flex-col items-center gap-4">
+                <div className="h-10 w-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400">Synchronisation...</span>
+             </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
-
