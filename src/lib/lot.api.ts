@@ -23,7 +23,13 @@ type LotsQueryResponse = {
 type DeleteLotResponse = {
   deleteLot: Lot;
 };
-
+export type PaginatedLots = {
+  data: Lot[];
+  currentPage: number;
+  lastPage: number;
+  total: number;
+  hasMorePages: boolean;
+};
 async function graphqlFetch<T>(
   query: string,
   variables?: Record<string, unknown>,
@@ -57,7 +63,8 @@ async function graphqlFetch<T>(
   return json.data;
 }
 
-export async function getLots(page = 1, first = 50): Promise<Lot[]> {
+
+export async function getLots(page = 1, first = 12): Promise<PaginatedLots> {
   const query = `
     query GetLots($page: Int!, $first: Int!) {
       lots(page: $page, first: $first) {
@@ -71,16 +78,15 @@ export async function getLots(page = 1, first = 50): Promise<Lot[]> {
           user_id
           created_at
           updated_at
-          emballage {
-            id
-            name
-            
-            code
+          emballage { 
+            id 
+            name 
+            code 
           }
-          user {
-            id
-            name
-            email
+          user { 
+            id 
+            name 
+            email 
           }
         }
         paginatorInfo {
@@ -94,8 +100,17 @@ export async function getLots(page = 1, first = 50): Promise<Lot[]> {
   `;
 
   const data = await graphqlFetch<LotsQueryResponse>(query, { page, first });
-  return data.lots?.data ?? [];
+
+  return {
+    data: data.lots.data,
+    currentPage: data.lots.paginatorInfo?.currentPage ?? 1,
+    lastPage: data.lots.paginatorInfo?.lastPage ?? 1,
+    total: data.lots.paginatorInfo?.total ?? 0,
+    hasMorePages: data.lots.paginatorInfo?.hasMorePages ?? false,
+  };
 }
+
+
 
 export async function updateLot(
   id: string | number,

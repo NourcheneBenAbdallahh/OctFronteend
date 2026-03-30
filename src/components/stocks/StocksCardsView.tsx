@@ -32,7 +32,6 @@ export default function StocksCardsView({
           stock={stock}
           onView={onView}
           onEdit={onEdit}
-          onDelete={onDelete}
         />
       ))}
     </div>

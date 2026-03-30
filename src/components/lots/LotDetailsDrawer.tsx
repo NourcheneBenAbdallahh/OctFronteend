@@ -38,7 +38,6 @@ export default function LotDetailsDrawer({ lot, open, onClose }: Props) {
 
       <div className="relative h-full w-full max-w-xl bg-white shadow-[-20px_0_80px_rgba(0,0,0,0.1)] flex flex-col animate-in slide-in-from-right duration-500">
         
-        {/* HEADER STYLE "DASHBOARD" */}
         <div className="px-8 py-8 border-b border-gray-50">
           <div className="flex items-start justify-between">
             <div className="space-y-1">
@@ -62,10 +61,8 @@ export default function LotDetailsDrawer({ lot, open, onClose }: Props) {
           </div>
         </div>
 
-        {/* CONTENU - SCROLLABLE */}
         <div className="flex-1 overflow-y-auto px-8 py-8 space-y-10">
           
-          {/* SECTION 1: STATS CLÉS */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="p-6 rounded-[32px] bg-[#F2F7F7] border border-[#DDF2F1]">
               <div className="flex items-center gap-2 text-[#00A09D] mb-4">
@@ -89,7 +86,6 @@ export default function LotDetailsDrawer({ lot, open, onClose }: Props) {
             </div>
           </div>
 
-          {/* SECTION 2: INFOS COMPLÉMENTAIRES */}
           <div className="space-y-6">
             <div className="flex items-center gap-3">
               <div className="h-[2px] w-8 bg-[#00A09D]" />
@@ -97,18 +93,16 @@ export default function LotDetailsDrawer({ lot, open, onClose }: Props) {
             </div>
 
             <div className="grid grid-cols-1 gap-4">
-              {/* Emballage */}
               <div className="flex items-center justify-between p-5 bg-white border border-gray-100 rounded-2xl group hover:border-[#DDF2F1] transition-colors">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 group-hover:text-[#00A09D] transition-colors">
                     <Hash size={18} />
                   </div>
-                  <span className="text-[13px] font-bold text-gray-500 uppercase tracking-wider">Type Emballage</span>
+                  <span className="text-[13px] font-bold text-gray-500 uppercase tracking-wider">Emballage</span>
                 </div>
                 <span className="text-[14px] font-[900] text-[#1C2434] uppercase">{getEmballageLabel(lot)}</span>
               </div>
 
-              {/* Utilisateur */}
               <div className="flex items-center justify-between p-5 bg-white border border-gray-100 rounded-2xl group hover:border-[#DDF2F1] transition-colors">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 group-hover:text-[#00A09D] transition-colors">
@@ -121,7 +115,6 @@ export default function LotDetailsDrawer({ lot, open, onClose }: Props) {
             </div>
           </div>
 
-          {/* SECTION 3: COMMENTAIRES STYLE "MESSAGE" */}
           <div className="space-y-6">
             <div className="flex items-center gap-3">
               <div className="h-[2px] w-8 bg-orange-400" />
@@ -136,7 +129,6 @@ export default function LotDetailsDrawer({ lot, open, onClose }: Props) {
             </div>
           </div>
 
-          {/* SECTION 4: METADONNÉES TECHNIQUES */}
           <div className="pt-6 border-t border-gray-50">
              <div className="grid grid-cols-2 gap-8">
                 <div>
@@ -151,7 +143,6 @@ export default function LotDetailsDrawer({ lot, open, onClose }: Props) {
           </div>
         </div>
 
-        {/* FOOTER ACTIONS */}
         <div className="px-8 py-6 border-t border-gray-50 bg-[#F8FAFA] flex justify-end">
           <button
             onClick={onClose}

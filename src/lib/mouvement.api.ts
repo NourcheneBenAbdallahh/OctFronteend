@@ -1,30 +1,30 @@
 import {
   EmballageRef,
   EntrepotRef,
-  LotDisponible,
-  MouvementStock,
+  LotDisponible,MouvementsPageStats,
+  MouvementStock, 
 } from "@/types/mouvement";
 
 const GRAPHQL_URL =
   process.env.NEXT_PUBLIC_GRAPHQL_URL ?? "http://127.0.0.1:8000/graphql";
 
+  
 async function gql<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
-  // 1. Récupération du token depuis l'objet complexe "auth-storage"
   const storage = typeof window !== "undefined" ? localStorage.getItem("auth-storage") : null;
   let token = null;
 
   if (storage) {
     try {
       const parsed = JSON.parse(storage);
-      // Selon ta capture, le token est dans state.user.token
       token = parsed.state?.user?.token || parsed.state?.token;
     } catch (e) {
-      console.error("Erreur de lecture du storage auth", e);
+      // console.error("Erreur de lecture du storage auth", e);
     }
   }
 
-  // Debug pour ton PFE
-  console.log("Token extrait :", token ? "✅ Trouvé" : "❌ Non trouvé");
+  // console.log("Token extrait :", token ? "✅ Trouvé" : "❌ Non trouvé");
+  // console.log("GRAPHQL QUERY =", query);
+  // console.log("GRAPHQL VARIABLES =", variables);
 
   try {
     const res = await fetch(GRAPHQL_URL, {
@@ -38,67 +38,131 @@ async function gql<T>(query: string, variables?: Record<string, unknown>): Promi
       cache: "no-store",
     });
 
-    const json = (await res.json()) as {
-      data?: T;
-      errors?: { message: string; extensions?: any }[];
-    };
+    const json = await res.json();
 
-    // Gestion des erreurs HTTP
+    //console.log("GRAPHQL RAW RESPONSE =", json);
+
     if (!res.ok) {
-      console.error(`[HTTP ERROR ${res.status}]`, res.statusText);
+     // console.error(`[HTTP ERROR ${res.status}]`, res.statusText);
       throw new Error(`Erreur HTTP ${res.status}`);
     }
 
-    // Gestion des erreurs GraphQL
     if (json.errors?.length) {
-      console.groupCollapsed(" [GraphQL Error] ", json.errors[0].message);
-      console.table(json.errors);
-      console.groupEnd();
-      throw new Error(json.errors.map((e) => e.message).join(" | "));
+     // console.groupCollapsed("[GraphQL Error]");
+      //console.table(json.errors);
+      //console.groupEnd();
+      throw new Error(json.errors.map((e: any) => e.message).join(" | "));
     }
 
     if (!json.data) {
       throw new Error("Aucune donnée retournée par le serveur.");
     }
 
-    return json.data;
-
+    return json.data as T;
   } catch (error) {
-    console.error(" [Fetch Exception] ", error);
+    //console.error("[Fetch Exception]", error);
     throw error;
   }
 }
-
-// --- FONCTIONS API ---
-
-export async function fetchMouvements(): Promise<MouvementStock[]> {
+export async function fetchMouvements(filters: {
+  search?: string;
+  type?: string;
+  statut?: string;
+  page?: number;
+  first?: number;
+} = {}) {
   const query = `
-    query {
-      mouvementStocks(first: 100) {
-        data {
+  query(
+    $search: String,
+    $type: MouvementType,
+    $statut: MouvementStatut,
+    $first: Int!,
+    $page: Int!
+  ) {
+    mouvementStocks(
+      search: $search,
+      type_mouvement: $type,
+      statut: $statut,
+      first: $first,
+      page: $page
+    ) {
+      data {
+        id
+        code_mouvement
+        type_mouvement
+        statut
+        quantite
+        date_mouvement   
+         entrepot_source_id
+      entrepot_destination_id
+        emballage {     
           id
-          code_mouvement
-          type_mouvement
-          statut
+          code
+          name
+        }
+        lot {         
+          id
+          code_lot
           emballage_id
-          lot_id
-          entrepot_source_id
-          entrepot_destination_id
-          quantite
-          date_mouvement
-          user { id name }
-          emballage { id code name }
-          lot { id code_lot emballage_id }
-          entrepotSource { id adresse }
-          entrepotDestination { id adresse }
+        }
+        user {         
+          id
+          name
+        }
+        entrepotSource {
+          id
+          nom
+        }
+        entrepotDestination {
+          id
+          nom
         }
       }
+      paginatorInfo {
+        currentPage
+        lastPage
+        total
+        perPage
+        hasMorePages
+      }
     }
-  `;
-  const data = await gql<{ mouvementStocks: { data: MouvementStock[] } }>(query);
-  return data.mouvementStocks.data;
-}
+  }
+`;
 
+  const variables: Record<string, any> = {
+    first: filters.first ?? 10,
+    page: filters.page ?? 1,
+  };
+
+  if (filters.search?.trim()) {
+    variables.search = filters.search.trim();
+  }
+
+  if (filters.type && filters.type !== "ALL") {
+    variables.type = filters.type;
+  }
+
+  if (filters.statut && filters.statut !== "ALL") {
+    variables.statut = filters.statut;
+  }
+
+  const data = await gql<{
+    mouvementStocks: {
+      data: MouvementStock[];
+      paginatorInfo: {
+        currentPage: number;
+        lastPage: number;
+        total: number;
+        perPage: number;
+        hasMorePages: boolean;
+      };
+    };
+  }>(query, variables);
+
+ // console.log("MOUVEMENTS RETOURNÉS =", data.mouvementStocks);
+
+  return data.mouvementStocks;
+}
 export async function fetchEntrepots(): Promise<EntrepotRef[]> {
   const query = `
     query {
@@ -195,4 +259,21 @@ export async function deleteMouvementDraft(id: string) {
     }
   `;
   return gql(mutation, { id });
+}
+export async function fetchGlobalStats(): Promise<MouvementsPageStats> {
+  const query = `
+    query {
+      mouvementsStats {
+        total
+        brouillons
+        valides
+        transferts
+        sortiesProduction
+        pertes
+        surplus
+      }
+    }
+  `;
+  const data = await gql<{ mouvementsStats: MouvementsPageStats }>(query);
+  return data.mouvementsStats;
 }

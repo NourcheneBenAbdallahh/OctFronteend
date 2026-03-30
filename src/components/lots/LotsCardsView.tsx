@@ -3,9 +3,16 @@
 import { Lot } from "@/types/lot";
 import LotCard from "./LotCard";
 import { Inbox } from "lucide-react";
+import Pagination from "@/components/tables/Pagination";
 
 interface Props {
   rows: Lot[];
+  // Informations de pagination optionnelles (pour ne pas casser le composant s'il n'y en a pas)
+  pagination?: {
+    currentPage: number;
+    lastPage: number;
+  };
+  onPageChange?: (page: number) => void;
   onView?: (lot: Lot) => void;
   onEdit?: (lot: Lot) => void;
   onDelete?: (lot: Lot) => void;
@@ -13,10 +20,14 @@ interface Props {
 
 export default function LotsCardsView({
   rows,
+  pagination,
+  onPageChange,
   onView,
   onEdit,
   onDelete,
 }: Props) {
+  
+  // ÉTAT VIDE : Si aucune donnée n'est trouvée
   if (!rows.length) {
     return (
       <div className="bg-white border-4 border-dashed border-gray-100 rounded-[40px] p-20 text-center flex flex-col items-center gap-4 mx-8">
@@ -46,7 +57,7 @@ export default function LotsCardsView({
           </span>
         </div>
         <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-          {rows.length} Éléments affichés
+          {rows.length} Éléments affichés sur cette page
         </span>
       </div>
 
@@ -67,6 +78,19 @@ export default function LotsCardsView({
           </div>
         ))}
       </div>
+
+      {/* BLOC PAGINATION : S'affiche seulement si les données sont présentes */}
+      {pagination && onPageChange && (
+        <div className="mt-12 py-8 border-t border-gray-50 flex justify-center">
+          <div className="bg-white px-6 py-2 rounded-full shadow-sm border border-gray-100">
+            <Pagination 
+              currentPage={pagination.currentPage} 
+              totalPages={pagination.lastPage} 
+              onPageChange={onPageChange} 
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

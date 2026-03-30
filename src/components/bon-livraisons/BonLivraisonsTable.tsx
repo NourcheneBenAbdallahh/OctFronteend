@@ -318,7 +318,7 @@ export default function BonLivraisonsTable({
         </table>
       </div>
 
-      <div className="p-6 border-t border-gray-50 bg-gray-50/30">
+  <div className="mt-10 flex justify-center items-center gap-8 py-6 bg-white rounded-[2rem] border border-gray-50 shadow-sm">
         <Pagination currentPage={pagination.currentPage} totalPages={pagination.lastPage} onPageChange={handlePageChange} />
       </div>
 

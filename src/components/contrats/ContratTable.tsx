@@ -10,12 +10,47 @@ import { normalizeContrat, TableContrat } from "@/types/contrat";
 import { TableEmballages } from "@/types/emballage";
 import { TableFournisseur } from "@/types/fournisseur";
 
+// Sous-composant interne pour la pagination en français
+const LocalPagination = ({ 
+  currentPage, 
+  totalPages, 
+  onPageChange 
+}: { 
+  currentPage: number; 
+  totalPages: number; 
+  onPageChange: (p: number) => void 
+}) => (
+  <div className="flex items-center gap-4">
+    <button
+      onClick={() => onPageChange(currentPage - 1)}
+      disabled={currentPage === 1}
+      className="px-4 py-2 text-xs font-bold uppercase tracking-widest bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-30 transition-all shadow-sm"
+    >
+      Précédent
+    </button>
+    <div className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-x px-6 border-gray-100">
+      Page {currentPage} sur {totalPages}
+    </div>
+    <button
+      onClick={() => onPageChange(currentPage + 1)}
+      disabled={currentPage === totalPages}
+      className="px-4 py-2 text-xs font-bold uppercase tracking-widest bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-30 transition-all shadow-sm"
+    >
+      Suivant
+    </button>
+  </div>
+);
+
 export default function ContratTable({ data }: { data?: TableContrat[] }) {
   const [rows, setRows] = useState<TableContrat[]>(data ? data.map(normalizeContrat) : []);
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [editing, setEditing] = useState<TableContrat | null>(null);
   const [query, setQuery] = useState("");
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 6;
 
   const [fournisseurs, setFournisseurs] = useState<TableFournisseur[]>([]);
   const [emballages, setEmballages] = useState<TableEmballages[]>([]);
@@ -49,6 +84,24 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
     loadRefs();
   }, []);
 
+  // Filtrage et Pagination combinés
+  const filteredRows = useMemo(() => {
+    return rows.filter(r =>
+      r.numero_contrat.toLowerCase().includes(query.toLowerCase()) ||
+      r.fournisseur?.raison_sociale?.toLowerCase().includes(query.toLowerCase())
+    );
+  }, [rows, query]);
+
+  const totalPages = Math.ceil(filteredRows.length / itemsPerPage);
+
+  const paginatedRows = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredRows.slice(start, start + itemsPerPage);
+  }, [filteredRows, currentPage]);
+
+  // Reset la page si on recherche
+  useEffect(() => { setCurrentPage(1); }, [query]);
+
   const stats = useMemo(() => {
     const total = rows.length;
     const totalV = rows.reduce((acc, c) => acc + (c.quantite_contractuelle || 0), 0);
@@ -60,17 +113,10 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
     };
   }, [rows]);
 
-  const filteredRows = rows.filter(r =>
-    r.numero_contrat.toLowerCase().includes(query.toLowerCase()) ||
-    r.fournisseur?.raison_sociale?.toLowerCase().includes(query.toLowerCase())
-  );
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-
     try {
-      // Nettoyage et typage forcé pour l'API
       const payload = {
         ...form,
         numero_contrat: form.numero_contrat || "",
@@ -82,7 +128,6 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
       } as any;
 
       let updated: TableContrat;
-
       if (editing) {
         const res = await updateContrat(editing.id, payload);
         updated = normalizeContrat(res.updateContrat);
@@ -91,16 +136,13 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
         updated = normalizeContrat(res.createContrat);
       }
 
-      // Liaison manuelle des objets pour l'affichage instantané
       updated.fournisseur = fournisseurs.find(f => String(f.id) === String(payload.fournisseur_id));
       updated.emballage = emballages.find(em => String(em.id) === String(payload.emballage_id));
 
       setRows(prev => editing ? prev.map(r => r.id === updated.id ? updated : r) : [updated, ...prev]);
-
       setIsOpen(false);
       setEditing(null);
       setForm(emptyForm);
-
     } catch (err) {
       console.error(err);
       alert("Erreur de sauvegarde : Vérifiez les champs obligatoires.");
@@ -110,7 +152,7 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6 min-h-[700px]">
       <ContratHeader
         query={query}
         setQuery={setQuery}
@@ -118,16 +160,29 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
         stats={stats}
       />
 
-      <ContratListView
-        rows={filteredRows}
-        onEdit={(c) => { setEditing(c); setForm(c); setIsOpen(true); }}
-        onDelete={async (id) => {
-          if (confirm("Supprimer ?")) {
-            await deleteContrat(id);
-            setRows(r => r.filter(x => x.id !== id));
-          }
-        }}
-      />
+      <div className="flex-1">
+        <ContratListView
+          rows={paginatedRows}
+          onEdit={(c) => { setEditing(c); setForm(c); setIsOpen(true); }}
+          onDelete={async (id) => {
+            if (confirm("Voulez-vous vraiment supprimer ce contrat ?")) {
+              await deleteContrat(id);
+              setRows(r => r.filter(x => x.id !== id));
+            }
+          }}
+        />
+      </div>
+
+      {/* FOOTER : Pagination en français */}
+      {totalPages > 1 && (
+        <div className="mt-4 flex justify-center items-center py-6 bg-white rounded-[2rem] border border-gray-50 shadow-sm animate-in fade-in zoom-in-95 duration-300">
+          <LocalPagination 
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+          />
+        </div>
+      )}
 
       <ContratForm
         isOpen={isOpen}

@@ -3,9 +3,17 @@
 import { Lot, LotsGroupedByDate } from "@/types/lot";
 import LotCard from "./LotCard";
 import { CalendarRange, Inbox, History } from "lucide-react";
+import Pagination from "@/components/tables/Pagination"; // Import indispensable
 
 interface Props {
   groups: LotsGroupedByDate[];
+  // AJOUT : On déclare les props de pagination
+  pagination?: {
+    currentPage: number;
+    lastPage: number;
+  };
+  onPageChange?: (page: number) => void;
+  
   onView?: (lot: Lot) => void;
   onEdit?: (lot: Lot) => void;
   onDelete?: (lot: Lot) => void;
@@ -13,6 +21,8 @@ interface Props {
 
 export default function LotsTimelineView({
   groups,
+  pagination,    // On les récupère ici
+  onPageChange,  // Et ici
   onView,
   onEdit,
   onDelete,
@@ -33,16 +43,14 @@ export default function LotsTimelineView({
 
   return (
     <div className="relative px-8 pb-20">
-      {/* LA LIGNE DE TEMPS - Dégradé Émeraude vers Transparent */}
+      {/* LA LIGNE DE TEMPS */}
       <div className="absolute left-[58px] top-0 bottom-0 w-[3px] bg-gradient-to-b from-[#00A09D] via-[#DDF2F1] to-transparent rounded-full opacity-60" />
 
       <div className="space-y-20">
         {groups.map((group) => (
           <div key={group.dateKey} className="relative">
-            
-            {/* EN-TÊTE DE GROUPE (DATE) STYLE STOCKCARD */}
+            {/* EN-TÊTE DE GROUPE */}
             <div className="flex items-center gap-8 mb-10 relative z-10">
-              {/* Le Point Indicateur XXL */}
               <div className="w-16 h-16 rounded-[24px] bg-white border-2 border-gray-100 flex items-center justify-center shadow-xl shadow-gray-100 group transition-all">
                 <div className="w-10 h-10 rounded-xl bg-[#F2F7F7] flex items-center justify-center text-[#00A09D]">
                    <CalendarRange size={22} />
@@ -69,13 +77,6 @@ export default function LotsTimelineView({
 
             {/* LISTE DES CARTES DU GROUPE */}
             <div className="pl-24 space-y-8 relative">
-              {/* Lignes de connexion horizontales (Discrètes) */}
-              <div className="absolute left-0 top-0 bottom-0 flex flex-col justify-around py-12 pointer-events-none">
-                 {group.items.map((_, i) => (
-                   <div key={i} className="w-6 h-[2px] bg-[#DDF2F1]" />
-                 ))}
-              </div>
-
               {group.items.map((lot) => (
                 <div key={lot.id} className="transition-all duration-500 hover:translate-x-3">
                   <LotCard
@@ -90,6 +91,19 @@ export default function LotsTimelineView({
           </div>
         ))}
       </div>
+
+      {/* AJOUT : Bloc Pagination en bas de la Timeline */}
+      {pagination && onPageChange && (
+        <div className="mt-20 py-8 border-t border-gray-50 flex justify-center relative z-20">
+          <div className="bg-white px-8 py-3 rounded-full shadow-lg border border-gray-100">
+            <Pagination 
+              currentPage={pagination.currentPage} 
+              totalPages={pagination.lastPage} 
+              onPageChange={onPageChange} 
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

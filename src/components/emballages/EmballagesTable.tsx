@@ -87,18 +87,19 @@ export default function EmballagesTable({ data, total, page, limit, onPageChange
       </div>
 
       {/* PAGINATION : Design épuré */}
-      {totalPages > 1 && !query && (
-        <div className="mt-10 flex justify-center items-center gap-8 py-6 bg-white rounded-[2rem] border border-gray-50 shadow-sm">
-          <Pagination
-            currentPage={page}
-            totalPages={totalPages}
-            onPageChange={onPageChange}
-          />
-          <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-l pl-8 border-gray-100">
-            Page {page} sur {totalPages}
-          </div>
-        </div>
-      )}
+{totalPages > 1 && !query && (
+  <div className="mt-10 flex justify-center items-center gap-8 py-6 bg-white rounded-[2rem] border border-gray-50 shadow-sm">
+    <Pagination
+      currentPage={page}
+      totalPages={totalPages}
+      onPageChange={onPageChange}
+    />
+    <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-l pl-8 border-gray-100">
+      {/* Traduction ici */}
+      Page {page} sur {totalPages}
+    </div>
+  </div>
+)}
 
       {/* FORMULAIRE : Le Drawer latéral */}
       {isOpen && (

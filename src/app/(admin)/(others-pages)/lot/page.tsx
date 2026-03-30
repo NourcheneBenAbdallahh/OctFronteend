@@ -1,23 +1,35 @@
 import LotsClient from "@/components/lots/LotsClient";
-import { getLots } from "@/lib/lot.api";
-import type { Lot } from "@/types/lot";
+import { getLots, type PaginatedLots } from "@/lib/lot.api"; // Importe le type ici
 
 export default async function LotsPage() {
-  let lots: Lot[] = [];
+  // 1. On précise le type PaginatedLots ici pour éviter le "never[]"
+  let initialData: PaginatedLots = {
+    data: [],
+    currentPage: 1,
+    lastPage: 1,
+    total: 0,
+    hasMorePages: false
+  };
 
   try {
-    lots = await getLots(1, 50);
+    // 2. On récupère les données (res sera automatiquement typé PaginatedLots)
+    const res = await getLots(1, 12);
+    initialData = res;
   } catch (error) {
     console.error("Failed to load lots:", error);
   }
 
   return (
- <div className="space-y-6">
-      
-      <div className="mt-8">       
-         <LotsClient initialLots={lots} />
-    </div>   
-     </div>
-
+    <div className="space-y-6">
+      <div className="mt-8">      
+        <LotsClient 
+          initialLots={initialData.data} 
+          initialPagination={{
+            currentPage: initialData.currentPage,
+            lastPage: initialData.lastPage
+          }}
+        />
+      </div>   
+    </div>
   );
 }
