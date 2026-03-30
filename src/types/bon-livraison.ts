@@ -53,6 +53,15 @@ export type EmballageOption = {
   label: string;
 };
 
+export interface BonLivraisonOption {
+  id: string | number;
+  numero_bl: string;
+  quantite_recue: number;
+  prix_unitaire?: number; 
+  commande?: {
+    prix_unitaire: number;
+  };
+}
 export type CommandeOption = {
   id: string | number;
   numero_commande: string;

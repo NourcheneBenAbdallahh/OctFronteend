@@ -201,14 +201,18 @@ export default function CommandesTable({
   }, [form.fournisseur_id, form.emballage_id, contrats]);
 
   const contractStats = useMemo(() => {
-    if (!activeContract) return null;
-    const total = Number(activeContract.quantite_contractuelle || 0);
-    const realise = Number(activeContract.quantite_realisee || 0);
-    const saisie = Number(form.quantite || 0);
-    const restant = total - realise;
-    const pourcentage = Math.min(((realise + saisie) / total) * 100, 100);
-    return { total, realise, restant, pourcentage, depasse: saisie > restant };
-  }, [activeContract, form.quantite]);
+  if (!activeContract) return null;
+  const total = Number(activeContract.quantite_contractuelle || 0);
+  const realise = Number(activeContract.quantite_realisee || 0);
+  const saisie = Number(form.quantite || 0);
+  const restant = total - realise;
+  const pourcentage = Math.min(((realise + saisie) / total) * 100, 100);
+  
+  const surplus = saisie - restant; 
+  
+  return { total, realise, restant, pourcentage, depasse: saisie > restant, surplus };
+}, [activeContract, form.quantite]);
+
 
   // --- ACTIONS ---
   const openNew = () => { setEditing(null); setForm(emptyForm); setErrorMessage(""); setIsDrawerOpen(true); };
@@ -537,21 +541,46 @@ const filteredRows = useMemo(() => {
                   </select>
                 </div>
 
-                {activeContract && contractStats && (
-                  <div className="rounded-[2.5rem] border-2 border-indigo-50 bg-indigo-50/30 p-8 space-y-4 shadow-inner">
-                    <div className="flex justify-between items-end">
-                      <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Capacité du contrat</span>
-                      <span className={`text-2xl font-black ${contractStats.depasse ? "text-red-600" : "text-indigo-900"}`}>{contractStats.pourcentage.toFixed(0)}%</span>
-                    </div>
-                    <div className="h-3 w-full overflow-hidden rounded-full bg-white border border-indigo-100/50">
-                      <div className={`h-full transition-all duration-1000 ${contractStats.depasse ? "bg-red-500" : "bg-indigo-600"}`} style={{ width: `${contractStats.pourcentage}%` }} />
-                    </div>
-                    <div className="flex justify-between text-[9px] font-black text-gray-400 uppercase">
-                        <span>Reste: {contractStats.restant}</span>
-                        <span>Total: {contractStats.total}</span>
-                    </div>
-                  </div>
-                )}
+               {activeContract && contractStats && (
+  <div className={`rounded-[2.5rem] border-2 p-8 space-y-4 shadow-inner transition-all duration-500 ${
+    contractStats.depasse ? "border-red-100 bg-red-50/50" : "border-indigo-50 bg-indigo-50/30"
+  }`}>
+    <div className="flex justify-between items-end">
+      <span className={`text-[10px] font-black uppercase tracking-widest ${
+        contractStats.depasse ? "text-red-600" : "text-indigo-600"
+      }`}>
+        Capacité du contrat
+      </span>
+      <span className={`text-2xl font-black ${contractStats.depasse ? "text-red-600" : "text-indigo-900"}`}>
+        {(( (contractStats.realise + Number(form.quantite)) / contractStats.total) * 100).toFixed(0)}%
+      </span>
+    </div>
+
+    {/* Barre de progression */}
+    <div className="h-3 w-full overflow-hidden rounded-full bg-white border border-indigo-100/50">
+      <div 
+        className={`h-full transition-all duration-1000 ${contractStats.depasse ? "bg-red-500" : "bg-indigo-600"}`} 
+        style={{ width: `${Math.min(((contractStats.realise + Number(form.quantite)) / contractStats.total) * 100), 100}%` }} 
+      />
+    </div>
+
+    {/* Message d'explication en cas de dépassement */}
+    {contractStats.depasse ? (
+      <div className="flex items-start gap-3 mt-4 animate-in fade-in slide-in-from-top-2">
+        <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
+        <p className="text-[11px] font-bold text-red-700 leading-relaxed uppercase tracking-tight">
+          Attention : Vous dépassez la limite du contrat de <span className="underline">{contractStats.surplus}</span> unités. 
+          Veuillez réduire la quantité ou modifier le contrat fournisseur.
+        </p>
+      </div>
+    ) : (
+      <div className="flex justify-between text-[9px] font-black text-gray-400 uppercase">
+        <span>Reste disponible: {contractStats.restant}</span>
+        <span>Plafond: {contractStats.total}</span>
+      </div>
+    )}
+  </div>
+)}
 
                 <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-3">

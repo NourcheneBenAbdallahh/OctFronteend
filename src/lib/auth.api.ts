@@ -38,6 +38,28 @@ mutation ResendVerificationEmail {
   resendVerificationEmail
 }`;
 
+
+const FORGOT_PASSWORD_MUTATION = `
+mutation ForgotPassword($email: String!) {
+  forgotPassword(email: $email)
+}`;
+
+const RESET_PASSWORD_MUTATION = `
+mutation ResetPassword(
+  $email: String!,
+  $token: String!,
+  $password: String!,
+  $password_confirmation: String!
+) {
+  resetPassword(
+    email: $email,
+    token: $token,
+    password: $password,
+    password_confirmation: $password_confirmation
+  )
+}`;
+
+
 const ME_QUERY = `
 query Me {
   me {
@@ -66,7 +88,28 @@ export async function verifyEmail(token: string): Promise<string> {
 }
 
 export async function resendVerificationEmail(token?: string): Promise<string> {
-  return graphqlRequest<{ resendVerificationEmail: string }>(RESEND_VERIFICATION_MUTATION, {}, { token }).then(d => d.resendVerificationEmail);
+  return graphqlRequest<{ resendVerificationEmail: string }>(
+    RESEND_VERIFICATION_MUTATION,
+    {},
+    { token }
+  ).then((d) => d.resendVerificationEmail);
+}
+
+export async function forgotPassword(email: string): Promise<string> {
+  return graphqlRequest<{ forgotPassword: string }>(FORGOT_PASSWORD_MUTATION, {
+    email,
+  }).then((d) => d.forgotPassword);
+}
+export async function resetPassword(input: {
+  email: string;
+  token: string;
+  password: string;
+  password_confirmation: string;
+}): Promise<string> {
+  return graphqlRequest<{ resetPassword: string }>(
+    RESET_PASSWORD_MUTATION,
+    input
+  ).then((d) => d.resetPassword);
 }
 
 export async function me(token?: string): Promise<User | null> {

@@ -9,15 +9,19 @@ import {
   updateFacture,
 } from "@/lib/factures.api";
 import {
-  CommandeOption,
-  CreateFactureInput,
-  EmballageOption,
   FactureStatut,
   FacturesPaginatorInfo,
   TableFacture,
   UpdateFactureInput,
+  CreateFactureInput,
 } from "@/types/facture";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { BonLivraisonOption } from "@/types/bon-livraison"; 
+import { usePathname, useRouter } from "next/navigation";
+import { 
+  X, Search, Edit2, Trash2, 
+  FileText, Clock, AlertCircle, 
+  ChevronDown, Banknote, TrendingUp, Save, Truck, Check
+} from "lucide-react";
 
 type Id = string | number;
 
@@ -25,573 +29,329 @@ type FactureForm = {
   numero_facture: string;
   date_facture: string;
   montant_ht: string;
-  emballage_id: string;
-  quantite_facturee: string;
-  commande_id: string;
-  commande_numero: string;
+  bon_livraison_ids: string[]; // Changé en tableau pour le multi-sélection
   statut: FactureStatut;
 };
 
 const emptyForm: FactureForm = {
   numero_facture: "",
-  date_facture: "",
-  montant_ht: "",
-  emballage_id: "",
-  quantite_facturee: "",
-  commande_id: "",
-  commande_numero: "",
+  date_facture: new Date().toISOString().split('T')[0],
+  montant_ht: "0",
+  bon_livraison_ids: [],
   statut: "BROUILLON",
 };
 
-function formatDate(value?: string | null) {
-  if (!value) return "-";
-  return value.includes("T") ? value.split("T")[0] : value;
-}
+const STATUT_STYLES: Record<string, string> = {
+  BROUILLON: "bg-amber-50 text-amber-700 border-amber-200",
+  VALIDE: "bg-blue-50 text-blue-700 border-blue-200",
+  PAYE: "bg-green-50 text-green-700 border-green-200",
+};
 
-function formatMoney(value?: number | null) {
-  if (value === null || value === undefined || Number.isNaN(Number(value))) {
-    return "-";
-  }
-
-  return Number(value).toFixed(2);
-}
-
-function getErrorMessage(error: unknown) {
-  if (error instanceof Error) return error.message;
-  return "Une erreur est survenue.";
-}
+const formatDate = (v?: string | null) => v ? (v.includes("T") ? v.split("T")[0] : v) : "-";
+const formatMoney = (v?: number | null) => v?.toLocaleString('fr-TN', { minimumFractionDigits: 3 }) || "0,000";
 
 export default function FacturesTable({
   data,
   pagination,
-  emballages,
-  commandes,
+  bonsLivraison,
 }: {
   data: TableFacture[];
   pagination: FacturesPaginatorInfo;
-  emballages: EmballageOption[];
-  commandes: CommandeOption[];
+  bonsLivraison: BonLivraisonOption[];
 }) {
   const [rows, setRows] = useState<TableFacture[]>(data);
-  const [isOpen, setIsOpen] = useState(false);
+  const [expandedId, setExpandedId] = useState<Id | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<TableFacture | null>(null);
   const [form, setForm] = useState<FactureForm>(emptyForm);
   const [query, setQuery] = useState("");
+  const [blSearch, setBlSearch] = useState("");
   const [submitLoading, setSubmitLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-
-  const [commandeDropdownOpen, setCommandeDropdownOpen] = useState(false);
+  const [blDropdownOpen, setBlDropdownOpen] = useState(false);
 
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
 
-  const commandeDropdownRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => { setRows(data); }, [data]);
 
+  // --- AUTO-REMPLISSAGE DES VALEURS ---
   useEffect(() => {
-    setRows(data);
-  }, [data]);
+    if (!editing && form.bon_livraison_ids.length > 0) {
+      const selectedBLs = bonsLivraison.filter(bl => form.bon_livraison_ids.includes(String(bl.id)));
+      
+      // Calcul du montant HT total basé sur (quantité reçue * prix unitaire de la commande)
+      const totalHT = selectedBLs.reduce((sum, bl) => {
+        const prix = bl.commande?.prix_unitaire || 0;
+        return sum + (bl.quantite_recue * prix);
+      }, 0);
+
+      setForm(prev => ({ ...prev, montant_ht: totalHT.toFixed(3) }));
+    }
+  }, [form.bon_livraison_ids, bonsLivraison, editing]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (
-        commandeDropdownRef.current &&
-        !commandeDropdownRef.current.contains(event.target as Node)
-      ) {
-        setCommandeDropdownOpen(false);
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setBlDropdownOpen(false);
       }
     }
-
     document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const emballagesMap = useMemo(() => {
-    return new Map(emballages.map((item) => [String(item.id), item.label]));
-  }, [emballages]);
+  const filteredBL = useMemo(() => {
+    const s = blSearch.trim().toLowerCase();
+    return bonsLivraison.filter(b => b.numero_bl.toLowerCase().includes(s));
+  }, [bonsLivraison, blSearch]);
 
-  const commandesMap = useMemo(() => {
-    return new Map(
-      commandes.map((item) => [String(item.id), item.numero_commande])
-    );
-  }, [commandes]);
+  const toggleBL = (id: string) => {
+    setForm(prev => ({
+      ...prev,
+      bon_livraison_ids: prev.bon_livraison_ids.includes(id)
+        ? prev.bon_livraison_ids.filter(i => i !== id)
+        : [...prev.bon_livraison_ids, id]
+    }));
+  };
 
-  const filteredCommandes = useMemo(() => {
-    const search = form.commande_numero.trim().toLowerCase();
-
-    if (!search) return commandes;
-
-    return commandes.filter((commande) =>
-      commande.numero_commande.toLowerCase().includes(search)
-    );
-  }, [commandes, form.commande_numero]);
-
-  function openNew() {
-    setEditing(null);
-    setForm(emptyForm);
-    setErrorMessage("");
-    setCommandeDropdownOpen(false);
-    setIsOpen(true);
-  }
-
-  function openEdit(item: TableFacture) {
-    const commandeNumero = commandesMap.get(String(item.commande_id)) || "";
-
+  const openNew = () => { setEditing(null); setForm(emptyForm); setBlSearch(""); setIsDrawerOpen(true); };
+  
+  const openEdit = (item: TableFacture) => {
     setEditing(item);
-    setErrorMessage("");
-    setCommandeDropdownOpen(false);
     setForm({
-      numero_facture: item.numero_facture ?? "",
-      date_facture: item.date_facture
-        ? item.date_facture.includes("T")
-          ? item.date_facture.split("T")[0]
-          : item.date_facture
-        : "",
-      montant_ht:
-        item.montant_ht !== null && item.montant_ht !== undefined
-          ? String(item.montant_ht)
-          : "",
-      emballage_id: item.emballage_id ? String(item.emballage_id) : "",
-      quantite_facturee:
-        item.quantite_facturee !== null && item.quantite_facturee !== undefined
-          ? String(item.quantite_facturee)
-          : "",
-      commande_id: item.commande_id ? String(item.commande_id) : "",
-      commande_numero: commandeNumero,
+      numero_facture: item.numero_facture || "",
+      date_facture: formatDate(item.date_facture),
+      montant_ht: String(item.montant_ht || ""),
+      bon_livraison_ids: item.bon_livraisons?.map(bl => String(bl.id)) || [],
       statut: item.statut,
     });
-    setIsOpen(true);
-  }
+    setIsDrawerOpen(true);
+  };
 
-  function closeModal() {
-    if (submitLoading) return;
-    setIsOpen(false);
-    setEditing(null);
-    setForm(emptyForm);
-    setErrorMessage("");
-    setCommandeDropdownOpen(false);
-  }
+  const closeDrawer = () => { if (!submitLoading) { setIsDrawerOpen(false); setErrorMessage(""); } };
 
-  function validateForm() {
-    if (!form.numero_facture.trim()) {
-      return "Le numéro de facture est obligatoire.";
-    }
-
-    if (!form.date_facture) {
-      return "La date de facture est obligatoire.";
-    }
-
-    if (!form.montant_ht || Number(form.montant_ht) <= 0) {
-      return "Le montant HT doit être supérieur à 0.";
-    }
-
-    if (!form.emballage_id) {
-      return "L'emballage est obligatoire.";
-    }
-
-    if (!form.quantite_facturee || Number(form.quantite_facturee) <= 0) {
-      return "La quantité facturée doit être supérieure à 0.";
-    }
-
-    if (!form.commande_id) {
-      return "La commande est obligatoire.";
-    }
-
-    return "";
-  }
-
-  function handleCommandeInputChange(value: string) {
-    setForm((prev) => ({
-      ...prev,
-      commande_numero: value,
-      commande_id: "",
-    }));
-    setCommandeDropdownOpen(true);
-  }
-
-  function handleSelectCommande(commande: CommandeOption) {
-    setForm((prev) => ({
-      ...prev,
-      commande_id: String(commande.id),
-      commande_numero: commande.numero_commande,
-    }));
-    setCommandeDropdownOpen(false);
-  }
-
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-
-    const validationError = validateForm();
-    if (validationError) {
-      setErrorMessage(validationError);
-      return;
-    }
-
+    if (form.bon_livraison_ids.length === 0) return setErrorMessage("Sélectionnez au moins un Bon de Livraison");
+    
     setSubmitLoading(true);
-    setErrorMessage("");
-
     try {
-      const payloadBase = {
-        numero_facture: form.numero_facture.trim(),
-        date_facture: form.date_facture,
-        montant_ht: Number(form.montant_ht),
-        emballage_id: form.emballage_id,
-        quantite_facturee: Number(form.quantite_facturee),
-        commande_id: form.commande_id,
-        statut: form.statut,
-      };
-
+      const payload = { ...form, montant_ht: Number(form.montant_ht) };
       if (editing) {
-        const updatePayload: UpdateFactureInput = payloadBase;
-        const res = await updateFacture(editing.id, updatePayload);
-        const updated = normalizeFacture(res.updateFacture);
-
-        setRows((current) =>
-          current.map((item) =>
-            String(item.id) === String(updated.id) ? updated : item
-          )
-        );
+        const res = await updateFacture(editing.id, payload as UpdateFactureInput);
+        setRows(prev => prev.map(r => String(r.id) === String(editing.id) ? normalizeFacture(res.updateFacture) : r));
       } else {
-        const createPayload: CreateFactureInput = payloadBase;
-        const res = await createFacture(createPayload);
-        const created = normalizeFacture(res.createFacture);
-
-        setRows((current) => [created, ...current]);
+        const res = await createFacture(payload as any); // Le service Laravel gérera le tableau bon_livraison_ids
+        setRows(prev => [normalizeFacture(res.createFacture), ...prev]);
       }
-
-      closeModal();
-    } catch (error) {
-      setErrorMessage(getErrorMessage(error));
-    } finally {
-      setSubmitLoading(false);
-    }
+      closeDrawer();
+    } catch (err: any) {
+      setErrorMessage(err.graphQLErrors?.[0]?.message || err.message);
+    } finally { setSubmitLoading(false); }
   }
-
+// --- SUPPRESSION D'UNE FACTURE ---
   async function handleDelete(id: Id) {
-    if (!confirm("Delete this facture?")) return;
-
+    // Utilisation d'une confirmation stylée ou standard
+    if (!confirm("Voulez-vous vraiment supprimer cette facture ? Cette action est irréversible.")) return;
+    
     try {
+      // Appel à ton API lib/factures.api
       await deleteFacture(id);
-      setRows((current) =>
-        current.filter((item) => String(item.id) !== String(id))
-      );
-    } catch (error) {
-      alert(getErrorMessage(error));
+      
+      // Mise à jour locale de l'état pour un feedback instantané (Optimistic UI)
+      setRows(prev => prev.filter(r => String(r.id) !== String(id)));
+      
+      // Optionnel : Notifier l'utilisateur (si tu as une lib de toast)
+      console.log(`Facture ${id} supprimée avec succès`);
+    } catch (err: any) {
+      alert("Erreur lors de la suppression : " + (err.message || "Serveur injoignable"));
     }
   }
-
-  const filteredRows = useMemo(() => {
-    if (!query.trim()) return rows;
-
-    const q = query.toLowerCase();
-
-    return rows.filter((item) => {
-      const commandeNumero = commandesMap.get(String(item.commande_id)) || "";
-      const emballageLabel = emballagesMap.get(String(item.emballage_id)) || "";
-
-      return (
-        item.numero_facture?.toLowerCase().includes(q) ||
-        item.statut?.toLowerCase().includes(q) ||
-        commandeNumero.toLowerCase().includes(q) ||
-        emballageLabel.toLowerCase().includes(q)
-      );
-    });
-  }, [rows, query, commandesMap, emballagesMap]);
-
-  function handlePageChange(page: number) {
-    const params = new URLSearchParams(searchParams?.toString());
-    params.set("page", String(page));
-    router.push(`${pathname}?${params.toString()}`);
-  }
-
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <button
-          onClick={openNew}
-          className="rounded-lg bg-brand-500 px-4 py-2 text-white"
-        >
-          + New Facture
-        </button>
-
-        <input
-          type="text"
-          placeholder="Search by numero, statut, commande, emballage..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-brand-300 sm:max-w-sm"
-        />
+    <div className="min-h-screen bg-gray-50/50 p-4 lg:p-8 font-sans">
+      <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="space-y-2">
+      <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-[#00A09D]">
+        <div className="w-8 h-[2px] bg-[#00A09D]"></div>
+Gestion Facturation      </div>
+      <h1 className="text-4xl font-black text-gray-900 tracking-tighter uppercase">
+        Automatisation des pénalités et groupement de BL <span className="text-[#00A09D]">.</span>
+      </h1>
+    </div>
+       
+        
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <input type="text" placeholder="Filtrer..." value={query} onChange={(e) => setQuery(e.target.value)} className="rounded-2xl border border-gray-200 bg-white pl-10 pr-4 py-3 text-sm outline-none w-64 shadow-sm" />
+          </div>
+          <button onClick={openNew} className="bg-gray-900 text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-xl">
+            Nouvelle Facture
+          </button>
+        </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+      {/* TABLE */}
+      <div className="overflow-hidden rounded-[2.5rem] border border-gray-100 bg-white shadow-2xl">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1100px] table-auto">
+          <table className="w-full text-left">
             <thead>
-              <tr className="text-left text-xs uppercase text-gray-500">
-                <th className="px-4 py-3">Numéro</th>
-                <th className="px-4 py-3">Date</th>
-                <th className="px-4 py-3">Montant HT</th>
-                <th className="px-4 py-3">Montant TTC</th>
-                <th className="px-4 py-3">Quantité</th>
-                <th className="px-4 py-3">Statut</th>
-                <th className="px-4 py-3">Commande</th>
-                <th className="px-4 py-3">Emballage</th>
-                <th className="px-4 py-3 text-right">Actions</th>
+              <tr className="bg-gray-50/30 text-[10px] font-black uppercase text-gray-400 border-b">
+                <th className="px-8 py-6 w-10"></th>
+                <th className="px-6 py-6">Facture</th>
+                <th className="px-6 py-6">BL Liés</th>
+                <th className="px-6 py-6 text-center">Montant TTC</th>
+                <th className="px-6 py-6">Statut</th>
+                <th className="px-8 py-6 text-right">Actions</th>
               </tr>
             </thead>
-
-            <tbody>
-              {filteredRows.length > 0 ? (
-                filteredRows.map((item) => (
-                  <tr key={item.id} className="border-t border-gray-100">
-                    <td className="px-4 py-3 font-medium text-gray-800">
-                      {item.numero_facture}
+            <tbody className="divide-y divide-gray-50">
+              {rows.map((item) => (
+                <React.Fragment key={item.id}>
+                  <tr onClick={() => setExpandedId(expandedId === item.id ? null : item.id)} className="hover:bg-gray-50/50 transition-all cursor-pointer">
+                    <td className="px-8 py-5"><ChevronDown className={`h-4 w-4 transition-transform ${expandedId === item.id ? 'rotate-180 text-indigo-600' : ''}`} /></td>
+                    <td className="px-6 py-5">
+                      <div className="font-black text-gray-900">{item.numero_facture}</div>
+                      <div className="text-[10px] text-gray-400 font-bold">{formatDate(item.date_facture)}</div>
                     </td>
-                    <td className="px-4 py-3 text-gray-700">
-                      {formatDate(item.date_facture)}
+                    <td className="px-6 py-5">
+                      <div className="flex -space-x-2">
+                        {item.bon_livraisons?.map((bl, i) => (
+                          <div key={bl.id} title={bl.numero_bl} className="h-8 w-8 rounded-full bg-indigo-100 border-2 border-white flex items-center justify-center text-[10px] font-black text-indigo-600">
+                            {bl.numero_bl.slice(-2)}
+                          </div>
+                        ))}
+                      </div>
                     </td>
-                    <td className="px-4 py-3 text-gray-700">
-                      {formatMoney(item.montant_ht)}
+                    <td className="px-6 py-5 text-center">
+                      <span className="bg-gray-900 text-white px-3 py-1 rounded-lg font-black text-xs">{formatMoney(item.montant_ttc)} DT</span>
                     </td>
-                    <td className="px-4 py-3 text-gray-700">
-                      {formatMoney(item.montant_ttc)}
+                    <td className="px-6 py-5">
+                      <span className={`px-4 py-1 rounded-full text-[9px] font-black border uppercase ${STATUT_STYLES[item.statut]}`}>{item.statut}</span>
                     </td>
-                    <td className="px-4 py-3 text-gray-700">
-                      {item.quantite_facturee ?? "-"}
-                    </td>
-                    <td className="px-4 py-3">
-                      {item.statut === "PAYE" ? (
-                        <span className="font-medium text-green-600">PAYE</span>
-                      ) : item.statut === "VALIDE" ? (
-                        <span className="font-medium text-blue-600">VALIDE</span>
-                      ) : (
-                        <span className="font-medium text-amber-600">
-                          BROUILLON
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-gray-700">
-                      {commandesMap.get(String(item.commande_id)) || "-"}
-                    </td>
-                    <td className="px-4 py-3 text-gray-700">
-                      {emballagesMap.get(String(item.emballage_id)) || "-"}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => openEdit(item)}
-                        className="mr-3 text-brand-600"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(item.id)}
-                        className="text-red-600"
-                      >
-                        Delete
-                      </button>
+                    <td className="px-8 py-5 text-right" onClick={(e) => e.stopPropagation()}>
+                      <button onClick={() => openEdit(item)} className="p-2 hover:text-indigo-600"><Edit2 className="h-4 w-4" /></button>
+                      <button onClick={() => handleDelete(item.id)} className="p-2 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td
-                    colSpan={9}
-                    className="px-4 py-6 text-center text-sm text-gray-500"
-                  >
-                    No factures found.
-                  </td>
-                </tr>
-              )}
+                  {expandedId === item.id && (
+                    <tr className="bg-gray-50/50 animate-in fade-in duration-300">
+                      <td colSpan={6} className="p-8">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                          <div className="bg-white p-6 rounded-[2rem] border shadow-sm col-span-2">
+                             <h4 className="text-[10px] font-black uppercase text-gray-400 mb-4 flex items-center gap-2"><Truck className="h-3 w-3"/> Détails des réceptions</h4>
+                             <div className="space-y-3">
+                                {item.bon_livraisons?.map(bl => (
+                                  <div key={bl.id} className="flex justify-between text-sm border-b border-gray-50 pb-2">
+                                    <span className="font-bold">{bl.numero_bl} <span className="text-gray-400 font-medium">({formatDate(bl.date_reception)})</span></span>
+                                    <span className="font-black text-indigo-600">{bl.quantite_recue} Unités</span>
+                                  </div>
+                                ))}
+                             </div>
+                          </div>
+                          <div className="bg-indigo-600 p-6 rounded-[2rem] text-white space-y-4">
+                             <div>
+                               <p className="text-[10px] uppercase font-bold opacity-70">Pénalités appliquées</p>
+                               <p className="text-2xl font-black">-{formatMoney(item.montant_penalites)} DT</p>
+                             </div>
+                             <div className="pt-4 border-t border-white/20">
+                               <p className="text-[10px] uppercase font-bold opacity-70">Net à payer (TTC)</p>
+                               <p className="text-2xl font-black">{formatMoney(item.montant_ttc)} DT</p>
+                             </div>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              ))}
             </tbody>
           </table>
         </div>
       </div>
 
-      {pagination.lastPage > 1 && (
-        <div className="flex justify-center py-4">
-          <Pagination
-            currentPage={pagination.currentPage}
-            totalPages={pagination.lastPage}
-            onPageChange={handlePageChange}
-          />
-        </div>
-      )}
+      {/* DRAWER FORM */}
+      {isDrawerOpen && (
+        <div className="fixed inset-0 z-[999] flex justify-end">
+          <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-md" onClick={closeDrawer} />
+          <div className="relative w-full max-w-lg bg-white p-10 flex flex-col shadow-2xl animate-in slide-in-from-right duration-500">
+            <h2 className="text-3xl font-black italic mb-8 uppercase tracking-tighter text-gray-900">
+              {editing ? "Modifier Facture" : "Nouvelle Facture Groupée"}
+            </h2>
 
-      {isOpen && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/40 p-4">
-          <form
-            onSubmit={handleSubmit}
-            className="w-full max-w-2xl space-y-4 rounded-xl bg-white p-6 shadow-lg"
-          >
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-800">
-                {editing ? "Edit Facture" : "New Facture"}
-              </h3>
-              <button
-                type="button"
-                onClick={closeModal}
-                className="text-sm text-gray-500"
-              >
-                Close
-              </button>
-            </div>
+            <form onSubmit={handleSubmit} className="space-y-6 flex-1 overflow-y-auto pr-2 custom-scrollbar">
+              {errorMessage && <div className="p-4 bg-red-50 text-red-600 rounded-2xl text-[10px] font-black border border-red-100 uppercase">{errorMessage}</div>}
 
-            {errorMessage ? (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
-                {errorMessage}
-              </div>
-            ) : null}
-
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <input
-                placeholder="Numéro facture"
-                value={form.numero_facture}
-                onChange={(e) =>
-                  setForm({ ...form, numero_facture: e.target.value })
-                }
-                className="w-full rounded border p-2"
-                required
-              />
-
-              <input
-                type="date"
-                value={form.date_facture}
-                onChange={(e) =>
-                  setForm({ ...form, date_facture: e.target.value })
-                }
-                className="w-full rounded border p-2"
-                required
-              />
-
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="Montant HT"
-                value={form.montant_ht}
-                onChange={(e) =>
-                  setForm({ ...form, montant_ht: e.target.value })
-                }
-                className="w-full rounded border p-2"
-                required
-              />
-
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="Quantité facturée"
-                value={form.quantite_facturee}
-                onChange={(e) =>
-                  setForm({ ...form, quantite_facturee: e.target.value })
-                }
-                className="w-full rounded border p-2"
-                required
-              />
-
-              <select
-                value={form.emballage_id}
-                onChange={(e) =>
-                  setForm({ ...form, emballage_id: e.target.value })
-                }
-                className="w-full rounded border p-2"
-                required
-              >
-                <option value="">Select emballage</option>
-                {emballages.map((emballage) => (
-                  <option key={emballage.id} value={String(emballage.id)}>
-                    {emballage.label}
-                  </option>
-                ))}
-              </select>
-
-              <div className="relative w-full" ref={commandeDropdownRef}>
-                <input
-                  type="text"
-                  placeholder="Sélectionner un numéro de commande"
-                  value={form.commande_numero}
-                  onFocus={() => setCommandeDropdownOpen(true)}
-                  onChange={(e) => handleCommandeInputChange(e.target.value)}
-                  className="w-full rounded border p-2"
-                  required
-                />
-
-                {commandeDropdownOpen && (
-                  <div className="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
-                    {filteredCommandes.length > 0 ? (
-                      filteredCommandes.map((commande) => (
-                        <button
-                          key={commande.id}
-                          type="button"
-                          onClick={() => handleSelectCommande(commande)}
-                          className="block w-full border-b border-gray-100 px-3 py-2 text-left text-sm hover:bg-gray-50"
-                        >
-                          {commande.numero_commande}
-                        </button>
-                      ))
-                    ) : (
-                      <div className="px-3 py-2 text-sm text-gray-500">
-                        Aucun numéro de commande trouvé.
+              {/* MULTI-SELECT BL DROPDOWN */}
+              <div className="space-y-2 relative" ref={dropdownRef}>
+                <label className="text-[10px] font-black uppercase text-gray-400">Sélectionner un ou plusieurs BL</label>
+                
+                {/* Zone de Badges */}
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {form.bon_livraison_ids.map(id => {
+                    const bl = bonsLivraison.find(b => String(b.id) === id);
+                    return (
+                      <div key={id} className="bg-indigo-600 text-white px-3 py-1.5 rounded-full text-[10px] font-black flex items-center gap-2">
+                        {bl?.numero_bl}
+                        <X className="h-3 w-3 cursor-pointer" onClick={() => toggleBL(id)} />
                       </div>
-                    )}
+                    );
+                  })}
+                </div>
+
+                <div className="relative">
+                  <Truck className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input type="text" className="w-full bg-gray-50 rounded-2xl p-4 pl-12 text-sm font-bold outline-none border-2 border-transparent focus:border-indigo-600 transition-all" 
+                    placeholder="Ajouter un Bon de livraison..." value={blSearch} onFocus={() => setBlDropdownOpen(true)} onChange={e => setBlSearch(e.target.value)} />
+                </div>
+
+                {blDropdownOpen && (
+                  <div className="absolute z-30 w-full mt-2 bg-white border border-gray-100 rounded-2xl shadow-2xl max-h-56 overflow-y-auto p-2">
+                    {filteredBL.length > 0 ? filteredBL.map(bl => (
+                      <button key={bl.id} type="button" onClick={() => toggleBL(String(bl.id))} className={`w-full p-3 rounded-xl text-left text-xs font-black mb-1 flex justify-between items-center transition-colors ${form.bon_livraison_ids.includes(String(bl.id)) ? 'bg-indigo-50 text-indigo-600' : 'hover:bg-gray-50'}`}>
+                        <span>{bl.numero_bl} <span className="text-gray-400 ml-2">({bl.quantite_recue} reçus)</span></span>
+                        {form.bon_livraison_ids.includes(String(bl.id)) && <Check className="h-4 w-4" />}
+                      </button>
+                    )) : <div className="p-4 text-center text-xs text-gray-400 uppercase font-black">Aucun BL disponible</div>}
                   </div>
                 )}
               </div>
 
-              <select
-                value={form.statut}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    statut: e.target.value as FactureStatut,
-                  })
-                }
-                className="w-full rounded border p-2"
-              >
-                <option value="BROUILLON">BROUILLON</option>
-                <option value="VALIDE">VALIDE</option>
-                <option value="PAYE">PAYE</option>
-              </select>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-gray-400">N° Facture Fournisseur</label>
+                <input className="w-full bg-gray-50 rounded-2xl p-4 text-sm font-bold border-2 border-transparent focus:border-indigo-600 outline-none" required value={form.numero_facture} onChange={e => setForm({...form, numero_facture: e.target.value})} />
+              </div>
 
-              <input
-                value={
-                  form.montant_ht
-                    ? (Number(form.montant_ht) * 1.19).toFixed(2)
-                    : ""
-                }
-                readOnly
-                placeholder="Montant TTC (calculé)"
-                className="w-full rounded border bg-gray-50 p-2 text-gray-500"
-              />
-            </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400">Date Facture</label>
+                  <input type="date" className="w-full bg-gray-50 rounded-2xl p-4 text-sm font-bold" value={form.date_facture} onChange={e => setForm({...form, date_facture: e.target.value})} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 text-indigo-600">Montant HT (Auto)</label>
+                  <div className="relative">
+                     <Banknote className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-indigo-400" />
+                     <input type="number" step="0.001" className="w-full bg-indigo-50/50 rounded-2xl p-4 pl-12 text-sm font-black text-indigo-700 border-2 border-indigo-100" value={form.montant_ht} onChange={e => setForm({...form, montant_ht: e.target.value})} required />
+                  </div>
+                </div>
+              </div>
 
-            <div className="text-xs text-gray-500">
-              Commande sélectionnée :{" "}
-              <span className="font-medium text-gray-700">
-                {form.commande_numero || "-"}
-              </span>
-            </div>
+              <div className="p-8 bg-gray-900 rounded-[2rem] text-white shadow-xl relative overflow-hidden group">
+                <div className="relative z-10 flex justify-between items-center">
+                  <div>
+                    <p className="text-[10px] font-black uppercase text-gray-400 mb-1">Total Final Estimé (TVA 19%)</p>
+                    <p className="text-3xl font-black">{(Number(form.montant_ht) * 1.19).toFixed(3)} <span className="text-sm font-medium">DT</span></p>
+                  </div>
+                  <TrendingUp className="h-10 w-10 text-indigo-500 opacity-50 group-hover:scale-110 transition-transform" />
+                </div>
+              </div>
 
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={closeModal}
-                className="rounded px-4 py-2 text-gray-700"
-                disabled={submitLoading}
-              >
-                Cancel
+              <button disabled={submitLoading} className="w-full bg-indigo-600 text-white p-6 rounded-[2rem] font-black text-[10px] tracking-widest hover:bg-indigo-700 transition-all shadow-lg flex items-center justify-center gap-3">
+                {submitLoading ? "SYNCHRONISATION..." : <><Save className="h-5 w-5" /> VALIDER LA FACTURE GROUPÉE</>}
               </button>
-              <button
-                type="submit"
-                className="rounded bg-brand-500 px-4 py-2 text-white disabled:opacity-60"
-                disabled={submitLoading}
-              >
-                {submitLoading ? "Saving..." : "Save"}
-              </button>
-            </div>
-          </form>
+            </form>
+          </div>
         </div>
       )}
     </div>

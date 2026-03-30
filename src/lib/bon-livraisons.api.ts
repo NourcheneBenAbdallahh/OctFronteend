@@ -59,9 +59,10 @@ const LIST_BON_LIVRAISONS = `
   }
 `;
 
-export async function listBonLivraisons(page = 1) {
-  return graphqlRequest<ListBonLivraisonsResponse>(LIST_BON_LIVRAISONS, {
-    page,
+export async function listBonLivraisons(page: number = 1, first: number = 100) {
+  return graphqlRequest<{ bonLivraisons: any }>(LIST_BON_LIVRAISONS, { 
+    page, 
+    first 
   });
 }
 

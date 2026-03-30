@@ -43,6 +43,7 @@ export type MouvementStock = {
   lot?: LotRef | null;
   entrepotSource?: EntrepotRef | null;
   entrepotDestination?: EntrepotRef | null;
+  user?: { id: string; name: string } | null;
 };
 
 export type MouvementFormState = {

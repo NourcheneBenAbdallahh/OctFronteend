@@ -17,7 +17,7 @@ export default function RecentStockMovements({ stocks }: { stocks: Stock[] }) {
             Temps réel • {stocks.length} mouvements total
           </p>
         </div>
-        <Link href="/stocks" className="text-[10px] font-black text-[#00A09D] border border-[#00A09D]/20 px-4 py-2 rounded-full uppercase hover:bg-[#00A09D] hover:text-white transition-all">
+        <Link href="/stock" className="text-[10px] font-black text-[#00A09D] border border-[#00A09D]/20 px-4 py-2 rounded-full uppercase hover:bg-[#00A09D] hover:text-white transition-all">
           Voir l'historique
         </Link>
       </div>
