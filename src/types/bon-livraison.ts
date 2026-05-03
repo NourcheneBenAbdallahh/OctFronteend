@@ -1,4 +1,4 @@
-export type BonLivraisonStatut = "EN_ATTENTE" | "VALIDE";
+export type BonLivraisonStatut = "VALIDE" | "ANNULE";
 
 export type BonLivraison = {
   id: string;
@@ -11,9 +11,10 @@ export type BonLivraison = {
   commande_id: string | number;
   entrepot_id: string | number;
   receptionne_par?: string | number | null;
+  created_by?: string | number | null;
+  modified_by?: string | number | null;
   document_bl?: string | null;
   date_validation?: string | null;
-  validated_by?: string | number | null;
   created_at?: string | null;
   updated_at?: string | null;
 };
@@ -66,6 +67,9 @@ export type CommandeOption = {
   id: string | number;
   numero_commande: string;
   quantite: number;
+  quantite_recue_total?: number;
+  reste?: number;
+  statut?: string;
   emballage_id?: string | number;
   entrepot_id?: string | number; 
 };

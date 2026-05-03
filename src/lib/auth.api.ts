@@ -76,15 +76,25 @@ mutation Logout {
 }`;
 
 export async function login(input: LoginInput): Promise<AuthPayload> {
-  return graphqlRequest<{ login: AuthPayload }>(LOGIN_MUTATION, input).then(d => d.login);
+  return graphqlRequest<{ login: AuthPayload }>(LOGIN_MUTATION, input as unknown as Record<string, unknown>, {
+    skipAuth: true,
+  }).then((d) => d.login);
 }
 
 export async function register(input: RegisterInput): Promise<AuthPayload> {
-  return graphqlRequest<{ register: AuthPayload }>(REGISTER_MUTATION, input).then(d => d.register);
+  return graphqlRequest<{ register: AuthPayload }>(
+    REGISTER_MUTATION,
+    input as unknown as Record<string, unknown>,
+    { skipAuth: true }
+  ).then((d) => d.register);
 }
 
 export async function verifyEmail(token: string): Promise<string> {
-  return graphqlRequest<{ verifyEmail: string }>(VERIFY_EMAIL_MUTATION, { token }).then(d => d.verifyEmail);
+  return graphqlRequest<{ verifyEmail: string }>(
+    VERIFY_EMAIL_MUTATION,
+    { token },
+    { skipAuth: true }
+  ).then((d) => d.verifyEmail);
 }
 
 export async function resendVerificationEmail(token?: string): Promise<string> {
@@ -96,10 +106,13 @@ export async function resendVerificationEmail(token?: string): Promise<string> {
 }
 
 export async function forgotPassword(email: string): Promise<string> {
-  return graphqlRequest<{ forgotPassword: string }>(FORGOT_PASSWORD_MUTATION, {
-    email,
-  }).then((d) => d.forgotPassword);
+  return graphqlRequest<{ forgotPassword: string }>(
+    FORGOT_PASSWORD_MUTATION,
+    { email },
+    { skipAuth: true }
+  ).then((d) => d.forgotPassword);
 }
+
 export async function resetPassword(input: {
   email: string;
   token: string;
@@ -108,14 +121,17 @@ export async function resetPassword(input: {
 }): Promise<string> {
   return graphqlRequest<{ resetPassword: string }>(
     RESET_PASSWORD_MUTATION,
-    input
+    input as unknown as Record<string, unknown>,
+    { skipAuth: true }
   ).then((d) => d.resetPassword);
 }
 
 export async function me(token?: string): Promise<User | null> {
-  return graphqlRequest<{ me: User }>(ME_QUERY, {}, { token }).then(d => d.me).catch(() => null);
+  return graphqlRequest<{ me: User }>(ME_QUERY, {}, { token })
+    .then((d) => d.me)
+    .catch(() => null);
 }
 
 export async function logout(token?: string): Promise<boolean> {
-  return graphqlRequest<{ logout: boolean }>(LOGOUT_MUTATION, {}, { token }).then(d => d.logout);
+  return graphqlRequest<{ logout: boolean }>(LOGOUT_MUTATION, {}, { token }).then((d) => d.logout);
 }

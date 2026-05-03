@@ -1,5 +1,23 @@
 export type FactureStatut = "BROUILLON" | "VALIDE" | "PAYE" | "ANNULE";
+export type BonLivraison = {
+  id: string | number;
+  numero_bl: string;
+  date_reception: string;
+  quantite_recue: number;
 
+  commande?: {
+    id: string | number;
+    numero_commande: string;
+    prix_unitaire?: number;
+  };
+
+  emballage?: {
+    label: string;
+    code: string;
+  };
+
+  is_factured?: boolean;
+};
 export type Facture = {
   id: string;
   numero_facture: string;
@@ -13,17 +31,8 @@ export type Facture = {
   montant_ttc: number;
   statut: FactureStatut;
   
-  // Relations directes
-  bon_livraison_id: string | null;
-  // Objet relationnel pour l'affichage (GraphQL)
-  bon_livraison?: {
-    id: string;
-    numero_bl: string;
-    date_reception: string;
-    quantite_recue: number;
-    commande?: { numero_commande: string };
-    emballage?: { label: string; code: string };
-  };
+  bon_livraisons: BonLivraison[];
+ 
 
   fournisseur_id?: string | null;
   contrat_id?: string | null;
@@ -37,7 +46,7 @@ export type Facture = {
 export type CreateFactureInput = {
   numero_facture: string;
   date_facture: string;
-  bon_livraison_id: string | number; // On passe par le BL qui contient déjà commande_id et emballage_id
+  bon_livraison_ids: (string | number)[];
   montant_ht: number; 
   statut?: FactureStatut;
 };
@@ -46,18 +55,26 @@ export type UpdateFactureInput = {
   numero_facture?: string;
   date_facture?: string;
   montant_ht?: number;
-  bon_livraison_id?: string | number;
+  bon_livraison_ids: (string | number)[];
   statut?: FactureStatut;
 };
 
-// --- TYPES POUR LES SELECTS / DROPDOWNS ---
 export type BonLivraisonOption = {
   id: string | number;
   numero_bl: string;
   quantite_recue: number;
   date_reception: string;
-};
 
+  commande?: {
+    id: string | number;
+    numero_commande: string;
+    prix_unitaire?: number;
+  };
+
+  commande_id?: string | number;
+  is_factured?: boolean;
+  
+};
 export type TableFacture = Omit<Facture, "statut"> & {
   id: string | number;
   statut: FactureStatut;

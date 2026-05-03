@@ -1,4 +1,5 @@
 import { graphqlRequest } from "./graphqlClient";
+import { useAuthStore } from "@/store/useAuthStore";
 import {
   BonLivraison,
   BonLivraisonsPaginatorInfo,
@@ -13,7 +14,7 @@ export function normalizeBonLivraison(
   return {
     ...item,
     id: item.id,
-    statut: item.statut === "VALIDE" ? "VALIDE" : "EN_ATTENTE",
+    statut: item.statut === "ANNULE" ? "ANNULE" : "VALIDE",
   };
 }
 
@@ -35,16 +36,21 @@ const BON_LIVRAISON_FIELDS = `
   commande_id
   entrepot_id
   receptionne_par
+  created_by
+  modified_by
   document_bl
   date_validation
-  validated_by
   created_at
   updated_at
+  commande {
+    id
+    numero_commande
+  }
 `;
 
 const LIST_BON_LIVRAISONS = `
-  query ListBonLivraisons($page: Int!) {
-    bonLivraisons(page: $page) {
+  query ListBonLivraisons($page: Int!, $first: Int!) {
+    bonLivraisons(page: $page, first: $first) {
       data {
         ${BON_LIVRAISON_FIELDS}
       }
@@ -101,6 +107,7 @@ export async function createBonLivraisonWithFile(
   file: File
 ) {
   const endpoint = process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT || "http://localhost:8000/graphql";
+  const token = useAuthStore.getState().token;
 
   const operations = JSON.stringify({
     query: `
@@ -130,6 +137,9 @@ export async function createBonLivraisonWithFile(
 
   const response = await fetch(endpoint, {
     method: "POST",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: formData,
   });
 
@@ -176,13 +186,15 @@ export async function updateBonLivraison(
   input: UpdateBonLivraisonInput
 ) {
   const sanitizedInput = sanitizeBonLivraisonInput(input);
+  const token = useAuthStore.getState().token;
 
   return graphqlRequest<{ updateBonLivraison: BonLivraison }>(
     UPDATE_BON_LIVRAISON,
     {
       id,
       input: sanitizedInput,
-    }
+    },
+    { token: token || undefined }
   );
 }
 
@@ -195,8 +207,10 @@ const DELETE_BON_LIVRAISON = `
 `;
 
 export async function deleteBonLivraison(id: string | number) {
+  const token = useAuthStore.getState().token;
   return graphqlRequest<{ deleteBonLivraison: BonLivraison }>(
     DELETE_BON_LIVRAISON,
-    { id }
+    { id },
+    { token: token || undefined }
   );
 }

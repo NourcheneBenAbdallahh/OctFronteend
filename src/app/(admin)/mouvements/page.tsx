@@ -10,7 +10,7 @@ import {
   validateMouvement,
   deleteMouvementDraft,
 } from "@/lib/mouvement.api";
-import { emptyForm, formatGraphQLDateTime } from "@/lib/mouvement.helpers";
+import { emptyForm, formatGraphQLDateTime, validateForm } from "@/lib/mouvement.helpers";
 import {
   MouvementStock,
   EmballageRef,
@@ -45,6 +45,7 @@ export default function MouvementsPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
+  const [busyActionId, setBusyActionId] = useState<string | null>(null);
 
   const [form, setForm] = useState<MouvementFormState>(emptyForm());
 
@@ -92,6 +93,12 @@ setPagination(mouvementsResult.paginatorInfo);
   }, [search, typeFilter, statutFilter, dateFrom, dateTo]);
 
   async function handleCreateDraft() {
+    const validationMsg = validateForm(form);
+    if (validationMsg) {
+      setError(validationMsg);
+      return;
+    }
+
     setSaving(true);
     setError(null);
     try {
@@ -115,22 +122,28 @@ setPagination(mouvementsResult.paginatorInfo);
   }
 
   async function handleValidate(id: string) {
+    setBusyActionId(id);
     try {
       setError(null);
       await validateMouvement(id);
       await load();
     } catch (e: any) {
       setError(e?.message || "Erreur lors de la validation.");
+    } finally {
+      setBusyActionId(null);
     }
   }
 
   async function handleDelete(id: string) {
+    setBusyActionId(id);
     try {
       setError(null);
       await deleteMouvementDraft(id);
       await load();
     } catch (e: any) {
       setError(e?.message || "Erreur lors de la suppression.");
+    } finally {
+      setBusyActionId(null);
     }
   }
 
@@ -239,15 +252,16 @@ setPagination(mouvementsResult.paginatorInfo);
 
       <div className="rounded-[35px] overflow-hidden border border-gray-100 bg-white shadow-sm transition-all hover:shadow-md">
        <MouvementsTable
-  items={items}
-  loading={loading}
-  onValidate={handleValidate}
-  onDelete={handleDelete}
-  currentPage={pagination?.currentPage ?? 1}
-  totalPages={pagination?.lastPage ?? 1}
-  totalItems={pagination?.total ?? 0}
-  onPageChange={setPage}
-/>
+          items={items}
+          loading={loading}
+          onValidate={handleValidate}
+          onDelete={handleDelete}
+          busyActionId={busyActionId}
+          currentPage={pagination?.currentPage ?? 1}
+          totalPages={pagination?.lastPage ?? 1}
+          totalItems={pagination?.total ?? 0}
+          onPageChange={setPage}
+        />
       </div>
 
       <MouvementDrawer

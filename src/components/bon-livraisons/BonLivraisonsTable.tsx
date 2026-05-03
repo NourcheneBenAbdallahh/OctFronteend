@@ -1,13 +1,14 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import Pagination from "@/components/tables/Pagination";
 import {
   createBonLivraisonWithFile,
   updateBonLivraison,
   deleteBonLivraison,
   normalizeBonLivraison,
 } from "@/lib/bon-livraisons.api";
+import { graphqlRequest } from "@/lib/graphqlClient";
+import { useAuthStore } from "@/store/useAuthStore";
 import {
   TableBonLivraison,
   BonLivraisonsPaginatorInfo,
@@ -15,12 +16,42 @@ import {
   EntrepotOption,
   CommandeOption,
 } from "@/types/bon-livraison";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { 
   X, Plus, FileText, Calendar, Package, MapPin, 
-  Upload, Trash2, Edit2, AlertCircle, ChevronDown, Hash, ShoppingCart, Truck, CheckCircle2, Search
+  Upload, Trash2, Edit2, AlertCircle, ChevronDown, Hash, ShoppingCart, Truck, CheckCircle2, Search, ArrowRight
 } from "lucide-react";
+const PER_PAGE = 10;
+const LocalPagination = ({
+  currentPage,
+  totalPages,
+  onPageChange,
+}: {
+  currentPage: number;
+  totalPages: number;
+  onPageChange: (p: number) => void;
+}) => (
+  <div className="flex items-center gap-4">
+    <button
+      onClick={() => onPageChange(currentPage - 1)}
+      disabled={currentPage === 1}
+      className="px-4 py-2 text-xs font-bold uppercase tracking-widest bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-30 transition-all shadow-sm"
+    >
+      Précédent
+    </button>
 
+    <div className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-x px-6 border-gray-100">
+      Page {currentPage} sur {totalPages}
+    </div>
+
+    <button
+      onClick={() => onPageChange(currentPage + 1)}
+      disabled={currentPage === totalPages}
+      className="px-4 py-2 text-xs font-bold uppercase tracking-widest bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-30 transition-all shadow-sm"
+    >
+      Suivant
+    </button>
+  </div>
+);
 // --- SOUS-COMPOSANT : TIMELINE BUS ---
 const CommandeTimeline = ({ total, dejaRecu, actuel }: { total: number; dejaRecu: number; actuel: number }) => {
   const totalApresSaisie = Math.min(dejaRecu + actuel, total);
@@ -78,6 +109,7 @@ type BonLivraisonForm = {
   quantite_recue: string;
   numero_commande: string;
   entrepot_id: string;
+  statut: "VALIDE" | "ANNULE";
 };
 
 const emptyForm: BonLivraisonForm = {
@@ -86,6 +118,7 @@ const emptyForm: BonLivraisonForm = {
   quantite_recue: "",
   numero_commande: "",
   entrepot_id: "",
+  statut: "VALIDE",
 };
 
 export default function BonLivraisonsTable({
@@ -101,6 +134,7 @@ export default function BonLivraisonsTable({
   commandes: CommandeOption[];
   entrepots: EntrepotOption[];
 }) {
+  const token = useAuthStore((state) => state.token);
   const [rows, setRows] = useState<TableBonLivraison[]>(data);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<TableBonLivraison | null>(null);
@@ -110,11 +144,15 @@ export default function BonLivraisonsTable({
   const [file, setFile] = useState<File | null>(null);
   const [isCmdOpen, setIsCmdOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"TOUS" | "VALIDE" | "ANNULE">("TOUS");
+  const isEditMode = Boolean(editing);
+  const lockLogisticsFields = isEditMode || Boolean(form.numero_commande);
+  const isCancelledBL = isEditMode && editing?.statut === "ANNULE";
+  const [userNamesById, setUserNamesById] = useState<Record<string, string>>({});
 
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => setRows(data), [data]);
 
@@ -128,6 +166,34 @@ export default function BonLivraisonsTable({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    async function loadUsers() {
+      if (!token) return;
+      try {
+        const res = await graphqlRequest<{ users: Array<{ id: string | number; name: string }> }>(
+          `
+            query ListUsersForBL {
+              users {
+                id
+                name
+              }
+            }
+          `,
+          {},
+          { token }
+        );
+        const map: Record<string, string> = {};
+        (res.users || []).forEach((u) => {
+          map[String(u.id)] = u.name;
+        });
+        setUserNamesById(map);
+      } catch {
+        // silent fallback: UI keeps IDs if users query unavailable
+      }
+    }
+    loadUsers();
+  }, [token]);
+
   const commandesEnAttente = useMemo(() => {
     return commandes.filter((c: any) => c.statut !== "RECEPTIONNEE");
   }, [commandes]);
@@ -137,14 +203,25 @@ export default function BonLivraisonsTable({
     [commandes, form.numero_commande]
   );
 
-  const dejaRecu = useMemo(() => {
-    if (!selectedCommande) return 0;
-    return rows
-      .filter((bl) => bl.numero_commande === selectedCommande.numero_commande && String(bl.id) !== String(editing?.id))
-      .reduce((acc, bl) => acc + (Number(bl.quantite_recue) || 0), 0);
-  }, [selectedCommande, rows, editing]);
+  const selectedCommandeForForm = useMemo(() => {
+    if (selectedCommande) return selectedCommande;
+    if (!editing) return null;
+    return commandes.find((c) => c.numero_commande === editing.numero_commande) || null;
+  }, [selectedCommande, editing, commandes]);
+  const isCommandeFullyReceived = selectedCommandeForForm?.statut === "RECEPTIONNEE";
 
-  const remainingQuantity = selectedCommande ? (selectedCommande.quantite - dejaRecu) : 0;
+  const dejaRecu = useMemo(() => {
+    if (!selectedCommandeForForm) return 0;
+    return Number(selectedCommandeForForm.quantite_recue_total ?? 0);
+  }, [selectedCommandeForForm]);
+
+  const remainingQuantity = useMemo(() => {
+    if (!selectedCommandeForForm) return 0;
+    if (selectedCommandeForForm.reste !== undefined && selectedCommandeForForm.reste !== null) {
+      return Number(selectedCommandeForForm.reste);
+    }
+    return Number(selectedCommandeForForm.quantite) - Number(selectedCommandeForForm.quantite_recue_total ?? 0);
+  }, [selectedCommandeForForm]);
 
   const handleSelectCommande = (c: CommandeOption) => {
     setForm((prev) => ({
@@ -158,27 +235,78 @@ export default function BonLivraisonsTable({
     setErrorMessage("");
   };
 
-  const handlePageChange = (page: number) => {
-    const params = new URLSearchParams(searchParams?.toString());
-    params.set("page", String(page));
-    router.push(`${pathname}?${params.toString()}`);
+  const stats = useMemo(() => {
+    const totalCommande = commandes.reduce((acc, c) => acc + Number(c.quantite || 0), 0);
+    const totalRecuValide = commandes.reduce((acc, c) => acc + Number(c.quantite_recue_total ?? 0), 0);
+    const reliquatGlobal = commandesEnAttente.reduce(
+      (acc, curr) => acc + Number(curr.reste ?? (Number(curr.quantite) - Number(curr.quantite_recue_total ?? 0))),
+      0
+    );
+    const commandesOuvertes = commandes.filter((c) => Number(c.reste ?? 0) > 0).length;
+    const couverture = totalCommande > 0 ? Math.round((totalRecuValide / totalCommande) * 100) : 0;
+
+    return {
+      totalCommande,
+      totalRecuValide,
+      reliquatGlobal,
+      commandesOuvertes,
+      couverture,
+    };
+  }, [commandes, commandesEnAttente]);
+
+  const filteredRows = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return rows.filter((bl) => {
+      const matchesStatus = statusFilter === "TOUS" ? true : bl.statut === statusFilter;
+      const matchesQuery =
+        q === "" ||
+        String(bl.numero_bl || "").toLowerCase().includes(q) ||
+        String(bl.numero_commande || "").toLowerCase().includes(q);
+      return matchesStatus && matchesQuery;
+    });
+  }, [rows, query, statusFilter]);
+
+  const getFriendlyErrorMessage = (err: any): string => {
+    const raw = String(err?.message || "");
+    const concise = raw.split("\nDetails:")[0].trim();
+
+    if (raw.includes("Impossible d'annuler ce BL: la commande est déjà totalement réceptionnée.")) {
+      return "Action refusée: cette commande est totalement réceptionnée, le statut du BL est verrouillé.";
+    }
+    if (raw.includes("Impossible de revalider un BL déjà annulé.")) {
+      return "Action refusée: un bon de livraison annulé ne peut pas être revalidé.";
+    }
+    if (raw.includes("Unauthenticated")) {
+      return "Session expirée. Merci de vous reconnecter.";
+    }
+    if (raw.includes("Validation")) {
+      return concise || "Données invalides. Vérifiez les informations saisies.";
+    }
+    return concise || "Une erreur est survenue.";
   };
 
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PER_PAGE));
+  const paginatedRows = useMemo(() => {
+    const start = (currentPage - 1) * PER_PAGE;
+    return filteredRows.slice(start, start + PER_PAGE);
+  }, [filteredRows, currentPage]);
 
-  const stats = useMemo(() => {
-  const totalRecu = rows.reduce((acc, curr) => acc + (Number(curr.quantite_recue) || 0), 0);
-  const nbBl = rows.length;
-  // On calcule le reliquat global basé sur les commandes en attente
-  const reliquatGlobal = commandesEnAttente.reduce((acc, curr) => acc + (curr.quantite - (curr.quantite || 0)), 0);
-  
-  return { totalRecu, nbBl, reliquatGlobal };
-}, [rows, commandesEnAttente]);
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [query, statusFilter]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!editing && !file) { setErrorMessage("Le document BL est obligatoire"); return; }
-    if (Number(form.quantite_recue) > remainingQuantity) {
+    const maxAllowed = selectedCommandeForForm ? remainingQuantity : Number.POSITIVE_INFINITY;
+    if (!editing && Number(form.quantite_recue) > maxAllowed) {
         setErrorMessage(`Quantité dépasse le reste à livrer (${remainingQuantity})`);
         return;
     }
@@ -190,14 +318,21 @@ export default function BonLivraisonsTable({
         const res = await updateBonLivraison(editing.id, payload);
         setRows(prev => prev.map(r => String(r.id) === String(editing.id) ? normalizeBonLivraison(res.updateBonLivraison) : r));
       } else {
-        const created = await createBonLivraisonWithFile(payload as any, file!);
+        const createPayload = {
+          date_reception: payload.date_reception,
+          emballage_id: payload.emballage_id,
+          quantite_recue: payload.quantite_recue,
+          numero_commande: payload.numero_commande,
+          entrepot_id: payload.entrepot_id,
+        };
+        const created = await createBonLivraisonWithFile(createPayload as any, file!);
         setRows(prev => [normalizeBonLivraison(created), ...prev]);
       }
       setIsDrawerOpen(false);
       setForm(emptyForm);
       setFile(null);
     } catch (err: any) {
-      setErrorMessage(err.message || "Erreur de serveur");
+      setErrorMessage(getFriendlyErrorMessage(err));
     } finally {
       setSubmitLoading(false);
     }
@@ -212,52 +347,113 @@ export default function BonLivraisonsTable({
   }
 
   return (
-<div className="space-y-8">
-    {/* HEADER & STATS */}
-    <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+    <div className="min-h-screen bg-gray-50/50 p-4 lg:p-8 font-sans">
+    {/* HEADER SECTION */}
+    <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
       <div>
-        <h1 className="text-4xl font-black text-gray-900 tracking-tighter">
+        <h1 className="text-3xl font-black text-gray-900 tracking-tight">
           Flux Réceptions
         </h1>
-        <p className="text-gray-400 text-sm font-medium mt-1">
+        <p className="text-sm text-gray-500 font-medium italic mt-1">
           Gestion des bons de livraison et entrées en stock
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-3">
-        {/* Widget 1: Total Reçu */}
-        <div className="bg-white border border-gray-100 p-4 rounded-[2rem] flex items-center gap-4 min-w-[180px] shadow-sm">
-          <div className="h-12 w-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600">
-            <Package className="h-6 w-6" />
-          </div>
-          <div>
-            <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Reçu</span>
-            <span className="text-xl font-black text-gray-900">{stats.totalRecu.toLocaleString()}</span>
-          </div>
+      <div className="flex items-center gap-3">
+        <div className="relative group">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-600 transition-colors" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Rechercher BL ou commande..."
+            className="w-full rounded-2xl border border-gray-200 bg-white pl-10 pr-4 py-3 text-sm outline-none focus:ring-4 focus:ring-indigo-600/5 focus:border-indigo-600 md:w-80 transition-all shadow-sm"
+          />
         </div>
-
-        {/* Widget 2: Reliquat */}
-        <div className="bg-white border border-gray-100 p-4 rounded-[2rem] flex items-center gap-4 min-w-[180px] shadow-sm">
-          <div className="h-12 w-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600">
-            <Truck className="h-6 w-6" />
-          </div>
-          <div>
-            <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">En Attente</span>
-            <span className="text-xl font-black text-amber-600">{stats.reliquatGlobal.toLocaleString()}</span>
-          </div>
-        </div>
-
-        {/* Bouton Action */}
-        <button 
+        <button
           onClick={() => { setEditing(null); setForm(emptyForm); setIsDrawerOpen(true); }}
-        className="bg-white text-gray-900 border-2 border-gray-900 px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all shadow-[8px_8px_0px_rgba(0,160,157,0.2)]"
+          className="bg-white text-gray-900 border-2 border-gray-900 px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all shadow-[8px_8px_0px_rgba(0,160,157,0.2)]"
         >
-          <Plus className="h-5 w-5 stroke-[3px] group-hover:rotate-90 transition-transform" />
-          <span className="text-xs font-black uppercase tracking-[0.15em]">Nouveau BL</span>
+          NOUVEAU
         </button>
       </div>
     </div>   
-    
+
+    {/* STATS CARDS */}
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+      {/* Widget 1: Total commandé */}
+      <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex items-center gap-4">
+        <div className="h-12 w-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+          <ShoppingCart className="h-6 w-6" />
+        </div>
+        <div>
+          <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Commandé</span>
+          <span className="text-xl font-black text-gray-900">{stats.totalCommande.toLocaleString()}</span>
+        </div>
+      </div>
+
+      {/* Widget 2: Quantité validée */}
+      <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex items-center gap-4">
+        <div className="h-12 w-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
+          <ArrowRight className="h-6 w-6" />
+        </div>
+        <div>
+          <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Reçu Validé</span>
+          <span className="text-xl font-black text-amber-600">{stats.totalRecuValide.toLocaleString()}</span>
+        </div>
+      </div>
+
+      {/* Widget 3: Reliquat */}
+      <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex items-center gap-4">
+        <div className="h-12 w-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center">
+          <AlertCircle className="h-6 w-6" />
+        </div>
+        <div>
+          <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Reste à Recevoir</span>
+          <span className="text-xl font-black text-red-600">{stats.reliquatGlobal.toLocaleString()}</span>
+          <span className="block text-[10px] text-gray-400 font-bold uppercase">{stats.commandesOuvertes} commandes ouvertes</span>
+        </div>
+      </div>
+
+      {/* Widget 4: Couverture réception */}
+      <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex items-center gap-4">
+        <div className="h-12 w-12 rounded-2xl bg-green-50 text-green-600 flex items-center justify-center">
+          <CheckCircle2 className="h-6 w-6" />
+        </div>
+        <div>
+          <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Couverture Réception</span>
+          <span className="text-xl font-black text-green-700">{stats.couverture}%</span>
+        </div>
+      </div>
+    </div>
+    <div className="flex gap-3 mb-8 overflow-x-auto pb-4 scrollbar-hide items-center">
+      <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-2">Filtrer par :</div>
+      {(["TOUS", "VALIDE", "ANNULE"] as const).map((status) => {
+        const isActive = statusFilter === status;
+        const count = status === "TOUS" ? rows.length : rows.filter((r) => r.statut === status).length;
+        return (
+          <button
+            key={status}
+            type="button"
+            onClick={() => setStatusFilter(status)}
+            className={`group flex items-center gap-3 px-5 py-3 rounded-2xl text-[10px] font-black tracking-widest transition-all whitespace-nowrap border ${
+              isActive
+                ? "bg-gray-900 text-white border-gray-900 shadow-xl shadow-gray-200 scale-105"
+                : "bg-white text-gray-500 border-gray-100 hover:border-indigo-200 hover:text-indigo-600"
+            }`}
+          >
+            {status}
+            <span
+              className={`flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[9px] font-bold transition-colors ${
+                isActive ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
+              }`}
+            >
+              {count}
+            </span>
+          </button>
+        );
+      })}
+    </div>
 
       {/* TABLEAU DESIGN */}
 <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden">        <table className="w-full text-left border-collapse">
@@ -270,7 +466,7 @@ export default function BonLivraisonsTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {rows.map((bl) => (
+            {paginatedRows.map((bl) => (
               <tr key={bl.id} className="hover:bg-indigo-50/10 transition-colors group">
                 <td className="px-6 py-5">
                   <div className="flex items-center gap-4">
@@ -280,6 +476,11 @@ export default function BonLivraisonsTable({
                     <div>
                       <span className="block text-sm font-black text-gray-800">{bl.numero_bl || "En attente"}</span>
                       <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter italic">{bl.date_reception?.split("T")[0]}</span>
+                      <div className="mt-1 text-[10px] text-gray-400 font-bold uppercase tracking-tighter">
+                        <span>Créé par: {bl.created_by ? (userNamesById[String(bl.created_by)] || `#${bl.created_by}`) : "-"}</span>
+                        <span className="mx-2">•</span>
+                        <span>Modifié par: {bl.modified_by ? (userNamesById[String(bl.modified_by)] || `#${bl.modified_by}`) : "-"}</span>
+                      </div>
                     </div>
                   </div>
                 </td>
@@ -291,6 +492,15 @@ export default function BonLivraisonsTable({
                 <td className="px-6 py-5 text-center">
                   <span className="text-sm font-black text-gray-700">{bl.quantite_recue}</span>
                   <span className="text-[10px] ml-1.5 text-gray-300 font-bold uppercase">Unités</span>
+                  <div className="mt-1">
+                    <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-wider ${
+                      bl.statut === "VALIDE"
+                        ? "bg-green-50 text-green-700 border-green-200"
+                        : "bg-red-50 text-red-700 border-red-200"
+                    }`}>
+                      {bl.statut}
+                    </span>
+                  </div>
                 </td>
                 <td className="px-6 py-5">
                   <div className="flex justify-end gap-1">
@@ -302,14 +512,13 @@ export default function BonLivraisonsTable({
                             quantite_recue: String(bl.quantite_recue),
                             numero_commande: bl.numero_commande,
                             entrepot_id: String(bl.entrepot_id),
+                            statut: bl.statut || "VALIDE",
                         });
                         setIsDrawerOpen(true);
                       }} className="p-2.5 text-gray-400 hover:text-indigo-600 hover:bg-white rounded-xl transition-all">
                       <Edit2 className="h-4 w-4" />
                     </button>
-                    <button onClick={() => handleDelete(bl.id)} className="p-2.5 text-gray-400 hover:text-red-500 hover:bg-white rounded-xl transition-all">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    
                   </div>
                 </td>
               </tr>
@@ -318,9 +527,15 @@ export default function BonLivraisonsTable({
         </table>
       </div>
 
-  <div className="mt-10 flex justify-center items-center gap-8 py-6 bg-white rounded-[2rem] border border-gray-50 shadow-sm">
-        <Pagination currentPage={pagination.currentPage} totalPages={pagination.lastPage} onPageChange={handlePageChange} />
-      </div>
+{totalPages > 1 && (
+  <div className="mt-4 flex justify-center items-center py-6 bg-white rounded-[2rem] border border-gray-50 shadow-sm animate-in fade-in zoom-in-95 duration-300">
+    <LocalPagination
+      currentPage={currentPage}
+      totalPages={totalPages}
+      onPageChange={setCurrentPage}
+    />
+  </div>
+)}
 
       {/* DRAWER DESIGN */}
       {isDrawerOpen && (
@@ -349,10 +564,11 @@ export default function BonLivraisonsTable({
                 <div className="relative">
                   <button
                     type="button"
-                    onClick={() => setIsCmdOpen(!isCmdOpen)}
+                    onClick={() => !isEditMode && setIsCmdOpen(!isCmdOpen)}
+                    disabled={isEditMode}
                     className={`w-full flex items-center justify-between rounded-2xl border-2 p-4 text-sm font-black transition-all ${
                       form.numero_commande ? "border-indigo-600 bg-indigo-50/20 text-indigo-900" : "border-gray-100 text-gray-300"
-                    }`}
+                    } ${isEditMode ? "opacity-80 cursor-not-allowed" : ""}`}
                   >
                     <div className="flex items-center gap-3">
                       <Hash className={`h-4 w-4 ${form.numero_commande ? "text-indigo-600" : "text-gray-200"}`} />
@@ -360,7 +576,7 @@ export default function BonLivraisonsTable({
                     </div>
                     <ChevronDown className={`h-4 w-4 transition-transform ${isCmdOpen ? "rotate-180" : ""}`} />
                   </button>
-                  {isCmdOpen && (
+                  {isCmdOpen && !isEditMode && (
                     <div className="absolute z-[110] mt-3 w-full bg-white border border-gray-100 rounded-[2rem] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                       <div className="max-h-64 overflow-y-auto p-3 space-y-1">
                         {commandesEnAttente.map((c) => (
@@ -376,27 +592,27 @@ export default function BonLivraisonsTable({
               </div>
 
               {/* VISUELLE PAR COMMANDE (TIMELINE) */}
-              {selectedCommande && (
+              {selectedCommandeForForm && (
                 <CommandeTimeline 
-                  total={selectedCommande.quantite} 
+                  total={selectedCommandeForForm.quantite} 
                   dejaRecu={dejaRecu} 
                   actuel={Number(form.quantite_recue) || 0} 
                 />
               )}
 
               {/* FORM FIELDS */}
-              <div className={`space-y-6 transition-all duration-700 ${!selectedCommande ? "opacity-20 pointer-events-none" : ""}`}>
+              <div className={`space-y-6 transition-all duration-700 ${!selectedCommandeForForm ? "opacity-20 pointer-events-none" : ""}`}>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase text-gray-400 tracking-[0.2em] ml-1">Emballage</label>
-                    <select value={form.emballage_id} onChange={(e) => setForm({...form, emballage_id: e.target.value})} className="w-full rounded-2xl border-2 border-gray-50 bg-gray-50 p-4 text-xs font-black outline-none focus:border-indigo-200 focus:bg-white transition-all appearance-none cursor-pointer">
+                    <select value={form.emballage_id} onChange={(e) => setForm({...form, emballage_id: e.target.value})} disabled={lockLogisticsFields} className="w-full rounded-2xl border-2 border-gray-50 bg-gray-50 p-4 text-xs font-black outline-none focus:border-indigo-200 focus:bg-white transition-all appearance-none cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed">
                       <option value="">N/A</option>
                       {emballages.map(e => <option key={e.id} value={String(e.id)}>{e.label}</option>)}
                     </select>
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase text-gray-400 tracking-[0.2em] ml-1">Destination</label>
-                    <select value={form.entrepot_id} onChange={(e) => setForm({...form, entrepot_id: e.target.value})} className="w-full rounded-2xl border-2 border-gray-50 bg-gray-50 p-4 text-xs font-black outline-none focus:border-indigo-200 focus:bg-white transition-all appearance-none cursor-pointer">
+                    <select value={form.entrepot_id} onChange={(e) => setForm({...form, entrepot_id: e.target.value})} disabled={lockLogisticsFields} className="w-full rounded-2xl border-2 border-gray-50 bg-gray-50 p-4 text-xs font-black outline-none focus:border-indigo-200 focus:bg-white transition-all appearance-none cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed">
                       <option value="">N/A</option>
                       {entrepots.map(e => <option key={e.id} value={String(e.id)}>{e.label}</option>)}
                     </select>
@@ -406,12 +622,34 @@ export default function BonLivraisonsTable({
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase text-gray-400 tracking-[0.2em] ml-1">Date d'Arrivée</label>
-                    <input type="date" value={form.date_reception} onChange={(e) => setForm({...form, date_reception: e.target.value})} className="w-full rounded-2xl border-2 border-gray-50 bg-gray-50 p-4 text-xs font-black outline-none focus:border-indigo-200 focus:bg-white transition-all" required />
+                    <input type="date" value={form.date_reception} onChange={(e) => setForm({...form, date_reception: e.target.value})} readOnly={isEditMode} className="w-full rounded-2xl border-2 border-gray-50 bg-gray-50 p-4 text-xs font-black outline-none focus:border-indigo-200 focus:bg-white transition-all read-only:opacity-70 read-only:cursor-not-allowed" required />
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase text-gray-400 tracking-[0.2em] ml-1">Quantité (Max: {remainingQuantity})</label>
-                    <input type="number" value={form.quantite_recue} onChange={(e) => setForm({...form, quantite_recue: e.target.value})} className="w-full rounded-2xl border-2 border-gray-100 p-4 text-xs font-black outline-none focus:border-indigo-600 transition-all placeholder:text-gray-200" placeholder="00" required />
+                    <input type="number" value={form.quantite_recue} onChange={(e) => setForm({...form, quantite_recue: e.target.value})} readOnly={isEditMode} className="w-full rounded-2xl border-2 border-gray-100 p-4 text-xs font-black outline-none focus:border-indigo-600 transition-all placeholder:text-gray-200 read-only:opacity-70 read-only:cursor-not-allowed" placeholder="00" required />
                   </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-[0.2em] ml-1">Statut du BL</label>
+                  <select
+                    value={form.statut}
+                    onChange={(e) => setForm({ ...form, statut: e.target.value as "VALIDE" | "ANNULE" })}
+                    disabled={isCommandeFullyReceived || isCancelledBL}
+                    className="w-full rounded-2xl border-2 border-gray-50 bg-gray-50 p-4 text-xs font-black outline-none focus:border-indigo-200 focus:bg-white transition-all appearance-none cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+                  >
+                    <option value="VALIDE">VALIDE</option>
+                    <option value="ANNULE">ANNULE</option>
+                  </select>
+                  {isCommandeFullyReceived && (
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                      Commande totalement réceptionnée: statut verrouillé.
+                    </p>
+                  )}
+                  {isCancelledBL && (
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                      Ce BL est annulé: revalidation impossible.
+                    </p>
+                  )}
                 </div>
 
                 {/* DRAG & DROP ZONE */}
@@ -450,7 +688,7 @@ export default function BonLivraisonsTable({
               <button onClick={() => setIsDrawerOpen(false)} className="flex-1 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest hover:text-gray-900 transition-colors">Fermer</button>
               <button 
                 onClick={(e) => handleSubmit(e as any)}
-                disabled={submitLoading || !selectedCommande}
+                disabled={submitLoading || !selectedCommandeForForm}
                 className="flex-[2] bg-gray-900 text-white py-5 rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] shadow-2xl shadow-gray-200 hover:bg-indigo-600 disabled:bg-gray-100 disabled:text-gray-300 transition-all active:scale-95"
               >
                 {submitLoading ? "En cours..." : editing ? "Modifier le BL" : "Confirmer l'Entrée"}

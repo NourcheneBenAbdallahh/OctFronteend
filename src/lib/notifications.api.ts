@@ -1,4 +1,5 @@
 import { graphqlRequest } from "@/lib/graphqlClient";
+import { useAuthStore } from "@/store/useAuthStore";
 
 export type AlertSeverity = "info" | "warning" | "critical";
 export type AlertStatus = "unread" | "read" | "archived";
@@ -54,7 +55,7 @@ const GET_UNREAD_ALERTS_COUNT_QUERY = `
 
 const MARK_ALERT_AS_READ_MUTATION = `
   mutation MarkAlertAsRead($id: ID!) {
-    markAlertAsRead(id: $id) {
+    markAlertAsRead(id: $id, is_read: true) {
       id
       status
       read_at
@@ -78,38 +79,47 @@ const ARCHIVE_ALERT_MUTATION = `
 `;
 
 export async function getAlerts(): Promise<Alert[]> {
-  return graphqlRequest<{ alerts: Alert[] }>(GET_ALERTS_QUERY).then(
+  const token = useAuthStore.getState().token;
+  return graphqlRequest<{ alerts: Alert[] }>(GET_ALERTS_QUERY, {}, { token: token || undefined }).then(
     (d) => d.alerts ?? []
   );
 }
 
 export async function getUnreadAlertsCount(): Promise<number> {
+  const token = useAuthStore.getState().token;
   return graphqlRequest<{ unreadAlertsCount: number }>(
-    GET_UNREAD_ALERTS_COUNT_QUERY
+    GET_UNREAD_ALERTS_COUNT_QUERY,
+    {},
+    { token: token || undefined }
   ).then((d) => d.unreadAlertsCount ?? 0);
 }
 
 export async function markAlertAsRead(id: string) {
+  const token = useAuthStore.getState().token;
   return graphqlRequest<{
     markAlertAsRead: {
       id: string;
       status: AlertStatus;
       read_at?: string | null;
     };
-  }>(MARK_ALERT_AS_READ_MUTATION, { id }).then((d) => d.markAlertAsRead);
+  }>(MARK_ALERT_AS_READ_MUTATION, { id }, { token: token || undefined }).then((d) => d.markAlertAsRead);
 }
 
 export async function markAllAlertsAsRead() {
+  const token = useAuthStore.getState().token;
   return graphqlRequest<{ markAllAlertsAsRead: boolean }>(
-    MARK_ALL_ALERTS_AS_READ_MUTATION
+    MARK_ALL_ALERTS_AS_READ_MUTATION,
+    {},
+    { token: token || undefined }
   ).then((d) => d.markAllAlertsAsRead);
 }
 
 export async function archiveAlert(id: string) {
+  const token = useAuthStore.getState().token;
   return graphqlRequest<{
     archiveAlert: {
       id: string;
       status: AlertStatus;
     };
-  }>(ARCHIVE_ALERT_MUTATION, { id }).then((d) => d.archiveAlert);
+  }>(ARCHIVE_ALERT_MUTATION, { id }, { token: token || undefined }).then((d) => d.archiveAlert);
 }

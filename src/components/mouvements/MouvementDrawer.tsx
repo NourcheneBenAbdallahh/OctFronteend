@@ -6,8 +6,8 @@ import { MOUVEMENT_TYPES, needsDestination, needsLot, needsSource } from "@/lib/
 import {
   buildSummary,
   formatQuantity,
+  getEntrepotIdForLots,
   getSelectedLotAvailable,
-  validateForm,
   validateQuantityAgainstLot,
 } from "@/lib/mouvement.helpers";
 import {
@@ -17,8 +17,16 @@ import {
   MouvementFormState,
   MouvementType,
 } from "@/types/mouvement";
-import { inputClass, Label, selectClass, TypeBadge } from "./mouvement-ui";
-import { ChevronRight, ChevronLeft, Package, Truck, ClipboardCheck, ArrowRight, X } from "lucide-react";
+import { inputClass, Label, TypeBadge } from "./mouvement-ui";
+import { MouvementSearchableSelect } from "./MouvementSearchableSelect";
+import {
+  ChevronRight,
+  ChevronLeft,
+  Package,
+  Truck,
+  ClipboardCheck,
+  X,
+} from "lucide-react";
 
 export default function MouvementStepperModal({
   open,
@@ -43,226 +51,451 @@ export default function MouvementStepperModal({
   const [lots, setLots] = useState<LotDisponible[]>([]);
   const [lotsLoading, setLotsLoading] = useState(false);
 
-  // --- Logique Métier (Garder la même que ton drawer) ---
-  const selectedLotAvailable = useMemo(() => getSelectedLotAvailable(lots, form.lotId), [lots, form.lotId]);
-  const summary = useMemo(() => buildSummary(form, emballages, entrepots, lots), [form, emballages, entrepots, lots]);
-  
-  useEffect(() => {
-    if (!open) { setStep(1); return; }
-    if (!form.emballageId || (needsSource(form.type) && !form.sourceId)) return;
-    
-    setLotsLoading(true);
-    fetchLotsDisponibles(form.sourceId, form.emballageId)
-      .then(setLots)
-      .finally(() => setLotsLoading(false));
-  }, [open, form.type, form.sourceId, form.emballageId]);
+  const selectedLotAvailable = useMemo(
+    () => getSelectedLotAvailable(lots, form.lotId),
+    [lots, form.lotId]
+  );
 
-  const canGoNext = () => {
-    if (step === 1) return !!form.type;
-    if (step === 2) return !!form.emballageId;
-    if (step === 3) {
-        const sourceOk = needsSource(form.type) ? !!form.sourceId : true;
-        const destOk = needsDestination(form.type) ? !!form.destId : true;
-        return sourceOk && destOk;
+  const qtyLotError = useMemo(
+    () => validateQuantityAgainstLot(form, selectedLotAvailable),
+    [form, selectedLotAvailable]
+  );
+
+  const summary = useMemo(
+    () => buildSummary(form, emballages, entrepots, lots),
+    [form, emballages, entrepots, lots]
+  );
+
+  const entrepotPourLots = useMemo(() => getEntrepotIdForLots(form.type, form), [form]);
+
+  useEffect(() => {
+    if (!open) return;
+    const scrollbarW = window.innerWidth - document.documentElement.clientWidth;
+    const prevOverflow = document.body.style.overflow;
+    const prevPadding = document.body.style.paddingRight;
+    document.body.style.overflow = "hidden";
+    if (scrollbarW > 0) document.body.style.paddingRight = `${scrollbarW}px`;
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.body.style.paddingRight = prevPadding;
+    };
+  }, [open]);
+
+  /** Réinitialiser l’étape à l’ouverture (évite setState synchrone dans l’effet des lots). */
+  useEffect(() => {
+    if (!open) return;
+    queueMicrotask(() => setStep(1));
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (!form.emballageId || !entrepotPourLots) {
+      queueMicrotask(() => setLots([]));
+      return;
     }
+
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setLotsLoading(true);
+      fetchLotsDisponibles(entrepotPourLots, form.emballageId)
+        .then((data) => {
+          if (!cancelled) setLots(data);
+        })
+        .finally(() => {
+          if (!cancelled) setLotsLoading(false);
+        });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, form.type, form.emballageId, form.sourceId, form.destId, entrepotPourLots]);
+
+  const step2Complete = (): boolean => {
+    if (!form.emballageId) return false;
+    if (!entrepotPourLots) return false;
+
+    if (needsLot(form.type) && !form.lotId) return false;
+
+    if (form.quantite === "" || Number(form.quantite) <= 0) return false;
+
+    if (qtyLotError) return false;
+
+    return true;
+  };
+
+  const step3Complete = (): boolean => {
+    if (needsDestination(form.type) && needsSource(form.type)) {
+      return !!form.destId;
+    }
+    return true;
+  };
+
+  const canGoNext = (): boolean => {
+    if (step === 1) return !!form.type;
+    if (step === 2) return step2Complete();
+    if (step === 3) return step3Complete();
     return true;
   };
 
   if (!open) return null;
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-[#1C2434]/60 backdrop-blur-md" onClick={onClose} />
+  const compactTrigger = `${inputClass} !py-2.5 !text-base !rounded-2xl sm:!py-3 min-h-[2.75rem] sm:min-h-0 touch-manipulation`;
+  const compactInput = `${inputClass} !py-2.5 !text-base !rounded-2xl sm:!py-3 min-h-[2.75rem] sm:min-h-0 touch-manipulation`;
 
-      {/* Modal Card */}
-      <div className="relative w-full max-w-4xl overflow-hidden rounded-[40px] bg-white shadow-2xl animate-in zoom-in-95 duration-200">
-        
-        {/* Header avec Stepper */}
-        <div className="border-b border-gray-100 bg-gray-50/50 px-10 py-8">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h2 className="text-3xl font-[1000] uppercase tracking-tighter text-[#1C2434]">
+  /** Étapes « légères » : centrer le bloc dans la zone fixe */
+  const sparseStep = step === 3 || step === 4;
+
+  return (
+    <div className="fixed inset-0 z-[100] overflow-hidden">
+      <button
+        type="button"
+        aria-label="Fermer"
+        className="fixed inset-0 bg-[#1C2434]/60 backdrop-blur-md"
+        onClick={onClose}
+      />
+      <div className="relative z-[101] flex min-h-[100dvh] w-full items-stretch justify-center overflow-y-auto overflow-x-hidden p-0 sm:min-h-full sm:items-center sm:p-3 md:p-4">
+        <div className="relative flex h-[100dvh] max-h-[100dvh] w-full max-w-full flex-1 flex-col overflow-hidden bg-white shadow-2xl ring-1 ring-gray-200/60 animate-in zoom-in-95 duration-200 sm:h-[min(92vh,840px)] sm:max-h-[min(92vh,840px)] sm:max-w-6xl sm:flex-none sm:rounded-3xl">
+        {/* En-tête : fixe, ne défile pas */}
+        <div className="shrink-0 border-b border-gray-100 bg-gradient-to-b from-[#f8fafb] to-white px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-4 sm:px-10 sm:py-7 sm:pt-7">
+          <div className="mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-xl font-[1000] uppercase tracking-tighter text-[#1C2434] sm:text-3xl">
                 Nouveau Flux Stock<span className="text-[#00A09D]">.</span>
               </h2>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Étape {step} sur 4</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
+                Étape {step} sur 4
+              </p>
             </div>
-            <button onClick={onClose} className="rounded-full p-2 hover:bg-gray-200 transition-colors">
-              <X size={24} className="text-gray-400" />
-            </button>
+
+            <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3 sm:shrink-0">
+              <button
+                type="button"
+                onClick={() => (step > 1 ? setStep(step - 1) : onClose())}
+                className="flex items-center gap-2 rounded-full px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-gray-500 transition-colors hover:bg-gray-200/80 hover:text-[#1C2434] sm:px-4 sm:text-[11px] touch-manipulation"
+              >
+                <ChevronLeft size={16} />
+                {step === 1 ? "Abandonner" : "Retour"}
+              </button>
+
+              {step < 4 ? (
+                <button
+                  type="button"
+                  disabled={!canGoNext()}
+                  onClick={() => setStep(step + 1)}
+                  className="flex items-center gap-2 rounded-full bg-[#1C2434] px-4 py-3 text-[10px] font-black uppercase tracking-widest text-white shadow-md shadow-[#1C2434]/15 transition-all hover:bg-[#00A09D] disabled:cursor-not-allowed disabled:opacity-30 sm:px-6 sm:text-[11px] touch-manipulation"
+                >
+                  Étape suivante
+                  <ChevronRight size={16} />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={onSubmit}
+                  className="rounded-full bg-[#00A09D] px-5 py-3 text-[10px] font-black uppercase tracking-widest text-white shadow-md transition-all hover:bg-[#1C2434] disabled:opacity-50 sm:px-7 sm:text-[11px] touch-manipulation"
+                >
+                  {saving ? "Enregistrement…" : "Confirmer"}
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-full p-2.5 text-gray-400 transition-colors hover:bg-gray-200 hover:text-[#1C2434]"
+                aria-label="Fermer"
+              >
+                <X size={22} />
+              </button>
+            </div>
           </div>
 
-          {/* Stepper Visual */}
-          <div className="flex items-center gap-4">
+          <div className="flex min-w-0 items-center gap-1 sm:gap-5">
             {[
-              { s: 1, icon: <Package size={18} />, label: "Type" },
-              { s: 2, icon: <Package size={18} />, label: "Article" },
-              { s: 3, icon: <Truck size={18} />, label: "Logistique" },
-              { s: 4, icon: <ClipboardCheck size={18} />, label: "Validation" }
+              { s: 1, icon: <Package className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Type" },
+              { s: 2, icon: <Package className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Article & lot" },
+              { s: 3, icon: <Truck className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Logistique" },
+              { s: 4, icon: <ClipboardCheck className="h-4 w-4 sm:h-5 sm:w-5" />, label: "Validation" },
             ].map((item, index) => (
-              <div key={item.s} className="flex items-center flex-1">
-                <div className={`flex items-center gap-3 transition-all ${step >= item.s ? 'text-[#00A09D]' : 'text-gray-300'}`}>
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-full font-black ${step >= item.s ? 'bg-[#00A09D] text-white' : 'bg-gray-200 text-gray-400'}`}>
+              <div key={item.s} className="flex min-w-0 items-center flex-1">
+                <div
+                  className={`flex min-w-0 items-center gap-1.5 transition-all sm:gap-3 ${step >= item.s ? "text-[#00A09D]" : "text-gray-300"}`}
+                >
+                  <div
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[10px] font-black sm:h-10 sm:w-10 sm:text-xs ${step >= item.s ? "bg-[#00A09D] text-white" : "bg-gray-200 text-gray-400"}`}
+                  >
                     {step > item.s ? "✓" : item.icon}
                   </div>
-                  <span className="text-[10px] font-black uppercase tracking-widest hidden md:block">{item.label}</span>
+                  <span className="hidden truncate text-[11px] font-black uppercase tracking-widest text-gray-400 sm:inline">
+                    {item.label}
+                  </span>
                 </div>
-                {index < 3 && <div className={`mx-4 h-[2px] flex-1 rounded-full ${step > item.s ? 'bg-[#00A09D]' : 'bg-gray-200'}`} />}
+                {index < 3 && (
+                  <div
+                    className={`mx-1 h-[2px] min-w-[0.5rem] flex-1 rounded-full sm:mx-4 ${step > item.s ? "bg-[#00A09D]" : "bg-gray-200"}`}
+                  />
+                )}
               </div>
             ))}
           </div>
         </div>
 
-        {/* Content Area */}
-        <div className="max-h-[60vh] overflow-y-auto px-10 py-10">
-          
+        {/* Corps : occupe l’espace sous le header ; scroll interne unique */}
+        <div className="flex min-h-0 flex-1 flex-col bg-[#eef3f4] pb-[env(safe-area-inset-bottom,0px)]">
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden px-4 py-6 sm:px-12 sm:py-12 [scrollbar-gutter:stable]">
+            <div
+              className={`mx-auto w-full max-w-5xl min-h-0 ${sparseStep ? "flex min-h-full flex-col justify-center py-2" : ""}`}
+            >
           {/* STEP 1: TYPE */}
           {step === 1 && (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 animate-in fade-in slide-in-from-bottom-4">
-               {(Object.keys(MOUVEMENT_TYPES) as MouvementType[]).map((type) => {
-                  const meta = MOUVEMENT_TYPES[type];
-                  return (
-                    <button
-                      key={type}
-                      onClick={() => { setForm(prev => ({ ...prev, type })); setStep(2); }}
-                      className={`group relative rounded-3xl border-2 p-6 text-left transition-all ${form.type === type ? 'border-[#00A09D] bg-[#00A09D]/5 ring-4 ring-[#00A09D]/10' : 'border-gray-100 hover:border-gray-300'}`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-3xl">{meta.icon}</span>
-                        <TypeBadge type={type} />
-                      </div>
-                      <h4 className="mt-4 font-black uppercase tracking-tight text-[#1C2434]">{meta.label}</h4>
-                      <p className="mt-1 text-xs text-gray-500 leading-relaxed">{meta.description}</p>
-                    </button>
-                  );
-               })}
-            </div>
-          )}
-
-          {/* STEP 2: ARTICLE */}
-          {step === 2 && (
-            <div className="max-w-xl mx-auto space-y-6 animate-in fade-in slide-in-from-right-4">
-               <div className="rounded-[30px] border-2 border-gray-100 p-8">
-                  <Label>Sélectionner l'Emballage</Label>
-                  <select
-                    value={form.emballageId}
-                    onChange={(e) => setForm(prev => ({ ...prev, emballageId: e.target.value, lotId: "" }))}
-                    className={`${selectClass} mt-4 !py-5 !rounded-2xl`}
+            <div className="grid max-w-none grid-cols-1 gap-4 sm:gap-7 lg:grid-cols-2 lg:gap-8 xl:grid-cols-3 animate-in fade-in slide-in-from-bottom-4">
+              {(Object.keys(MOUVEMENT_TYPES) as MouvementType[]).map((type) => {
+                const meta = MOUVEMENT_TYPES[type];
+                return (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => setForm((prev) => ({ ...prev, type }))}
+                    className={`group relative rounded-2xl border-2 bg-white p-5 text-left shadow-sm transition-all active:scale-[0.99] sm:rounded-3xl sm:p-9 min-h-[128px] sm:min-h-[168px] md:min-h-[188px] touch-manipulation ${form.type === type ? "border-[#00A09D] bg-[#00A09D]/5 ring-2 ring-[#00A09D]/10" : "border-gray-100 hover:border-gray-300"}`}
                   >
-                    <option value="">Choisir un produit...</option>
-                    {emballages.map((emb) => <option key={emb.id} value={emb.id}>{emb.code} · {emb.name}</option>)}
-                  </select>
-               </div>
+                    <div className="flex items-start justify-between gap-3 sm:gap-4">
+                      <span className="text-3xl leading-none sm:text-4xl md:text-5xl shrink-0">{meta.icon}</span>
+                      <TypeBadge type={type} />
+                    </div>
+                    <h4 className="mt-3 font-black uppercase tracking-tight text-base text-[#1C2434] pr-1 sm:mt-5 sm:text-lg md:text-xl">
+                      {meta.label}
+                    </h4>
+                    <p className="mt-2 text-xs leading-relaxed text-gray-500 line-clamp-3 sm:mt-3 sm:text-sm md:text-[15px]">
+                      {meta.description}
+                    </p>
+                  </button>
+                );
+              })}
             </div>
           )}
 
-          {/* STEP 3: LOGISTIQUE */}
-          {step === 3 && (
-            <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-right-4">
-              <div className="grid gap-6 sm:grid-cols-2">
+          {/* STEP 2: ARTICLE + ENTREPÔT POUR LOTS + CONTRÔLE LOT + QUANTITÉ */}
+          {step === 2 && (
+            <div className="w-full space-y-4 sm:space-y-5 animate-in fade-in slide-in-from-right-4">
+              <div
+                className={`grid gap-3 sm:gap-4 ${needsSource(form.type) || needsDestination(form.type) ? "md:grid-cols-2" : "grid-cols-1"}`}
+              >
+                <div className="rounded-2xl border border-gray-100/80 bg-white p-4 shadow-sm sm:p-6">
+                  <Label>Sélectionner l&apos;emballage</Label>
+                  <div className="mt-2">
+                    <MouvementSearchableSelect
+                      value={form.emballageId}
+                      onChange={(id) =>
+                        setForm((prev) => ({ ...prev, emballageId: id, lotId: "" }))
+                      }
+                      options={emballages.map((emb) => ({
+                        id: emb.id,
+                        label: `${emb.code} · ${emb.name}`,
+                        searchText: `${emb.code} ${emb.name}`,
+                      }))}
+                      placeholder="Choisir un produit…"
+                      triggerClassName={compactTrigger}
+                    />
+                  </div>
+                </div>
+
                 {needsSource(form.type) && (
-                  <div className="space-y-2">
-                    <Label>Entrepôt Source</Label>
-                    <select value={form.sourceId} onChange={(e) => setForm(prev => ({ ...prev, sourceId: e.target.value, lotId: "" }))} className={selectClass}>
-                      <option value="">Source...</option>
-                      {entrepots.map(e => <option key={e.id} value={e.id}>{e.adresse}</option>)}
-                    </select>
+                  <div className="rounded-2xl border border-gray-100/80 bg-white p-4 shadow-sm sm:p-6">
+                    <Label>Entrepôt source (stock des lots)</Label>
+                    <div className="mt-2">
+                      <MouvementSearchableSelect
+                        value={form.sourceId}
+                        onChange={(id) =>
+                          setForm((prev) => ({ ...prev, sourceId: id, lotId: "" }))
+                        }
+                        options={entrepots.map((e) => ({
+                          id: e.id,
+                          label: e.adresse,
+                          searchText: `${e.nom ?? ""} ${e.adresse}`,
+                        }))}
+                        placeholder="Choisir l&apos;entrepôt source…"
+                        triggerClassName={compactTrigger}
+                      />
+                    </div>
                   </div>
                 )}
-                {needsDestination(form.type) && (
-                  <div className="space-y-2">
-                    <Label>Entrepôt Destination</Label>
-                    <select value={form.destId} onChange={(e) => setForm(prev => ({ ...prev, destId: e.target.value }))} className={selectClass}>
-                      <option value="">Destination...</option>
-                      {entrepots.filter(e => e.id !== form.sourceId).map(e => <option key={e.id} value={e.id}>{e.adresse}</option>)}
-                    </select>
+
+                {!needsSource(form.type) && needsDestination(form.type) && (
+                  <div className="rounded-2xl border border-gray-100/80 bg-white p-4 shadow-sm sm:p-6">
+                    <Label>Entrepôt destination (stock des lots)</Label>
+                    <div className="mt-2">
+                      <MouvementSearchableSelect
+                        value={form.destId}
+                        onChange={(id) =>
+                          setForm((prev) => ({ ...prev, destId: id, lotId: "" }))
+                        }
+                        options={entrepots.map((e) => ({
+                          id: e.id,
+                          label: e.adresse,
+                          searchText: `${e.nom ?? ""} ${e.adresse}`,
+                        }))}
+                        placeholder="Choisir l&apos;entrepôt…"
+                        triggerClassName={compactTrigger}
+                      />
+                    </div>
                   </div>
                 )}
               </div>
-              
-              <div className="rounded-3xl bg-gray-50 p-6 border border-gray-100">
-                <Label>Quantité à mouvementer</Label>
+
+              <div className="rounded-2xl border border-[#00A09D]/30 bg-white p-4 shadow-sm ring-1 ring-[#00A09D]/10 sm:p-6">
+                <h5 className="text-[10px] font-black uppercase tracking-[0.25em] text-[#00A09D]">
+                  Contrôle lot
+                </h5>
+                <p className="mt-1 text-[11px] text-gray-500 leading-snug">
+                  Quantité ≤ stock du lot pour continuer.
+                </p>
+
+                {needsLot(form.type) ? (
+                  <>
+                    <Label className="mt-3">Lot</Label>
+                    <div className="mt-2">
+                      <MouvementSearchableSelect
+                        value={form.lotId}
+                        onChange={(id) => setForm((prev) => ({ ...prev, lotId: id }))}
+                        options={lots
+                          .filter((l) => l.lot_id)
+                          .map((l) => ({
+                            id: l.lot_id as string,
+                            label: `${l.code_lot ?? "—"} — disponible : ${formatQuantity(l.stock_disponible)}`,
+                            searchText: `${l.code_lot ?? ""} ${formatQuantity(l.stock_disponible)}`,
+                          }))}
+                        placeholder={
+                          lotsLoading ? "Chargement des lots…" : "Sélectionner un lot"
+                        }
+                        disabled={!form.emballageId || !entrepotPourLots || lotsLoading}
+                        triggerClassName={compactTrigger}
+                        listMaxHeightClassName="max-h-[min(13rem,40vh)] sm:max-h-52"
+                      />
+                    </div>
+                    {!lotsLoading && needsLot(form.type) && form.emballageId && entrepotPourLots && lots.length === 0 && (
+                      <p className="mt-3 text-xs font-bold text-amber-700">
+                        Aucun lot avec stock positif pour cet entrepôt et cet emballage.
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="mt-2 text-[11px] text-gray-500 leading-snug">
+                    Lot optionnel — sélectionnez-en un pour contrôler la quantité.
+                  </p>
+                )}
+
+                {!needsLot(form.type) && (
+                  <>
+                    <Label className="mt-3">Lot (optionnel)</Label>
+                    <div className="mt-2">
+                      <MouvementSearchableSelect
+                        value={form.lotId}
+                        onChange={(id) => setForm((prev) => ({ ...prev, lotId: id }))}
+                        options={[
+                          { id: "", label: "Sans lot lié", searchText: "sans" },
+                          ...lots
+                            .filter((l) => l.lot_id)
+                            .map((l) => ({
+                              id: l.lot_id as string,
+                              label: `${l.code_lot ?? "—"} — disponible : ${formatQuantity(l.stock_disponible)}`,
+                              searchText: `${l.code_lot ?? ""}`,
+                            })),
+                        ]}
+                        placeholder="Sans lot lié"
+                        disabled={!form.emballageId || !entrepotPourLots || lotsLoading}
+                        triggerClassName={compactTrigger}
+                        listMaxHeightClassName="max-h-[min(13rem,40vh)] sm:max-h-52"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {form.lotId && selectedLotAvailable != null && (
+                  <p className="mt-2 text-xs font-bold text-[#00A09D]">
+                    Dispo lot : {formatQuantity(selectedLotAvailable)} u.
+                  </p>
+                )}
+
+                <Label className="mt-3">Quantité</Label>
                 <input
                   type="number"
+                  min={0}
+                  step="any"
                   value={form.quantite}
-                  onChange={(e) => setForm(prev => ({ ...prev, quantite: e.target.value === "" ? "" : Number(e.target.value) }))}
-                  className={`${inputClass} mt-3 text-2xl font-[1000]`}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      quantite: e.target.value === "" ? "" : Number(e.target.value),
+                    }))
+                  }
+                  className={`${compactInput} mt-2 font-[1000]`}
                   placeholder="0.00"
+                />
+                {qtyLotError && (
+                  <p className="mt-2 text-xs font-bold text-red-600" role="alert">
+                    {qtyLotError}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* STEP 3: DESTINATION (si transfert) + DATE */}
+          {step === 3 && (
+            <div className="w-full space-y-3 sm:space-y-4 animate-in fade-in slide-in-from-right-4">
+              {needsDestination(form.type) && needsSource(form.type) && (
+                <div className="rounded-2xl border border-gray-100/80 bg-white p-4 shadow-sm sm:p-6">
+                  <Label>Entrepôt destination</Label>
+                  <div className="mt-2 max-w-full">
+                    <MouvementSearchableSelect
+                      value={form.destId}
+                      onChange={(id) => setForm((prev) => ({ ...prev, destId: id }))}
+                      options={entrepots
+                        .filter((e) => e.id !== form.sourceId)
+                        .map((e) => ({
+                          id: e.id,
+                          label: e.adresse,
+                          searchText: `${e.nom ?? ""} ${e.adresse}`,
+                        }))}
+                      placeholder="Choisir…"
+                      triggerClassName={compactTrigger}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="rounded-2xl border border-gray-100/80 bg-white p-4 shadow-sm sm:p-6">
+                <Label>Date du mouvement</Label>
+                <input
+                  type="datetime-local"
+                  value={form.dateMouvement}
+                  onChange={(e) => setForm((prev) => ({ ...prev, dateMouvement: e.target.value }))}
+                  className={`${compactInput} mt-2 w-full max-w-full`}
                 />
               </div>
             </div>
           )}
 
-          {/* STEP 4: RÉSUMÉ & LOT */}
+          {/* STEP 4: RÉCAP */}
           {step === 4 && (
-            <div className="grid gap-8 lg:grid-cols-2 animate-in fade-in zoom-in-95">
-              <div className="space-y-4">
-                <h5 className="text-[10px] font-black uppercase tracking-widest text-[#00A09D]">Récapitulatif</h5>
-                <div className="divide-y divide-gray-100 rounded-3xl border border-gray-100 px-6 bg-white">
-                   <SummaryRow label="Flux" value={summary.typeLabel} />
-                   <SummaryRow label="Article" value={summary.emballageLabel} />
-                   <SummaryRow label="Volume" value={summary.quantiteLabel} />
-                   <SummaryRow label="Trajet" value={`${summary.sourceLabel} → ${summary.destLabel}`} />
-                </div>
-              </div>
-              
-              <div className="space-y-4">
-                <h5 className="text-[10px] font-black uppercase tracking-widest text-[#00A09D]">Contrôle Lot</h5>
-                <div className="rounded-3xl bg-[#1C2434] p-6 text-white shadow-xl">
-                  <Label className="!text-gray-400">Affectation Lot</Label>
-                  <select 
-                    value={form.lotId} 
-                    onChange={(e) => setForm(prev => ({ ...prev, lotId: e.target.value }))}
-                    className="mt-3 w-full bg-white/10 border-white/20 text-white rounded-xl p-3 outline-none focus:ring-2 ring-[#00A09D]"
-                  >
-                    <option className="text-black" value="">{lotsLoading ? "Chargement..." : "Sélectionner un lot"}</option>
-{lots.map(l => (
-  <option 
-    className="text-black" 
-    key={l.lot_id ?? 'empty'} // 'empty' ou un index pour garantir une clé unique si lot_id est null
-    value={l.lot_id ?? ""}    // Utilise "" au lieu de null
-  >
-    {l.code_lot} (Dispo: {l.stock_disponible})
-  </option>
-))}                  </select>
-                  {selectedLotAvailable && <p className="mt-4 text-xs font-bold text-[#00A09D]">Stock disponible : {formatQuantity(selectedLotAvailable)} unités</p>}
-                </div>
+            <div className="animate-in fade-in zoom-in-95 w-full">
+              <h5 className="mb-5 text-xs font-black uppercase tracking-[0.2em] text-[#00A09D]">
+                Récapitulatif
+              </h5>
+              <div className="divide-y divide-gray-100 rounded-2xl border border-gray-100/80 bg-white px-4 py-1 shadow-sm sm:px-6">
+                <SummaryRow label="Flux" value={summary.typeLabel} />
+                <SummaryRow label="Article" value={summary.emballageLabel} />
+                <SummaryRow label="Lot" value={summary.lotLabel} />
+                <SummaryRow label="Volume" value={summary.quantiteLabel} />
+                <SummaryRow label="Trajet" value={`${summary.sourceLabel} → ${summary.destLabel}`} />
               </div>
             </div>
           )}
-        </div>
-
-        {/* Footer Actions */}
-        <div className="flex items-center justify-between border-t border-gray-100 bg-gray-50/50 px-10 py-8">
-          <button
-            onClick={() => step > 1 ? setStep(step - 1) : onClose()}
-            className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-[#1C2434] transition-colors"
-          >
-            <ChevronLeft size={16} />
-            {step === 1 ? "Abandonner" : "Retour"}
-          </button>
-
-          <div className="flex gap-4">
-            {step < 4 ? (
-              <button
-                disabled={!canGoNext()}
-                onClick={() => setStep(step + 1)}
-                className="flex items-center gap-3 bg-[#1C2434] text-white px-8 py-4 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-[#00A09D] transition-all disabled:opacity-20 disabled:grayscale shadow-lg shadow-[#1C2434]/20"
-              >
-                Étape Suivante
-                <ChevronRight size={16} />
-              </button>
-            ) : (
-              <button
-                disabled={saving}
-                onClick={onSubmit}
-                className="bg-[#00A09D] text-white px-10 py-4 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-[#1C2434] transition-all shadow-[8px_8px_0px_rgba(28,36,52,0.2)] active:translate-y-1 active:shadow-none"
-              >
-                {saving ? "Enregistrement..." : "Confirmer le mouvement"}
-              </button>
-            )}
+            </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );
@@ -270,9 +503,13 @@ export default function MouvementStepperModal({
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between py-4">
-      <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">{label}</span>
-      <span className="text-sm font-bold text-[#1C2434]">{value}</span>
+    <div className="flex flex-col gap-1 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:py-4">
+      <span className="shrink-0 text-[10px] font-black uppercase tracking-widest text-gray-400 sm:text-[11px]">
+        {label}
+      </span>
+      <span className="min-w-0 text-sm font-bold leading-snug text-[#1C2434] break-words sm:max-w-[65%] sm:text-right">
+        {value}
+      </span>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { graphqlRequest } from "./graphqlClient";
+import { useAuthStore } from "@/store/useAuthStore";
 import { Contrat } from "../types/contrat";
 
 export const CONTRAT_FIELDS = `
@@ -27,6 +28,8 @@ export const CONTRAT_FIELDS = `
     id
     name
   }
+  created_by
+  modified_by
   created_at
   updated_at
 `;
@@ -53,7 +56,12 @@ const CREATE_CONTRAT = `
 `;
 
 export async function createContrat(input: Partial<Contrat> & { numero_contrat: string; date_debut: string; date_fin: string; quantite_contractuelle: number; fournisseur_id: string | number; emballage_id: string | number; }) {
-  return graphqlRequest<{ createContrat: Contrat }>(CREATE_CONTRAT, { input });
+  const token = useAuthStore.getState().token;
+  return graphqlRequest<{ createContrat: Contrat }>(
+    CREATE_CONTRAT,
+    { input },
+    { token: token || undefined }
+  );
 }
 
 const UPDATE_CONTRAT = `
@@ -65,17 +73,31 @@ const UPDATE_CONTRAT = `
 `;
 
 export async function updateContrat(id: string | number, input: Partial<Contrat>) {
-  return graphqlRequest<{ updateContrat: Contrat }>(UPDATE_CONTRAT, { id, input });
+  const token = useAuthStore.getState().token;
+  return graphqlRequest<{ updateContrat: Contrat }>(
+    UPDATE_CONTRAT,
+    { id, input },
+    { token: token || undefined }
+  );
 }
 
 const DELETE_CONTRAT = `
   mutation DeleteContrat($id: ID!) {
-    deleteContrat(id: $id)
+    deleteContrat(id: $id) {
+      id
+      numero_contrat
+      statut
+    }
   }
 `;
 
 export async function deleteContrat(id: string | number) {
-  return graphqlRequest<{ deleteContrat: boolean }>(DELETE_CONTRAT, { id });
+  const token = useAuthStore.getState().token;
+  return graphqlRequest<{ deleteContrat: Contrat }>(
+    DELETE_CONTRAT,
+    { id },
+    { token: token || undefined }
+  );
 }
 
 const RESTORE_CONTRAT = `

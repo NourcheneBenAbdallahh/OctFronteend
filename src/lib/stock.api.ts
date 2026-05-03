@@ -126,6 +126,70 @@ export async function getStocks(page = 1, first = 50): Promise<Stock[]> {
   return data.stocks?.data ?? [];
 }
 
+const STOCKS_PAGE_QUERY = `
+  query GetStocksPage($page: Int!, $first: Int!) {
+    stocks(page: $page, first: $first) {
+      data {
+        id
+        entrepot_id
+        emballage_id
+        lot_id
+        date_stock
+        quantite
+        sens
+        user_id
+        created_at
+        updated_at
+        entrepot {
+          id
+          nom
+          adresse
+        }
+        emballage {
+          id
+          name
+          code
+          min_stock
+        }
+        lot {
+          id
+          code_lot
+        }
+        user {
+          id
+          name
+          email
+        }
+      }
+      paginatorInfo {
+        currentPage
+        lastPage
+        total
+        hasMorePages
+      }
+    }
+  }
+`;
+
+/** Charge toutes les pages de mouvements stock (limite de sécurité sur le nombre de pages). */
+export async function getAllStocks(
+  firstPerPage = 250,
+  maxPages = 80
+): Promise<Stock[]> {
+  const acc: Stock[] = [];
+  for (let page = 1; page <= maxPages; page++) {
+    const data = await graphqlFetch<StocksQueryResponse>(STOCKS_PAGE_QUERY, {
+      page,
+      first: firstPerPage,
+    });
+    const chunk = data.stocks?.data ?? [];
+    acc.push(...chunk);
+    const p = data.stocks?.paginatorInfo;
+    if (!p?.hasMorePages || page >= (p.lastPage ?? page)) break;
+  }
+  return acc;
+}
+
 export async function updateStock(
   id: string | number,
   input: {

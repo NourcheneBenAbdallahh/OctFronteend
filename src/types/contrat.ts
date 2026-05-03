@@ -23,6 +23,8 @@ id: string;
 
   fournisseur?: TableFournisseur;
   emballage?: TableEmballages;
+  created_by?: string | number | null;
+  modified_by?: string | number | null;
 
   created_at?: string | null;
   updated_at?: string | null;
@@ -48,6 +50,8 @@ export function normalizeContrat(c: Contrat): Contrat {
     statut: c.statut ?? "ACTIF",
     fournisseur: c.fournisseur ? { ...c.fournisseur } : undefined,
     emballage: c.emballage ? { ...c.emballage } : undefined,
+    created_by: c.created_by ?? null,
+    modified_by: c.modified_by ?? null,
     created_at: c.created_at ?? null,
     updated_at: c.updated_at ?? null,
   };

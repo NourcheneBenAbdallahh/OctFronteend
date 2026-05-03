@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useRef, useState,useCallback } from "react";
+import React, { useEffect, useMemo, useRef, useState,useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -22,7 +22,9 @@ import { Receipt } from "lucide-react";
 import { Truck } from "lucide-react";
 import { Boxes } from "lucide-react";
 import { ShoppingCart } from "lucide-react";
-import { ArrowLeftRight } from "lucide-react";
+import { ArrowLeftRight, BarChart3 } from "lucide-react";
+import { canAccessPath } from "@/lib/access";
+import { useAuthStore } from "@/store/useAuthStore";
 type NavItem = {
   name: string;
   icon: React.ReactNode;
@@ -35,6 +37,11 @@ const navItems: NavItem[] = [
     icon: <GridIcon />,
     name: "Dashboard",
     path: "/",
+  },
+  {
+    icon: <BarChart3 className="w-5 h-5" />,
+    name: "Tableau BI",
+    path: "/bi",
   },
     {
   icon: <BoxCubeIcon />,
@@ -106,9 +113,33 @@ const navItems: NavItem[] = [
 
 ];
 
+function navItemsVisibleForRole(role: string | undefined): NavItem[] {
+  const out: NavItem[] = [];
+  for (const nav of navItems) {
+    if (nav.subItems?.length) {
+      const subs = nav.subItems.filter(
+        (s) => s.path && canAccessPath(s.path, role)
+      );
+      if (subs.length === 0) continue;
+      out.push({ ...nav, subItems: subs });
+      continue;
+    }
+    if (nav.path && canAccessPath(nav.path, role)) {
+      out.push(nav);
+    }
+  }
+  return out;
+}
+
 const AppSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const pathname = usePathname();
+  const userRole = useAuthStore((s) => s.user?.role);
+
+  const visibleNavItems = useMemo(
+    () => navItemsVisibleForRole(userRole),
+    [userRole]
+  );
 
   const renderMenuItems = (
     navItems: NavItem[],
@@ -303,6 +334,7 @@ const AppSidebar: React.FC = () => {
           alt="Logo"
           width={160} // Taille augmentée pour la visibilité
           height={45} 
+          style={{ width: "auto", height: "auto" }}
           priority
         />
         {/* Si tu n'as pas encore de logo dark, tu peux utiliser un filtre CSS temporaire */}
@@ -312,6 +344,7 @@ const AppSidebar: React.FC = () => {
           alt="Logo"
           width={160}
           height={45}
+          style={{ width: "auto", height: "auto" }}
         />
       </div>
     ) : (
@@ -343,7 +376,7 @@ const AppSidebar: React.FC = () => {
                   <HorizontaLDots />
                 )}
               </h2>
-              {renderMenuItems(navItems, "main")}
+              {renderMenuItems(visibleNavItems, "main")}
             </div>
 
        

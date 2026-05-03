@@ -1,27 +1,30 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import Pagination from "@/components/tables/Pagination";
-import {
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import { Facture, FactureStatut, TableFacture, FacturesPaginatorInfo, BonLivraisonOption, UpdateFactureInput, CreateFactureInput } from "@/types/facture";
+import { 
+  updateFacture,
   createFacture,
   deleteFacture,
-  normalizeFacture,
-  updateFacture,
+  normalizeFacture
 } from "@/lib/factures.api";
-import {
-  FactureStatut,
-  FacturesPaginatorInfo,
-  TableFacture,
-  UpdateFactureInput,
-  CreateFactureInput,
-} from "@/types/facture";
-import { BonLivraisonOption } from "@/types/bon-livraison"; 
-import { usePathname, useRouter } from "next/navigation";
 import { 
-  X, Search, Edit2, Trash2, 
-  FileText, Clock, AlertCircle, 
-  ChevronDown, Banknote, TrendingUp, Save, Truck, Check
+  Edit2, Trash2, ChevronDown, ChevronRight, Truck, Calendar, 
+  AlertCircle, Search, Plus, User, FileText, Banknote, X, Check, TrendingUp, Save
 } from "lucide-react";
+import Pagination from "@/components/tables/Pagination";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+
+// Helper functions
+const formatDate = (date: string | Date) => {
+  const d = new Date(date);
+  return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+};
+
+const formatMoney = (amount: number | string) => {
+  const num = typeof amount === "string" ? parseFloat(amount) : amount;
+  return num.toFixed(3).replace(".", ",");
+};
 
 type Id = string | number;
 
@@ -32,7 +35,37 @@ type FactureForm = {
   bon_livraison_ids: string[]; // Changé en tableau pour le multi-sélection
   statut: FactureStatut;
 };
+const LocalPagination = ({
+  currentPage,
+  totalPages,
+  onPageChange,
+}: {
+  currentPage: number;
+  totalPages: number;
+  onPageChange: (p: number) => void;
+}) => (
+  <div className="flex items-center gap-4">
+    <button
+      onClick={() => onPageChange(currentPage - 1)}
+      disabled={currentPage === 1}
+      className="px-4 py-2 text-xs font-bold uppercase tracking-widest bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-30 transition-all shadow-sm"
+    >
+      Précédent
+    </button>
 
+    <div className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-x px-6 border-gray-100">
+      Page {currentPage} sur {totalPages}
+    </div>
+
+    <button
+      onClick={() => onPageChange(currentPage + 1)}
+      disabled={currentPage === totalPages}
+      className="px-4 py-2 text-xs font-bold uppercase tracking-widest bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-30 transition-all shadow-sm"
+    >
+      Suivant
+    </button>
+  </div>
+);
 const emptyForm: FactureForm = {
   numero_facture: "",
   date_facture: new Date().toISOString().split('T')[0],
@@ -47,8 +80,6 @@ const STATUT_STYLES: Record<string, string> = {
   PAYE: "bg-green-50 text-green-700 border-green-200",
 };
 
-const formatDate = (v?: string | null) => v ? (v.includes("T") ? v.split("T")[0] : v) : "-";
-const formatMoney = (v?: number | null) => v?.toLocaleString('fr-TN', { minimumFractionDigits: 3 }) || "0,000";
 
 export default function FacturesTable({
   data,
@@ -59,7 +90,14 @@ export default function FacturesTable({
   pagination: FacturesPaginatorInfo;
   bonsLivraison: BonLivraisonOption[];
 }) {
-  const [rows, setRows] = useState<TableFacture[]>(data);
+  const [rows, setRows] = useState<TableFacture[]>([]);
+  const [paginationState, setPaginationState] = useState<FacturesPaginatorInfo>({
+    count: 0,
+    currentPage: 1,
+    lastPage: 1,
+    perPage: 10,
+    total: 0,
+  });
   const [expandedId, setExpandedId] = useState<Id | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<TableFacture | null>(null);
@@ -69,27 +107,75 @@ export default function FacturesTable({
   const [submitLoading, setSubmitLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [blDropdownOpen, setBlDropdownOpen] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState<string | number | null>(null);
 
   const router = useRouter();
   const pathname = usePathname();
   const dropdownRef = useRef<HTMLDivElement | null>(null);
 
+
+const handlePageChange = (page: number) => {
+  if (page < 1 || page > pagination.lastPage) return;
+
+  const params = new URLSearchParams();
+  params.set("page", String(page));
+  router.push(`${pathname}?${params.toString()}`);
+};
   useEffect(() => { setRows(data); }, [data]);
+
+// 1. Calculer le nombre d'éléments par statut pour les badges
+const statusCounts = useMemo(() => {
+  const counts: Record<string, number> = {
+    BROUILLON: 0,
+    VALIDE: 0,
+    PAYE: 0,
+    ANNULE: 0,
+  };
+  
+  rows.forEach((item) => {
+    if (counts[item.statut] !== undefined) {
+      counts[item.statut]++;
+    }
+  });
+  
+  return counts;
+}, [rows]);
+
+// 2. Mettre à jour la logique de filtrage pour qu'elle comprenne les statuts
+const filteredRows = useMemo(() => {
+  const q = query.trim().toUpperCase();
+  if (!q) return rows;
+
+  // Liste des statuts possibles
+  const statusList = ['BROUILLON', 'VALIDE', 'PAYE', 'ANNULE'];
+
+  if (statusList.includes(q)) {
+    // Si on a cliqué sur un bouton de statut
+    return rows.filter(r => r.statut === q);
+  }
+
+  // Sinon, recherche textuelle (Numéro ou fournisseur)
+  return rows.filter(r => 
+    r.numero_facture?.toLowerCase().includes(query.toLowerCase())
+  );
+}, [rows, query]);
 
   // --- AUTO-REMPLISSAGE DES VALEURS ---
   useEffect(() => {
     if (!editing && form.bon_livraison_ids.length > 0) {
       const selectedBLs = bonsLivraison.filter(bl => form.bon_livraison_ids.includes(String(bl.id)));
       
-      // Calcul du montant HT total basé sur (quantité reçue * prix unitaire de la commande)
-      const totalHT = selectedBLs.reduce((sum, bl) => {
-        const prix = bl.commande?.prix_unitaire || 0;
-        return sum + (bl.quantite_recue * prix);
-      }, 0);
+      // Calcul du montant HT total basé sur la quantité totale
+      // Note: prix_unitaire n'est pas disponible depuis l'API, l'utilisateur doit saisir le montant
+      const totalQuantite = selectedBLs.reduce((sum, bl) => sum + bl.quantite_recue, 0);
 
-      setForm(prev => ({ ...prev, montant_ht: totalHT.toFixed(3) }));
+      // Si le montant HT est vide ou zéro, on le met à jour avec une valeur par défaut
+      // L'utilisateur devra ajuster manuellement le montant HT
+      if (!form.montant_ht || form.montant_ht === "0") {
+        setForm(prev => ({ ...prev, montant_ht: (totalQuantite * 100).toFixed(3) })); // Valeur par défaut: 100 DT par unité
+      }
     }
-  }, [form.bon_livraison_ids, bonsLivraison, editing]);
+  }, [form.bon_livraison_ids, bonsLivraison, editing, form.montant_ht]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -103,8 +189,29 @@ export default function FacturesTable({
 
   const filteredBL = useMemo(() => {
     const s = blSearch.trim().toLowerCase();
-    return bonsLivraison.filter(b => b.numero_bl.toLowerCase().includes(s));
-  }, [bonsLivraison, blSearch]);
+    
+    // Si aucun BL n'est sélectionné, montrer tous les BLs non facturés
+    if (form.bon_livraison_ids.length === 0) {
+      return bonsLivraison.filter(b => 
+        b.numero_bl.toLowerCase().includes(s) && 
+        !b.is_factured
+      );
+    }
+    
+    // Si un BL est déjà sélectionné, montrer seulement les BLs de la même commande
+    const firstBLId = form.bon_livraison_ids[0];
+    const firstBL = bonsLivraison.find(b => String(b.id) === firstBLId);
+    
+    if (!firstBL) {
+      return [];
+    }
+    
+    return bonsLivraison.filter(b => 
+      b.numero_bl.toLowerCase().includes(s) && 
+      !b.is_factured &&
+      b.commande_id === firstBL.commande_id
+    );
+  }, [bonsLivraison, blSearch, form.bon_livraison_ids]);
 
   const toggleBL = (id: string) => {
     setForm(prev => ({
@@ -168,97 +275,354 @@ export default function FacturesTable({
       alert("Erreur lors de la suppression : " + (err.message || "Serveur injoignable"));
     }
   }
+
+  const handleStatusChange = async (id: string | number, newStatut: FactureStatut) => {
+    setUpdatingStatus(id);
+    try {
+      const currentFacture = rows.find(r => r.id === id);
+      if (!currentFacture) return;
+      
+      await updateFacture(id, { 
+        statut: newStatut,
+        bon_livraison_ids: currentFacture.bon_livraisons.map(bl => bl.id)
+      });
+      // Mettre à jour l'état local
+      setRows(rows.map(row => 
+        row.id === id ? { ...row, statut: newStatut } : row
+      ));
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour du statut:", error);
+      alert("Erreur lors de la mise à jour du statut");
+    } finally {
+      setUpdatingStatus(null);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50/50 p-4 lg:p-8 font-sans">
-      <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div className="space-y-2">
-      <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-[#00A09D]">
-        <div className="w-8 h-[2px] bg-[#00A09D]"></div>
-Gestion Facturation      </div>
-      <h1 className="text-4xl font-black text-gray-900 tracking-tighter uppercase">
-        Automatisation des pénalités et groupement de BL <span className="text-[#00A09D]">.</span>
-      </h1>
-    </div>
-       
-        
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <input type="text" placeholder="Filtrer..." value={query} onChange={(e) => setQuery(e.target.value)} className="rounded-2xl border border-gray-200 bg-white pl-10 pr-4 py-3 text-sm outline-none w-64 shadow-sm" />
+    <>
+      {/* HEADER */}
+      <div className="bg-[#F0F4F4] px-8 py-8 flex flex-col md:flex-row justify-between items-end gap-6">
+      <div>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center shadow-sm text-[#00A09D]">
+              <FileText className="h-5 w-5" />
+            </div>
+            <nav className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">
+              Ressources / <span className="text-gray-900">Finance</span>
+            </nav>
           </div>
-          <button onClick={openNew} className="bg-gray-900 text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-xl">
-            Nouvelle Facture
+          <h1 className="text-4xl font-black text-gray-900 uppercase tracking-tighter leading-none">
+            Factures<span className="text-[#00A09D]">.</span>
+          </h1>
+        </div>
+
+        <div className="flex items-center gap-6">
+          <div className="text-right hidden sm:block">
+            <span className="text-[10px] font-black text-gray-400 uppercase block">Total Actif</span>
+            <span className="text-2xl font-black text-gray-900 leading-none">{filteredRows.length} Factures</span>
+          </div>
+          <button
+            onClick={openNew}
+            className="bg-white text-gray-900 border-2 border-gray-900 px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all shadow-[8px_8px_0px_rgba(0,160,157,0.2)]"
+            >
+            <span className="flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              NOUVEAU
+            </span>
           </button>
         </div>
       </div>
 
+      <div className="relative group mb-6">
+        <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-600 transition-colors" />
+        <input
+          type="text"
+          placeholder="Rechercher une facture..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="w-full rounded-2xl border border-gray-200 bg-white pl-12 pr-4 py-4 text-sm font-medium outline-none focus:ring-4 focus:ring-indigo-600/10 focus:border-indigo-600 transition-all shadow-sm hover:shadow-md"
+        />
+        {query && (
+          <button
+            onClick={() => setQuery("")}
+            className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <X className="h-3 w-3 text-gray-400" />
+          </button>
+        )}
+      </div>
+
+      {/* STATUS FILTERS */}
+      <div className="mb-6 flex flex-wrap gap-3">
+        <button
+          onClick={() => setQuery("")}
+          className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${
+            query === "" 
+              ? "bg-gray-900 text-white shadow-[4px_4px_0px_rgba(0,160,157,0.2)]" 
+              : "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50"
+          }`}
+        >
+          Toutes ({rows.length})
+        </button>
+        {Object.entries(statusCounts).map(([statut, count]) => (
+          <button
+            key={statut}
+            onClick={() => setQuery(statut)}
+            className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${
+              query === statut 
+                ? `${STATUT_STYLES[statut]} shadow-lg` 
+                : "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50"
+            }`}
+          >
+            {statut === 'BROUILLON' && 'Brouillons'}
+            {statut === 'VALIDE' && 'Validées'}
+            {statut === 'PAYE' && 'Payées'}
+            {statut === 'ANNULE' && 'Annulées'} ({count})
+          </button>
+        ))}
+      </div>
+
       {/* TABLE */}
-      <div className="overflow-hidden rounded-[2.5rem] border border-gray-100 bg-white shadow-2xl">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-gray-50/30 text-[10px] font-black uppercase text-gray-400 border-b">
-                <th className="px-8 py-6 w-10"></th>
-                <th className="px-6 py-6">Facture</th>
-                <th className="px-6 py-6">BL Liés</th>
-                <th className="px-6 py-6 text-center">Montant TTC</th>
-                <th className="px-6 py-6">Statut</th>
-                <th className="px-8 py-6 text-right">Actions</th>
+      <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden backdrop-blur-sm">
+          
+          <table className="w-full">
+            <thead className="bg-gray-50/80 border-b border-gray-100">
+              <tr>
+                <th className="px-6 py-4 text-left text-[10px] font-black uppercase text-gray-500 tracking-wider">
+                  <FileText className="h-3 w-3" />
+                  N° Facture
+                </th>
+                <th className="px-6 py-4 text-left text-[10px] font-black uppercase text-gray-500 tracking-wider">
+                  <Calendar className="h-3 w-3" />
+                  Date
+                </th>
+                <th className="px-6 py-4 text-left text-[10px] font-black uppercase text-gray-500 tracking-wider">
+                  <Banknote className="h-3 w-3" />
+                  Montant HT
+                </th>
+                <th 
+                className="px-6 py-4 text-left text-[10px] font-black uppercase text-gray-500 tracking-wider">
+                  <TrendingUp className="h-3 w-3" />
+                  Montant TTC
+                </th>
+                <th className="px-6 py-4 text-left text-[10px] font-black uppercase text-gray-500 tracking-wider">
+                  <User className="h-3 w-3" />
+                  Validé par
+                </th>
+                <th className="px-6 py-4 text-left text-[10px] font-black uppercase text-gray-500 tracking-wider">
+                  <AlertCircle className="h-3 w-3" />
+                  Statut
+                </th>
+                <th className="px-6 py-4 text-right text-[10px] font-black uppercase text-gray-500 tracking-wider">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
-              {rows.map((item) => (
+            <tbody className="divide-y divide-gray-100">
+              {filteredRows.map((item) => (
                 <React.Fragment key={item.id}>
-                  <tr onClick={() => setExpandedId(expandedId === item.id ? null : item.id)} className="hover:bg-gray-50/50 transition-all cursor-pointer">
-                    <td className="px-8 py-5"><ChevronDown className={`h-4 w-4 transition-transform ${expandedId === item.id ? 'rotate-180 text-indigo-600' : ''}`} /></td>
-                    <td className="px-6 py-5">
-                      <div className="font-black text-gray-900">{item.numero_facture}</div>
-                      <div className="text-[10px] text-gray-400 font-bold">{formatDate(item.date_facture)}</div>
-                    </td>
-                    <td className="px-6 py-5">
-                      <div className="flex -space-x-2">
-                        {item.bon_livraisons?.map((bl, i) => (
-                          <div key={bl.id} title={bl.numero_bl} className="h-8 w-8 rounded-full bg-indigo-100 border-2 border-white flex items-center justify-center text-[10px] font-black text-indigo-600">
-                            {bl.numero_bl.slice(-2)}
+                  <tr className="hover:bg-gray-50 transition-all duration-300 cursor-pointer group" onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 bg-gradient-to-br from-indigo-100 to-cyan-100 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-sm">
+                          <FileText className="h-6 w-6 text-indigo-600" />
+                        </div>
+                        <div>
+                          <p className="font-black text-gray-900 text-sm">{item.numero_facture}</p>
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700">
+                              <Truck className="h-3 w-3 mr-1" />
+                              {item.bon_livraisons?.length} BL{item.bon_livraisons?.length > 1 ? 's' : ''}
+                            </span>
                           </div>
-                        ))}
+                        </div>
                       </div>
                     </td>
-                    <td className="px-6 py-5 text-center">
-                      <span className="bg-gray-900 text-white px-3 py-1 rounded-lg font-black text-xs">{formatMoney(item.montant_ttc)} DT</span>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
+                          <Calendar className="h-4 w-4 text-gray-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{formatDate(item.date_facture)}</p>
+                          <p className="text-xs text-gray-500">Émise</p>
+                        </div>
+                      </div>
                     </td>
-                    <td className="px-6 py-5">
-                      <span className={`px-4 py-1 rounded-full text-[9px] font-black border uppercase ${STATUT_STYLES[item.statut]}`}>{item.statut}</span>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col gap-1">
+                        <span className="bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 px-3 py-2 rounded-xl font-black text-xs shadow-sm">
+                          {formatMoney(item.montant_ht)} DT
+                        </span>
+                        <p className="text-xs text-gray-500 text-center">Hors taxes</p>
+                      </div>
                     </td>
-                    <td className="px-8 py-5 text-right" onClick={(e) => e.stopPropagation()}>
-                      <button onClick={() => openEdit(item)} className="p-2 hover:text-indigo-600"><Edit2 className="h-4 w-4" /></button>
-                      <button onClick={() => handleDelete(item.id)} className="p-2 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col gap-1">
+                        <span
+                        className="bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 px-3 py-2 rounded-xl font-black text-xs shadow-sm"
+                        >
+                          {formatMoney(item.montant_ttc)} DT
+                        </span>
+                        <p className="text-xs text-gray-700 text-center font-medium">TTC</p>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      {item.valide_par ? (
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                            <User className="h-4 w-4 text-green-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">ID {item.valide_par}</p>
+                            <p className="text-xs text-green-600 font-medium">Validé</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
+                            <AlertCircle className="h-4 w-4 text-gray-400" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-500">En attente</p>
+                            <p className="text-xs text-gray-400">Non validé</p>
+                          </div>
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                      {updatingStatus === item.id ? (
+                        <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50 rounded-xl">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
+                          <span className="text-xs text-indigo-700 font-medium">Mise à jour...</span>
+                        </div>
+                      ) : item.statut === 'VALIDE' ? (
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                          <span className={`px-4 py-2 rounded-xl text-[10px] font-black border uppercase shadow-sm ${STATUT_STYLES[item.statut]}`}>
+                            VALIDÉ
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="relative">
+                          <select
+                            value={item.statut}
+                            onChange={(e) => handleStatusChange(item.id, e.target.value as FactureStatut)}
+                            className={`px-4 py-2 rounded-xl text-[10px] font-black border uppercase cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 appearance-none pr-8 shadow-sm transition-all hover:shadow-md ${STATUT_STYLES[item.statut]}`}
+                          >
+                            <option value="BROUILLON">BROUILLON</option>
+                            <option value="VALIDE">VALIDE</option>
+                            <option value="PAYE">PAYE</option>
+                            <option value="ANNULE">ANNULE</option>
+                          </select>
+                          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 pointer-events-none text-gray-400" />
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-2 justify-end">
+                        <button 
+                          onClick={() => openEdit(item)} 
+                          className="group p-2.5 bg-indigo-50 rounded-xl hover:bg-indigo-100 transition-all duration-200 transform hover:scale-105"
+                        >
+                          <Edit2 className="h-4 w-4 text-indigo-600 group-hover:rotate-12 transition-transform" />
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(item.id)} 
+                          className="group p-2.5 bg-red-50 rounded-xl hover:bg-red-100 transition-all duration-200 transform hover:scale-105"
+                        >
+                          <Trash2 className="h-4 w-4 text-red-600 group-hover:rotate-12 transition-transform" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                   {expandedId === item.id && (
-                    <tr className="bg-gray-50/50 animate-in fade-in duration-300">
-                      <td colSpan={6} className="p-8">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                          <div className="bg-white p-6 rounded-[2rem] border shadow-sm col-span-2">
-                             <h4 className="text-[10px] font-black uppercase text-gray-400 mb-4 flex items-center gap-2"><Truck className="h-3 w-3"/> Détails des réceptions</h4>
-                             <div className="space-y-3">
-                                {item.bon_livraisons?.map(bl => (
-                                  <div key={bl.id} className="flex justify-between text-sm border-b border-gray-50 pb-2">
-                                    <span className="font-bold">{bl.numero_bl} <span className="text-gray-400 font-medium">({formatDate(bl.date_reception)})</span></span>
-                                    <span className="font-black text-indigo-600">{bl.quantite_recue} Unités</span>
-                                  </div>
-                                ))}
-                             </div>
+                    <tr className="bg-gray-50 animate-in fade-in duration-500">
+                      <td colSpan={7} className="p-8">
+                        <div className="space-y-6">
+                          {/* Header des détails */}
+                          <div className="flex items-center gap-3 mb-6">
+                            <div className="w-8 h-8 bg-gradient-to-r from-indigo-600 to-cyan-500 rounded-xl flex items-center justify-center">
+                              <ChevronDown className="h-4 w-4 text-white" />
+                            </div>
+                            <h4 className="text-lg font-black text-gray-900">Détails de la facture #{item.numero_facture}</h4>
+                            <div className="ml-auto">
+                              <span className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-medium">
+                                {item.bon_livraisons?.length || 0} Bon{item.bon_livraisons?.length > 1 ? 's' : ''} de livraison
+                              </span>
+                            </div>
                           </div>
-                          <div className="bg-indigo-600 p-6 rounded-[2rem] text-white space-y-4">
-                             <div>
-                               <p className="text-[10px] uppercase font-bold opacity-70">Pénalités appliquées</p>
-                               <p className="text-2xl font-black">-{formatMoney(item.montant_penalites)} DT</p>
-                             </div>
-                             <div className="pt-4 border-t border-white/20">
-                               <p className="text-[10px] uppercase font-bold opacity-70">Net à payer (TTC)</p>
-                               <p className="text-2xl font-black">{formatMoney(item.montant_ttc)} DT</p>
-                             </div>
+                          
+                          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            {/* Détails des BL */}
+                            <div className="lg:col-span-2">
+                              <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden">
+                                <div className="bg-gray-100 px-6 py-4 border-b border-gray-200">
+                                  <h5 className="text-sm font-black text-gray-700 uppercase tracking-wider flex items-center gap-2">
+                                    <Truck className="h-4 w-4 text-indigo-600" />
+                                    Détails des réceptions
+                                  </h5>
+                                </div>
+                                <div className="p-6 space-y-4">
+                                  {item.bon_livraisons?.map((bl: any, index: number) => (
+                                    <div key={bl.id} className="group">
+                                      <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-indigo-50 transition-all duration-300">
+                                        <div className="flex items-center gap-3">
+                                          <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                                            <Truck className="h-5 w-5 text-indigo-600" />
+                                          </div>
+                                          <div>
+                                            <p className="font-black text-gray-900">{bl.numero_bl}</p>
+                                            <p className="text-xs text-gray-500 font-medium">{formatDate(bl.date_reception)}</p>
+                                          </div>
+                                        </div>
+                                        <div className="text-right">
+                                          <p className="font-black text-indigo-600 text-lg">{bl.quantite_recue}</p>
+                                          <p className="text-xs text-indigo-500 font-medium">Unités</p>
+                                        </div>
+                                      </div>
+                                      {index < (item.bon_livraisons?.length || 0) - 1 && (
+                                        <div className="border-l-2 border-gray-200 ml-5 h-4"></div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* Résumé financier */}
+                            <div className="space-y-4">
+                              <div className="bg-gradient-to-br from-indigo-600 to-cyan-500 rounded-2xl shadow-xl overflow-hidden">
+                                <div className="p-6 space-y-6">
+                                  <div className="flex items-center justify-between">
+                                    <h5 className="text-sm font-black text-white/80 uppercase tracking-wider">Résumé financier</h5>
+                                    <TrendingUp className="h-5 w-5 text-white/60" />
+                                  </div>
+                                  
+                                  <div className="space-y-4">
+                                    <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+                                      <p className="text-xs text-white/70 font-medium mb-1">Montant HT</p>
+                                      <p className="text-2xl font-black text-white">{formatMoney(item.montant_ht)} DT</p>
+                                    </div>
+                                    
+                                    <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+                                      <p className="text-xs text-white/70 font-medium mb-1">TVA (19%)</p>
+                                      <p className="text-xl font-bold text-white/90">{formatMoney(Number(item.montant_ht) * 0.19)} DT</p>
+                                    </div>
+                                    
+                                    {(item.montant_penalites || 0) > 0 && (
+                                      <div className="bg-red-500/20 backdrop-blur-sm rounded-xl p-4 border border-red-500/30">
+                                        <p className="text-xs text-red-100 font-medium mb-1">Pénalités appliquées</p>
+                                        <p className="text-xl font-bold text-red-100">-{formatMoney(item.montant_penalites || 0)} DT</p>
+                                      </div>
+                                    )}
+                                    
+                                    <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 border border-white/30">
+                                      <p className="text-xs text-white/90 font-medium mb-1">Net à payer (TTC)</p>
+                                      <p className="text-3xl font-black text-white">{formatMoney(item.montant_ttc)} DT</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </td>
@@ -269,11 +633,71 @@ Gestion Facturation      </div>
             </tbody>
           </table>
         </div>
-      </div>
+        
+        {/* PAGINATION */}
+        <div className="bg-gray-50 px-6 py-6 border-t border-gray-100">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="text-sm text-gray-600">
+                <span className="font-medium text-gray-900">{filteredRows.length}</span> factures
+                <span className="mx-2 text-gray-400">•</span>
+                Page <span className="font-medium text-gray-900">{pagination.currentPage}</span> sur <span className="font-medium text-gray-900">{pagination.lastPage}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handlePageChange(Math.max(1, pagination.currentPage - 1))}
+                disabled={pagination.currentPage === 1}
+                className="p-2 rounded-xl bg-white border border-gray-300 text-gray-600 hover:bg-gray-100 hover:border-gray-400 hover:text-gray-900 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:border-gray-300 disabled:hover:text-gray-600"
+              >
+                <ChevronRight className="h-4 w-4 rotate-180" />
+              </button>
+              
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.min(5, pagination.lastPage) }, (_, i) => {
+                  const pageNum = i + 1;
+                  const isActive = pageNum === pagination.currentPage;
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => handlePageChange(pageNum)}
+                      className={`w-10 h-10 rounded-xl font-medium text-sm transition-all duration-200 ${
+                        isActive
+                          ? 'bg-gray-900 text-white shadow-[4px_4px_0px_rgba(0,160,157,0.2)]'
+                          : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-100 hover:border-gray-400 hover:text-gray-900'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+                {pagination.lastPage > 5 && (
+                  <>
+                    <span className="px-2 text-gray-400">...</span>
+                    <button
+                      onClick={() => handlePageChange(pagination.lastPage)}
+                      className="w-10 h-10 rounded-xl bg-white border border-gray-300 text-gray-600 hover:bg-gray-100 hover:border-gray-400 hover:text-gray-900 transition-all duration-200"
+                    >
+                      {pagination.lastPage}
+                    </button>
+                  </>
+                )}
+              </div>
+              
+              <button
+                onClick={() => handlePageChange(Math.min(pagination.lastPage, pagination.currentPage + 1))}
+                disabled={pagination.currentPage === pagination.lastPage}
+                className="p-2 rounded-xl bg-white border border-gray-300 text-gray-600 hover:bg-gray-100 hover:border-gray-400 hover:text-gray-900 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:border-gray-300 disabled:hover:text-gray-600"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
 
       {/* DRAWER FORM */}
       {isDrawerOpen && (
-        <div className="fixed inset-0 z-[999] flex justify-end">
+          <div className="fixed inset-0 z-[999] flex justify-end">
           <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-md" onClick={closeDrawer} />
           <div className="relative w-full max-w-lg bg-white p-10 flex flex-col shadow-2xl animate-in slide-in-from-right duration-500">
             <h2 className="text-3xl font-black italic mb-8 uppercase tracking-tighter text-gray-900">
@@ -337,7 +761,7 @@ Gestion Facturation      </div>
                 </div>
               </div>
 
-              <div className="p-8 bg-gray-900 rounded-[2rem] text-white shadow-xl relative overflow-hidden group">
+              <div className="p-8 bg-gradient-to-r from-indigo-700 to-cyan-600 rounded-[2rem] text-white shadow-xl relative overflow-hidden group">
                 <div className="relative z-10 flex justify-between items-center">
                   <div>
                     <p className="text-[10px] font-black uppercase text-gray-400 mb-1">Total Final Estimé (TVA 19%)</p>
@@ -354,6 +778,6 @@ Gestion Facturation      </div>
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

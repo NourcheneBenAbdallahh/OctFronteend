@@ -11,15 +11,12 @@ export function normalizeFacture(f: any): TableFacture {
   return {
     ...f,
     id: f.id,
-    // Garantir que c'est un tableau de BL
-    bon_livraisons: f.bon_livraisons || (f.bon_livraison ? [f.bon_livraison] : []),
-    
-    // Correction des types numériques (Valeur brute ou 0)
+    bon_livraisons: Array.isArray(f.bon_livraisons) ? f.bon_livraisons : [],
     montant_ht: Number(f.montant_ht || 0),
-    montant_ttc: Number(f.montant_ttc || 0),
     montant_penalites: Number(f.montant_penalites || 0),
-    
-    // Sécurité sur le statut
+    montant_ht_net: Number(f.montant_ht_net || 0),
+    montant_ttc: Number(f.montant_ttc || 0),
+    jours_retard_total: Number(f.jours_retard_total || 0),
     statut:
       f.statut === "VALIDE" || f.statut === "PAYE" || f.statut === "ANNULE"
         ? f.statut
@@ -34,22 +31,23 @@ export type ListFacturesResponse = {
   };
 };
 
-// --- CHAMPS GRAPHQL MIS À JOUR POUR LE MULTI-BL ---
 const FACTURE_FIELDS = `
   id
   numero_facture
   date_facture
   montant_ht
-  montant_ttc
   montant_penalites
+  montant_ht_net
+  montant_ttc
   jours_retard_total
   statut
-  
-  bon_livraisons { 
-    id 
-    numero_bl 
-    date_reception 
+
+  bon_livraisons {
+    id
+    numero_bl
+    date_reception
     quantite_recue
+    is_factured
   }
 `;
 
@@ -68,11 +66,10 @@ const LIST_FACTURES = `
   }
 `;
 
-export async function listFactures(page = 1) {
-  return graphqlRequest<ListFacturesResponse>(LIST_FACTURES, { page });
+export async function listFactures(page = 1, opts?: { token?: string }) {
+  return graphqlRequest<ListFacturesResponse>(LIST_FACTURES, { page }, { token: opts?.token });
 }
 
-// --- MUTATIONS MISES À JOUR POUR ACCEPTER UN TABLEAU D'IDS ---
 const CREATE_FACTURE = `
   mutation CreateFacture($input: CreateFactureInput!) {
     createFacture(input: $input) {
@@ -81,12 +78,7 @@ const CREATE_FACTURE = `
   }
 `;
 
-/**
- * Note pour ton PFE : Dans ton schéma GraphQL (schema.graphql), 
- * l'input CreateFactureInput doit maintenant avoir un champ :
- * bon_livraison_ids: [ID!]!
- */
-export async function createFacture(input: any) {
+export async function createFacture(input: CreateFactureInput) {
   return graphqlRequest<{ createFacture: Facture }>(CREATE_FACTURE, { input });
 }
 
@@ -98,20 +90,20 @@ const UPDATE_FACTURE = `
   }
 `;
 
-// --- NETTOYAGE DES DONNÉES AVANT ENVOI ---
-function sanitizeFactureInput(input: any) {
+function sanitizeFactureInput(input: Partial<UpdateFactureInput>) {
   const allowedFields = [
-    'numero_facture', 
-    'date_facture', 
-    'montant_ht', 
-    'bon_livraison_ids', // On envoie le tableau d'IDs au pluriel
-    'statut'
+    "numero_facture",
+    "date_facture",
+    "montant_ht",
+    "bon_livraison_ids",
+    "statut",
   ];
 
-  const sanitized: any = {};
-  allowedFields.forEach(field => {
-    if (input[field] !== undefined) {
-      sanitized[field] = input[field];
+  const sanitized: Record<string, unknown> = {};
+
+  allowedFields.forEach((field) => {
+    if (input[field as keyof UpdateFactureInput] !== undefined) {
+      sanitized[field] = input[field as keyof UpdateFactureInput];
     }
   });
 
@@ -123,6 +115,7 @@ export async function updateFacture(
   input: UpdateFactureInput
 ) {
   const sanitizedInput = sanitizeFactureInput(input);
+
   return graphqlRequest<{ updateFacture: Facture }>(UPDATE_FACTURE, {
     id,
     input: sanitizedInput,

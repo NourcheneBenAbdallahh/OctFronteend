@@ -1,15 +1,53 @@
 "use client";
 
-import { formatDate, formatEmballageLabel, formatFlow, formatQuantity } from "@/lib/mouvement.helpers";
+import {
+  formatDate,
+  formatEmballageLabel,
+  formatQuantity,
+  isMouvementBrouillon,
+} from "@/lib/mouvement.helpers";
 import { MouvementStock } from "@/types/mouvement";
 import { StatusBadge, TypeBadge } from "./mouvement-ui";
-import { CheckCircle2, Trash2, History, User, ChevronLeft, ChevronRight } from "lucide-react";
+import { CheckCircle2, History, Loader2, Trash2, User } from "lucide-react";
+
+const LocalPagination = ({
+  currentPage,
+  totalPages,
+  onPageChange,
+}: {
+  currentPage: number;
+  totalPages: number;
+  onPageChange: (p: number) => void;
+}) => (
+  <div className="flex items-center gap-4">
+    <button
+      onClick={() => onPageChange(currentPage - 1)}
+      disabled={currentPage === 1}
+      className="px-4 py-2 text-xs font-bold uppercase tracking-widest bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-30 transition-all shadow-sm"
+    >
+      Précédent
+    </button>
+
+    <div className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-x px-6 border-gray-100">
+      Page {currentPage} sur {totalPages}
+    </div>
+
+    <button
+      onClick={() => onPageChange(currentPage + 1)}
+      disabled={currentPage === totalPages}
+      className="px-4 py-2 text-xs font-bold uppercase tracking-widest bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-30 transition-all shadow-sm"
+    >
+      Suivant
+    </button>
+  </div>
+);
 
 export default function MouvementsTable({
   items,
   loading,
   onValidate,
   onDelete,
+  busyActionId,
   currentPage,
   totalPages,
   totalItems,
@@ -19,6 +57,8 @@ export default function MouvementsTable({
   loading: boolean;
   onValidate: (id: string) => void;
   onDelete: (id: string) => void;
+  /** Désactive les boutons pendant validate/delete */
+  busyActionId?: string | null;
   currentPage: number;
   totalPages: number;
   totalItems: number;
@@ -37,6 +77,10 @@ export default function MouvementsTable({
             <p className="mt-1 text-xs font-bold uppercase tracking-widest text-gray-400">
               {totalItems} mouvement(s) trouvé(s)
             </p>
+            <p className="mt-2 max-w-lg text-[11px] font-medium normal-case tracking-normal text-gray-500">
+              Mouvements en <strong>brouillon</strong> : validez pour appliquer le flux au stock, ou
+              supprimez le brouillon depuis la colonne <strong>Actions</strong>.
+            </p>
           </div>
         </div>
 
@@ -51,6 +95,7 @@ export default function MouvementsTable({
                 <th className="px-6 py-5">Entrepots</th>
                 <th className="px-6 py-5 text-center">Quantité</th>
                 <th className="px-6 py-5 text-center">Créé Par</th>
+                <th className="px-6 py-5 text-right">Actions</th>
               </tr>
             </thead>
 
@@ -68,7 +113,10 @@ export default function MouvementsTable({
                 </tr>
               ) : !items || items.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-20 text-center text-sm font-bold text-gray-400 uppercase tracking-widest">
+                  <td
+                    colSpan={8}
+                    className="px-6 py-20 text-center text-sm font-bold text-gray-400 uppercase tracking-widest"
+                  >
                     Aucun mouvement enregistré
                   </td>
                 </tr>
@@ -94,27 +142,29 @@ export default function MouvementsTable({
 
                     <td className="px-6 py-6">
                       <div className="text-sm font-black text-[#1C2434] leading-tight">
-{m.emballage ? formatEmballageLabel(m.emballage) : "N/A"}
-
+                        {m.emballage ? formatEmballageLabel(m.emballage) : "N/A"}
                       </div>
                       <div className="mt-1 inline-flex items-center rounded-md bg-gray-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-tight text-gray-500">
                         Lot: {m.lot?.code_lot ?? "N/A"}
                       </div>
                     </td>
 
-                  <td className="px-6 py-6">
-  <div className="text-sm font-black text-[#1C2434] leading-tight">
-Source: {m.entrepotSource?.nom ?? "N/A"}
-  </div>
-  <div className="mt-1 text-sm font-black text-[#1C2434] leading-tight">
-Destination: {m.entrepotDestination?.nom ?? "N/A"}  </div>
-</td>
+                    <td className="px-6 py-6">
+                      <div className="text-sm font-black text-[#1C2434] leading-tight">
+                        Source: {m.entrepotSource?.nom ?? "N/A"}
+                      </div>
+                      <div className="mt-1 text-sm font-black text-[#1C2434] leading-tight">
+                        Destination: {m.entrepotDestination?.nom ?? "N/A"}
+                      </div>
+                    </td>
 
                     <td className="px-6 py-6 text-center">
                       <div className="text-lg font-[1000] tracking-tighter text-[#1C2434]">
                         {formatQuantity(m.quantite)}
                       </div>
-                      <div className="text-[9px] font-black uppercase text-gray-400">Unités</div>
+                      <div className="text-[9px] font-black uppercase text-gray-400">
+                        Unités
+                      </div>
                     </td>
 
                     <td className="px-6 py-6 text-center">
@@ -128,7 +178,44 @@ Destination: {m.entrepotDestination?.nom ?? "N/A"}  </div>
                       </div>
                     </td>
 
-             
+                    <td className="px-6 py-6 text-right align-middle">
+                      {isMouvementBrouillon(m.statut) ? (
+                        <div className="flex flex-col items-end gap-2 sm:flex-row sm:justify-end">
+                          <button
+                            type="button"
+                            onClick={() => onValidate(m.id)}
+                            disabled={busyActionId != null}
+                            aria-label={`Valider le mouvement ${m.code_mouvement ?? m.id}`}
+                            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#00A09D] px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white shadow-sm transition hover:bg-[#008e8b] disabled:opacity-40"
+                          >
+                            {busyActionId === m.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                            ) : (
+                              <CheckCircle2 size={14} aria-hidden />
+                            )}
+                            Valider
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onDelete(m.id)}
+                            disabled={busyActionId != null}
+                            aria-label={`Supprimer le brouillon ${m.code_mouvement ?? m.id}`}
+                            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-red-200 bg-white px-3 py-2 text-[10px] font-black uppercase tracking-widest text-red-600 transition hover:bg-red-50 disabled:opacity-40"
+                          >
+                            {busyActionId === m.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                            ) : (
+                              <Trash2 size={14} aria-hidden />
+                            )}
+                            Supprimer
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] font-bold uppercase text-gray-400" title="Déjà validé">
+                          Validé
+                        </span>
+                      )}
+                    </td>
                   </tr>
                 ))
               )}
@@ -138,31 +225,12 @@ Destination: {m.entrepotDestination?.nom ?? "N/A"}  </div>
       </div>
 
       {!loading && totalPages > 1 && (
-        <div className="flex items-center justify-center gap-6 py-6 bg-white rounded-[2rem] border border-gray-100 shadow-sm">
-          <button
-            onClick={() => onPageChange(currentPage - 1)}
-            disabled={currentPage === 1}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-white border border-gray-200 text-gray-600 transition-all hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            <ChevronLeft size={20} />
-          </button>
-
-          <div className="flex flex-col items-center">
-            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
-              Page {currentPage} sur {totalPages}
-            </span>
-            <div className="text-xs font-bold text-[#1C2434] mt-1">
-              Total : {totalItems} mouvement(s)
-            </div>
-          </div>
-
-          <button
-            onClick={() => onPageChange(currentPage + 1)}
-            disabled={currentPage === totalPages}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-white border border-gray-200 text-gray-600 transition-all hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            <ChevronRight size={20} />
-          </button>
+        <div className="mt-4 flex justify-center items-center py-6 bg-white rounded-[2rem] border border-gray-50 shadow-sm animate-in fade-in zoom-in-95 duration-300">
+          <LocalPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={onPageChange}
+          />
         </div>
       )}
     </div>

@@ -1,4 +1,5 @@
 import { graphqlRequest } from "./graphqlClient";
+import { useAuthStore } from "@/store/useAuthStore";
 import {
   Commande,
   CommandesPaginatorInfo,
@@ -43,7 +44,16 @@ const COMMANDE_FIELDS = `
   updated_at
 `;
 
-export async function listCommandes(page = 1, first = 100) {
+function getAuthToken(): string | undefined {
+  const token = useAuthStore.getState().token;
+  return token || undefined;
+}
+
+export async function listCommandes(
+  page = 1,
+  first = 100,
+  opts?: { token?: string }
+) {
   const query = `
     query ListCommandes($page: Int!, $first: Int!) {
       commandes(page: $page, first: $first) {
@@ -66,7 +76,7 @@ export async function listCommandes(page = 1, first = 100) {
       data: Commande[];
       paginatorInfo: CommandesPaginatorInfo;
     };
-  }>(query, { page, first });
+  }>(query, { page, first }, { token: opts?.token });
 }
 
 export async function createCommande(input: CreateCommandeInput) {
@@ -78,7 +88,11 @@ export async function createCommande(input: CreateCommandeInput) {
     }
   `;
 
-  return graphqlRequest<{ createCommande: Commande }>(mutation, { input });
+  return graphqlRequest<{ createCommande: Commande }>(
+    mutation,
+    { input },
+    { token: getAuthToken() }
+  );
 }
 
 function sanitizeCommandeInput(input: UpdateCommandeInput) {
@@ -117,10 +131,14 @@ export async function updateCommande(
     }
   `;
 
-  return graphqlRequest<{ updateCommande: Commande }>(mutation, {
-    id,
-    input: sanitizeCommandeInput(input),
-  });
+  return graphqlRequest<{ updateCommande: Commande }>(
+    mutation,
+    {
+      id,
+      input: sanitizeCommandeInput(input),
+    },
+    { token: getAuthToken() }
+  );
 }
 
 export async function cancelCommande(id: string | number) {
@@ -132,7 +150,11 @@ export async function cancelCommande(id: string | number) {
     }
   `;
 
-  return graphqlRequest<{ cancelCommande: Commande }>(mutation, { id });
+  return graphqlRequest<{ cancelCommande: Commande }>(
+    mutation,
+    { id },
+    { token: getAuthToken() }
+  );
 }
 
 export async function dropCommande(id: string | number) {
@@ -142,5 +164,9 @@ export async function dropCommande(id: string | number) {
     }
   `;
 
-  return graphqlRequest<{ dropCommande: boolean }>(mutation, { id });
+  return graphqlRequest<{ dropCommande: boolean }>(
+    mutation,
+    { id },
+    { token: getAuthToken() }
+  );
 }

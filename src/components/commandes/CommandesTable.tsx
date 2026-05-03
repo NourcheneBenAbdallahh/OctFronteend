@@ -20,6 +20,8 @@ import {
   TableCommande,
   UpdateCommandeInput,
 } from "@/types/commandes";
+import { useAuthStore } from "@/store/useAuthStore";
+import { graphqlRequest } from "@/lib/graphqlClient";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { 
   X, Plus, Search, Edit2, Trash2, Ban, 
@@ -163,7 +165,10 @@ export default function CommandesTable({
   fournisseurs: FournisseurOption[];
   contrats: ContratForCommande[];
 }) {
+  const currentUser = useAuthStore((state) => state.user);
+  const token = useAuthStore((state) => state.token);
   const [rows, setRows] = useState<TableCommande[]>(data);
+  const [userNamesById, setUserNamesById] = useState<Record<string, string>>({});
   const [expandedId, setExpandedId] = useState<Id | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<TableCommande | null>(null);
@@ -172,9 +177,48 @@ export default function CommandesTable({
   const [submitLoading, setSubmitLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  const router = useRouter();
+    const router = useRouter();
+const searchParams = useSearchParams();
+const pathname = usePathname();
+
+const goToPage = (page: number) => {
+  const params = new URLSearchParams(searchParams.toString());
+  params.set("page", String(page));
+  router.push(`${pathname}?${params.toString()}`);
+};
+
 
   useEffect(() => { setRows(data); }, [data]);
+
+  useEffect(() => {
+    async function loadUserNames() {
+      if (!token) return;
+      try {
+        const query = `
+          query ListUsersForCommandes {
+            users {
+              id
+              name
+            }
+          }
+        `;
+        const res = await graphqlRequest<{ users: Array<{ id: string | number; name: string }> }>(
+          query,
+          {},
+          { token }
+        );
+        const map: Record<string, string> = {};
+        (res.users || []).forEach((u) => {
+          map[String(u.id)] = u.name;
+        });
+        setUserNamesById(map);
+      } catch {
+        // Fallback handled in UI if users query is unavailable
+      }
+    }
+
+    loadUserNames();
+  }, [token]);
 
   const emballagesMap = useMemo(() => new Map(emballages.map((x) => [String(x.id), x.label])), [emballages]);
   const entrepotsMap = useMemo(() => new Map(entrepots.map((x) => [String(x.id), x.label])), [entrepots]);
@@ -230,6 +274,9 @@ export default function CommandesTable({
   };
 
   const closeDrawer = () => { if (!submitLoading) { setIsDrawerOpen(false); setErrorMessage(""); } };
+
+
+
 
   async function handleCancel(id: Id) {
     if (!confirm("Annuler cette commande ?")) return;
@@ -432,6 +479,7 @@ const filteredRows = useMemo(() => {
                 <th className="px-6 py-6">Référence</th>
                 <th className="px-6 py-6">Logistique</th>
                 <th className="px-6 py-6 text-center">Quantité</th>
+                <th className="px-6 py-6">Créé par</th>
                 <th className="px-6 py-6">Statut</th>
                 <th className="px-6 py-6 text-right">Actions</th>
               </tr>
@@ -463,6 +511,14 @@ const filteredRows = useMemo(() => {
                       <div className="text-[10px] mt-1 text-gray-400 font-bold uppercase">{emballagesMap.get(String(item.emballage_id))}</div>
                     </td>
                     <td className="px-6 py-5">
+                      <div className="inline-flex items-center rounded-xl bg-gray-100 px-3 py-1.5 text-xs font-black text-gray-700">
+                        {userNamesById[String(item.created_by)] ||
+                          (String(item.created_by) === String(currentUser?.id)
+                            ? (currentUser?.name || "-")
+                            : `Utilisateur #${item.created_by}`)}
+                      </div>
+                    </td>
+                    <td className="px-6 py-5">
                       <span className={`inline-flex items-center rounded-full border px-4 py-1 text-[9px] font-black uppercase tracking-widest shadow-sm ${STATUT_STYLES[item.statut]}`}>
                         {item.statut}
                       </span>
@@ -489,7 +545,7 @@ const filteredRows = useMemo(() => {
                   {/* TIMELINE DETAIL RÉEL */}
                   {expandedId === item.id && (
                     <tr>
-                      <td colSpan={6} className="p-0 border-none bg-white">
+                      <td colSpan={7} className="p-0 border-none bg-white">
                          <OrderTimelineDetail 
                             item={item} 
                             emballageLabel={emballagesMap.get(String(item.emballage_id))} 
@@ -502,8 +558,15 @@ const filteredRows = useMemo(() => {
             </tbody>
           </table>
         </div>
+        
       </div>
-
+<div className="mt-6 flex justify-center">
+  <Pagination
+    currentPage={pagination.currentPage}
+    totalPages={pagination.lastPage}
+    onPageChange={goToPage}
+  />
+</div>
       {/* DRAWER SECTION */}
       {isDrawerOpen && (
         <>

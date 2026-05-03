@@ -24,8 +24,7 @@ type PageProps = {
 export default async function BonLivraisonsPage({
   searchParams,
 }: PageProps) {
-  const params = await searchParams;
-  const currentPage = Number(params?.page || "1");
+  await searchParams;
 
   const [
     bonLivraisonsResult,
@@ -33,7 +32,7 @@ export default async function BonLivraisonsPage({
     commandesResult,
     entrepotsResult,
   ] = await Promise.all([
-    listBonLivraisons(currentPage),
+    listBonLivraisons(1, 1000),
     listEmballages(1, 100),
     listCommandes(1, 100),
     fetchEntrepots(),
@@ -52,6 +51,8 @@ export default async function BonLivraisonsPage({
       id: item.id,
       numero_commande: item.numero_commande,
       quantite: item.quantite,
+      quantite_recue_total: Number(item.quantite_recue_total ?? 0),
+      reste: Number(item.reste ?? 0),
       emballage_id: item.emballage_id,
       entrepot_id: item.entrepot_id,
       statut: item.statut,
@@ -61,8 +62,6 @@ export default async function BonLivraisonsPage({
     id: item.id,
     label: item.nom || `Entrepot #${item.id}`,
   }));
-console.log(commandes);
-
   return (
     <div>
       <div className="space-y-6">

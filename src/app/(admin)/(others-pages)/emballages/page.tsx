@@ -1,8 +1,13 @@
 // src/app/(admin)/(others-pages)/emballages/page.tsx
-'use client'; // <-- IMPORTANT : rend ce fichier côté client
+"use client";
 
-import EmballagesClient from './EmballagesClient';
+import { Suspense } from "react";
+import EmballagesClient from "./EmballagesClient";
 
 export default function Page() {
-  return <EmballagesClient />;
+  return (
+    <Suspense fallback={<div className="p-8 text-sm text-gray-500">Chargement…</div>}>
+      <EmballagesClient />
+    </Suspense>
+  );
 }

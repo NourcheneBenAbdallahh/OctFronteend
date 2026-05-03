@@ -2,8 +2,7 @@ import FacturesTable from "@/components/factures/FacturesTable";
 import { listFactures, normalizeFacture } from "@/lib/factures.api";
 import { listBonLivraisons } from "@/lib/bon-livraisons.api"; 
 // Importe le type depuis la source attendue par le composant FacturesTable
-import { BonLivraisonOption } from "@/types/bon-livraison";
-import { TableFacture } from "@/types/facture";
+import { BonLivraisonOption, TableFacture } from "@/types/facture";
 
 type PageProps = {
   searchParams?: Promise<{
@@ -17,7 +16,7 @@ export default async function FacturesPage({ searchParams }: PageProps) {
 
   const [facturesResult, blResult] = await Promise.all([
     listFactures(currentPage),
-    listBonLivraisons(1, 100), 
+    listBonLivraisons(1, 10000), // Augmenté à 10000 pour charger tous les BLs
   ]);
 
   const rows: TableFacture[] = facturesResult.factures.data.map(normalizeFacture);
@@ -30,13 +29,21 @@ export default async function FacturesPage({ searchParams }: PageProps) {
       quantite_recue: Number(item.quantite_recue),
       date_reception: item.date_reception,
       // On s'assure que numero_commande est bien mappé depuis l'API
-      numero_commande: item.numero_commande || "N/A", 
+      numero_commande: item.numero_commande || "N/A",
+      // Ajout des champs nécessaires pour le filtrage et la validation
+      commande_id: item.commande_id,
+      is_factured: item.is_factured,
+      // Ajout des données de commande (sans prix_unitaire pour éviter l'erreur GraphQL)
+      commande: item.commande ? {
+        id: item.commande.id,
+        numero_commande: item.commande.numero_commande,
+        prix_unitaire: 0 // Valeur par défaut, sera calculé différemment
+      } : undefined
     })
   );
 
   return (
-    <div className="p-6">
-      {/* Tu peux ajouter un PageBreadcrumb ici si nécessaire */}
+    <div >
       <div className="mt-8">         
         <FacturesTable
             data={rows}
