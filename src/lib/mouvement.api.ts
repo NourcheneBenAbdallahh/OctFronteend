@@ -4,66 +4,7 @@ import {
   LotDisponible,MouvementsPageStats,
   MouvementStock, 
 } from "@/types/mouvement";
-
-const GRAPHQL_URL =
-  process.env.NEXT_PUBLIC_GRAPHQL_URL ?? "http://127.0.0.1:8000/graphql";
-
-  
-async function gql<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
-  const storage = typeof window !== "undefined" ? localStorage.getItem("auth-storage") : null;
-  let token = null;
-
-  if (storage) {
-    try {
-      const parsed = JSON.parse(storage);
-      token = parsed.state?.user?.token || parsed.state?.token;
-    } catch (e) {
-      // console.error("Erreur de lecture du storage auth", e);
-    }
-  }
-
-  // console.log("Token extrait :", token ? "✅ Trouvé" : "❌ Non trouvé");
-  // console.log("GRAPHQL QUERY =", query);
-  // console.log("GRAPHQL VARIABLES =", variables);
-
-  try {
-    const res = await fetch(GRAPHQL_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({ query, variables }),
-      cache: "no-store",
-    });
-
-    const json = await res.json();
-
-    //console.log("GRAPHQL RAW RESPONSE =", json);
-
-    if (!res.ok) {
-     // console.error(`[HTTP ERROR ${res.status}]`, res.statusText);
-      throw new Error(`Erreur HTTP ${res.status}`);
-    }
-
-    if (json.errors?.length) {
-     // console.groupCollapsed("[GraphQL Error]");
-      //console.table(json.errors);
-      //console.groupEnd();
-      throw new Error(json.errors.map((e: any) => e.message).join(" | "));
-    }
-
-    if (!json.data) {
-      throw new Error("Aucune donnée retournée par le serveur.");
-    }
-
-    return json.data as T;
-  } catch (error) {
-    //console.error("[Fetch Exception]", error);
-    throw error;
-  }
-}
+import { graphqlRequest } from "@/lib/graphqlClient";
 export async function fetchMouvements(filters: {
   search?: string;
   type?: string;
@@ -146,7 +87,7 @@ export async function fetchMouvements(filters: {
     variables.statut = filters.statut;
   }
 
-  const data = await gql<{
+  const data = await graphqlRequest<{
     mouvementStocks: {
       data: MouvementStock[];
       paginatorInfo: {
@@ -172,7 +113,7 @@ export async function fetchEntrepots(): Promise<EntrepotRef[]> {
       }
     }
   `;
-  const data = await gql<{ entrepots: EntrepotRef[] }>(query);
+  const data = await graphqlRequest<{ entrepots: EntrepotRef[] }>(query);
   return data.entrepots;
 }
 
@@ -188,7 +129,7 @@ export async function fetchEmballages(): Promise<EmballageRef[]> {
       }
     }
   `;
-  const data = await gql<{ emballages: { data: EmballageRef[] } }>(query);
+  const data = await graphqlRequest<{ emballages: { data: EmballageRef[] } }>(query);
   return data.emballages.data;
 }
 
@@ -210,7 +151,7 @@ export async function fetchLotsDisponibles(
       }
     }
   `;
-  const data = await gql<{ lotsDisponiblesParEntrepotEtEmballage: LotDisponible[] }>(query, {
+  const data = await graphqlRequest<{ lotsDisponiblesParEntrepotEtEmballage: LotDisponible[] }>(query, {
     entrepot_id,
     emballage_id,
   });
@@ -235,7 +176,7 @@ export async function createMouvementDraft(input: {
       }
     }
   `;
-  return gql(mutation, { input });
+  return graphqlRequest(mutation, { input });
 }
 
 export async function validateMouvement(id: string) {
@@ -249,7 +190,7 @@ export async function validateMouvement(id: string) {
       }
     }
   `;
-  return gql(mutation, { input: { id } });
+  return graphqlRequest(mutation, { input: { id } });
 }
 
 export async function deleteMouvementDraft(id: string) {
@@ -258,7 +199,7 @@ export async function deleteMouvementDraft(id: string) {
       deleteMouvementDraft(id: $id)
     }
   `;
-  return gql(mutation, { id });
+  return graphqlRequest(mutation, { id });
 }
 export async function fetchGlobalStats(): Promise<MouvementsPageStats> {
   const query = `
@@ -274,6 +215,6 @@ export async function fetchGlobalStats(): Promise<MouvementsPageStats> {
       }
     }
   `;
-  const data = await gql<{ mouvementsStats: MouvementsPageStats }>(query);
+  const data = await graphqlRequest<{ mouvementsStats: MouvementsPageStats }>(query);
   return data.mouvementsStats;
 }

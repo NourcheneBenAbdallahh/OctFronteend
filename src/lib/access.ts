@@ -86,8 +86,8 @@ export function canAccessPath(
     return r === "STOCK";
   }
 
-  if (path.startsWith("/bi")) {
-    return false;
+  if (path === "/bi" || path.startsWith("/bi/")) {
+    return true;
   }
 
   if (
@@ -137,4 +137,61 @@ export function canAccessPath(
   }
 
   return false;
+}
+
+/** Voir tous les mouvements / événements (calendrier) ; les autres utilisateurs ont une vue filtrée. */
+export function isAdminUser(role: string | undefined | null): boolean {
+  return (role ?? "").trim().toUpperCase() === "ADMIN";
+}
+
+function isStockSectionUser(role: string | undefined | null): boolean {
+  return toAccessRole(role) === "STOCK";
+}
+
+function isLogistiqueSectionUser(role: string | undefined | null): boolean {
+  return toAccessRole(role) === "LOGISTIQUE";
+}
+
+export function filterStocksForDashboardUser<T extends { user_id?: string | number | null }>(
+  stocks: T[],
+  userId: string | undefined | null,
+  role: string | undefined | null
+): T[] {
+  if (isAdminUser(role) || isStockSectionUser(role)) return stocks;
+  if (!userId) return [];
+  return stocks.filter((s) => String(s.user_id ?? "") === String(userId));
+}
+
+export function filterCommandesForCalendarUser<
+  T extends { created_by?: string | number | null },
+>(commandes: T[], userId: string | undefined | null, role: string | undefined | null): T[] {
+  if (isAdminUser(role) || isLogistiqueSectionUser(role)) return commandes;
+  if (!userId) return [];
+  return commandes.filter((c) => String(c.created_by ?? "") === String(userId));
+}
+
+/** Domaine de données du tableau BI : chaque rôle a sa vue métier. */
+export type BiDataScope = "full" | "stock" | "logistique" | "finance";
+
+export function biDataScopeForRole(role: string | undefined | null): BiDataScope {
+  const r = toAccessRole(role);
+  if (r === "ADMIN") return "full";
+  if (r === "STOCK") return "stock";
+  if (r === "LOGISTIQUE") return "logistique";
+  if (r === "FINANCE") return "finance";
+  return "full";
+}
+
+/** Libellé menu latéral pour la route `/bi`. */
+export function sidebarBiNavLabel(role: string | undefined | null): string {
+  switch (biDataScopeForRole(role)) {
+    case "stock":
+      return "BI — Stock";
+    case "logistique":
+      return "BI — Logistique";
+    case "finance":
+      return "BI — Finance";
+    default:
+      return "Tableau BI";
+  }
 }

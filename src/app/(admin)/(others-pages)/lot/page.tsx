@@ -1,4 +1,5 @@
 import LotsClient from "@/components/lots/LotsClient";
+import { getServerAccessToken } from "@/lib/getServerAccessToken";
 import { getLots, type PaginatedLots } from "@/lib/lot.api"; // Importe le type ici
 
 export default async function LotsPage() {
@@ -12,8 +13,8 @@ export default async function LotsPage() {
   };
 
   try {
-    // 2. On récupère les données (res sera automatiquement typé PaginatedLots)
-    const res = await getLots(1, 12);
+    const token = await getServerAccessToken();
+    const res = await getLots(1, 12, token ? { token } : undefined);
     initialData = res;
   } catch (error) {
     console.error("Failed to load lots:", error);

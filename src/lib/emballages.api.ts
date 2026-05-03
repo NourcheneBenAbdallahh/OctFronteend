@@ -1,4 +1,4 @@
-import { graphqlRequest } from "./graphqlClient";
+import { graphqlRequest, type GraphqlRequestOptions } from "./graphqlClient";
 import  { Emballages,sanitizeUpdateEmballageInput } from "@/types/emballage";
 
 export const EMBALLAGE_FIELDS = `
@@ -36,14 +36,18 @@ const LIST_EMBALLAGES = `
   }
 `;
 
-export async function listEmballages(page = 1, first = 10) {
+export async function listEmballages(
+  page = 1,
+  first = 10,
+  opts?: GraphqlRequestOptions
+) {
   try {
     return await graphqlRequest<{
       emballages: {
         data: Emballages[];
         paginatorInfo: { currentPage: number; lastPage: number; total: number };
       };
-    }>(LIST_EMBALLAGES, { first, page });
+    }>(LIST_EMBALLAGES, { first, page }, opts);
   } catch (error) {
     console.error("Erreur listEmballages:", error);
     throw error; // on relance pour que le composant qui appelle puisse aussi gérer

@@ -1,4 +1,4 @@
-import { graphqlRequest } from "./graphqlClient";
+import { graphqlRequest, type GraphqlRequestOptions } from "./graphqlClient";
 import { useAuthStore } from "@/store/useAuthStore";
 import {
   Commande,
@@ -52,7 +52,7 @@ function getAuthToken(): string | undefined {
 export async function listCommandes(
   page = 1,
   first = 100,
-  opts?: { token?: string }
+  opts?: GraphqlRequestOptions
 ) {
   const query = `
     query ListCommandes($page: Int!, $first: Int!) {
@@ -76,7 +76,7 @@ export async function listCommandes(
       data: Commande[];
       paginatorInfo: CommandesPaginatorInfo;
     };
-  }>(query, { page, first }, { token: opts?.token });
+  }>(query, { page, first }, opts);
 }
 
 export async function createCommande(input: CreateCommandeInput) {

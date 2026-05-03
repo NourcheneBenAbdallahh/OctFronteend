@@ -3,6 +3,7 @@
 import React, { useCallback, useMemo, useState } from "react";
 import {
   Activity,
+  AlertTriangle,
   ArrowDownRight,
   ArrowUpRight,
   Download,
@@ -29,6 +30,12 @@ import {
   Line,
 } from "recharts";
 import { getAllStocks } from "@/lib/stock.api";
+import {
+  biDataScopeForRole,
+  filterCommandesForCalendarUser,
+  filterStocksForDashboardUser,
+  isAdminUser,
+} from "@/lib/access";
 import { useAuthStore } from "@/store/useAuthStore";
 import type { Stock } from "@/types/stock";
 import type { Commande } from "@/types/commandes";
@@ -72,6 +79,14 @@ const FACTURE_FR: Record<string, string> = {
 
 const PIE_COLORS = ["#00A09D", "#FF9C55", "#6366F1", "#F472B6", "#94A3B8", "#22C55E"];
 
+const ROLE_LABEL_FR: Record<string, string> = {
+  ADMIN: "Administrateur",
+  STOCK: "Stock",
+  LOGISTIQUE: "Logistique",
+  FINANCE: "Finance",
+  CONTRAT: "Contrat",
+};
+
 function fmt(n: number): string {
   return n.toLocaleString("fr-FR", { maximumFractionDigits: 0 });
 }
@@ -85,8 +100,24 @@ function fmtMoney(n: number): string {
   );
 }
 
+const SCOPE_SUBTITLE: Record<
+  ReturnType<typeof biDataScopeForRole>,
+  string
+> = {
+  full: "Synthèse stocks, achats et facturation — vue administrateur.",
+  stock: "Indicateurs et graphiques basés sur les mouvements de stock (vue métier stock).",
+  logistique:
+    "Pilotage des commandes et du pipeline (vue métier logistique / achats).",
+  finance: "Chiffre d’affaires et répartition des factures (vue métier finance).",
+};
+
 export default function BiAdvancedDashboard() {
   const token = useAuthStore((s) => s.token);
+  const user = useAuthStore((s) => s.user);
+  const scope = useMemo(() => biDataScopeForRole(user?.role), [user?.role]);
+  const showStock = scope === "full" || scope === "stock";
+  const showCmd = scope === "full" || scope === "logistique";
+  const showFac = scope === "full" || scope === "finance";
 
   const [period, setPeriod] = useState<BiPeriodKey>("90d");
   const [entrepot, setEntrepot] = useState<string | "all">("all");
@@ -101,14 +132,32 @@ export default function BiAdvancedDashboard() {
     setLoading(true);
     setError(null);
     try {
-      const [allStocks, cmd, fac] = await Promise.all([
-        getAllStocks(),
-        fetchAllCommandes(token),
-        fetchAllFactures(token),
+      const [allStocksRaw, cmdRaw, facRaw] = await Promise.all([
+        showStock
+          ? getAllStocks().catch((): Stock[] => [])
+          : Promise.resolve([] as Stock[]),
+        showCmd
+          ? fetchAllCommandes(token).catch((): Commande[] => [])
+          : Promise.resolve([] as Commande[]),
+        showFac
+          ? fetchAllFactures(token).catch((): Facture[] => [])
+          : Promise.resolve([] as Facture[]),
       ]);
-      setStocks(allStocks);
-      setCommandes(cmd);
-      setFactures(fac);
+      setStocks(
+        filterStocksForDashboardUser(
+          allStocksRaw,
+          user?.id ?? null,
+          user?.role ?? null
+        )
+      );
+      setCommandes(
+        filterCommandesForCalendarUser(
+          cmdRaw,
+          user?.id ?? null,
+          user?.role ?? null
+        )
+      );
+      setFactures(facRaw);
     } catch (e) {
       console.error(e);
       setError(
@@ -117,7 +166,7 @@ export default function BiAdvancedDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, user?.id, user?.role, showStock, showCmd, showFac]);
 
   React.useEffect(() => {
     load();
@@ -151,6 +200,23 @@ export default function BiAdvancedDashboard() {
   } = model;
 
   const busiestDays = useMemo(() => topBusyDays(activity56, 5), [activity56]);
+
+  const facturesCountPeriod = useMemo(
+    () => facturesStat.reduce((a, f) => a + f.count, 0),
+    [facturesStat]
+  );
+
+  const roleUi =
+    ROLE_LABEL_FR[(user?.role ?? "").trim().toUpperCase()] ??
+    user?.role ??
+    "—";
+
+  const biSectionEmpty =
+    !loading &&
+    !isAdminUser(user?.role) &&
+    ((showStock && stocks.length === 0) ||
+      (showCmd && commandes.length === 0) ||
+      (showFac && factures.length === 0));
 
   const handleExportPdf = useCallback(() => {
     if (loading) return;
@@ -239,6 +305,31 @@ export default function BiAdvancedDashboard() {
 
   return (
     <div className="flex flex-col gap-6">
+      {user ? (
+        <div className="rounded-[28px] border border-teal-100 bg-gradient-to-r from-teal-50/90 to-white px-6 py-5 shadow-sm dark:border-teal-900/40 dark:from-teal-950/40 dark:to-gray-900">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-teal-600/80 dark:text-teal-300/80">
+            Tableau de bord personnel
+          </p>
+          <div className="mt-2 flex flex-wrap items-baseline justify-between gap-3">
+            <h2 className="text-2xl font-[1000] tracking-tight text-[#1C2434] dark:text-white">
+              Bonjour {user.name?.split(" ")[0] ?? user.email}
+            </h2>
+            <span className="text-xs font-bold text-gray-500 dark:text-gray-400">
+              {roleUi}
+              {!isAdminUser(user.role)
+                ? " · données de votre section"
+                : " · vue complète"}
+            </span>
+          </div>
+          {biSectionEmpty ? (
+            <p className="mt-3 text-xs font-medium text-amber-700 dark:text-amber-400">
+              Aucune donnée disponible pour votre section sur ce périmètre BI pour
+              le moment.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
       <header className="bg-[#F0F4F4] px-8 py-8 flex flex-col md:flex-row justify-between items-end gap-6">
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.25em] text-[#00A09D]">
@@ -246,12 +337,18 @@ export default function BiAdvancedDashboard() {
           </p>
        
           <h1 className="text-4xl font-black text-gray-900 uppercase tracking-tighter leading-none">
-          Tableau de bord BI
-          <span className="text-[#00A09D]">.</span>
+            {scope === "full"
+              ? "Tableau de bord BI"
+              : scope === "stock"
+                ? "BI — Stock"
+                : scope === "logistique"
+                  ? "BI — Logistique"
+                  : "BI — Finance"}
+            <span className="text-[#00A09D]">.</span>
           </h1>
           <p className="mt-1 text-xs font-medium text-gray-500 dark:text-gray-400">
-            Synthèse stocks, achats et facturation — filtres multi-périodes et
-            comparaison à la fenêtre précédente.
+            {SCOPE_SUBTITLE[scope]} Filtres multi-périodes et comparaison à la
+            fenêtre précédente lorsque les données le permettent.
           </p>
         </div>
 
@@ -273,6 +370,7 @@ export default function BiAdvancedDashboard() {
             ))}
           </div>
 
+          {showStock ? (
           <select
             value={entrepot}
             onChange={(e) => setEntrepot(e.target.value as typeof entrepot)}
@@ -285,6 +383,7 @@ export default function BiAdvancedDashboard() {
               </option>
             ))}
           </select>
+          ) : null}
 
           <button
             type="button"
@@ -308,7 +407,8 @@ export default function BiAdvancedDashboard() {
         </div>
       </header>
 
-      {/* KPIs */}
+      {scope === "full" ? (
+      <>
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           loading={loading}
@@ -388,10 +488,120 @@ export default function BiAdvancedDashboard() {
           </p>
         </div>
       </section>
+      </>
+      ) : scope === "stock" ? (
+        <>
+          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <KpiCard
+              loading={loading}
+              icon={Package}
+              label="Volume entrées"
+              value={`${fmt(kpis.volumeEntrees)} u.`}
+              hint={prevKpis ? delta(kpis.volumeEntrees, prevKpis.volumeEntrees) : null}
+              tint="bg-teal-50 text-[#00A09D]"
+            />
+            <KpiCard
+              loading={loading}
+              icon={Activity}
+              label="Volume sorties"
+              value={`${fmt(kpis.volumeSorties)} u.`}
+              hint={prevKpis ? delta(kpis.volumeSorties, prevKpis.volumeSorties) : null}
+              tint="bg-orange-50 text-orange-600"
+            />
+            <KpiCard
+              loading={loading}
+              icon={Layers}
+              label="Mouvements / SKU actifs"
+              value={`${fmt(kpis.mouvements)} / ${fmt(kpis.skusActifs)}`}
+              hint={
+                prevKpis ? delta(kpis.mouvements, prevKpis.mouvements) : null
+              }
+              tint="bg-indigo-50 text-indigo-600"
+            />
+            <KpiCard
+              loading={loading}
+              icon={AlertTriangle}
+              label="Alertes seuil"
+              value={`${fmt(kpis.alertesSeuil)} SKU`}
+              tint="bg-amber-50 text-amber-700"
+            />
+          </section>
+          <section className={cardShell}>
+            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+              Lecture rapide
+            </p>
+            <p className="mt-2 text-sm font-semibold text-[#1C2434] dark:text-gray-100">
+              Flux net sur la période :{" "}
+              <span className={kpis.netFlux >= 0 ? "text-emerald-600" : "text-orange-600"}>
+                {kpis.netFlux >= 0 ? "+" : ""}
+                {fmt(kpis.netFlux)} unités
+              </span>
+              .
+            </p>
+          </section>
+        </>
+      ) : scope === "logistique" ? (
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <KpiCard
+            loading={loading}
+            icon={ShoppingCart}
+            label="Commandes créées (période)"
+            value={fmt(kpis.commandesCreees)}
+            hint={
+              prevKpis ? delta(kpis.commandesCreees, prevKpis.commandesCreees) : null
+            }
+            tint="bg-sky-50 text-sky-600"
+          />
+          <KpiCard
+            loading={loading}
+            icon={ShoppingCart}
+            label="Pipeline ouvert"
+            value={fmt(kpis.commandesPipeline)}
+            hint={
+              <span className="text-[10px] font-bold text-gray-400">
+                Hors statuts clôturés (réceptionnée / annulée)
+              </span>
+            }
+            tint="bg-indigo-50 text-indigo-600"
+          />
+        </section>
+      ) : (
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <KpiCard
+            loading={loading}
+            icon={Wallet}
+            label="CA factures (période)"
+            value={fmtMoney(kpis.chiffreFacturesTtc)}
+            hint={
+              prevKpis
+                ? delta(
+                    kpis.chiffreFacturesTtc,
+                    prevKpis.chiffreFacturesTtc,
+                    "money"
+                  )
+                : null
+            }
+            tint="bg-emerald-50 text-emerald-700"
+          />
+          <KpiCard
+            loading={loading}
+            icon={Wallet}
+            label="Nombre de factures (période)"
+            value={fmt(facturesCountPeriod)}
+            tint="bg-teal-50 text-[#00A09D]"
+          />
+        </section>
+      )}
 
       {/* Charts row 1 */}
+      {(showStock || showCmd) && (
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
-        <div className={`${cardShell} xl:col-span-8 min-h-[380px]`}>
+        {showStock ? (
+        <div
+          className={`${cardShell} min-h-[380px] ${
+            showCmd ? "xl:col-span-8" : "xl:col-span-12"
+          }`}
+        >
           <h3 className="mb-4 text-sm font-[1000] uppercase tracking-tight text-[#1C2434] dark:text-white">
             Entrées vs sorties (journalier)
           </h3>
@@ -428,8 +638,14 @@ export default function BiAdvancedDashboard() {
             </ResponsiveContainer>
           )}
         </div>
+        ) : null}
 
-        <div className={`${cardShell} xl:col-span-4 min-h-[380px]`}>
+        {showCmd ? (
+        <div
+          className={`${cardShell} min-h-[380px] ${
+            showStock ? "xl:col-span-4" : "xl:col-span-12"
+          }`}
+        >
           <h3 className="mb-4 text-sm font-[1000] uppercase tracking-tight text-[#1C2434] dark:text-white">
             Pipeline commandes
           </h3>
@@ -480,9 +696,12 @@ export default function BiAdvancedDashboard() {
             </ResponsiveContainer>
           )}
         </div>
+        ) : null}
       </div>
+      )}
 
       {/* Row 2 — entrepôts & top SKU */}
+      {showStock ? (
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <div className={`${cardShell} min-h-[360px]`}>
           <h3 className="mb-4 text-sm font-[1000] uppercase tracking-tight text-[#1C2434] dark:text-white">
@@ -524,10 +743,17 @@ export default function BiAdvancedDashboard() {
           )}
         </div>
       </div>
+      ) : null}
 
       {/* Pareto & factures */}
+      {(showStock || showFac) && (
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
-        <div className={`${cardShell} xl:col-span-7`}>
+        {showStock ? (
+        <div
+          className={`${cardShell} min-h-[260px] ${
+            showFac ? "xl:col-span-7" : "xl:col-span-12"
+          }`}
+        >
           <h3 className="mb-4 text-sm font-[1000] uppercase tracking-tight text-[#1C2434] dark:text-white">
             Courbe de Pareto (cumul % — TOP articles)
           </h3>
@@ -561,8 +787,14 @@ export default function BiAdvancedDashboard() {
             </ResponsiveContainer>
           )}
         </div>
+        ) : null}
 
-        <div className={`${cardShell} xl:col-span-5`}>
+        {showFac ? (
+        <div
+          className={`${cardShell} min-h-[260px] ${
+            showStock ? "xl:col-span-5" : "xl:col-span-12"
+          }`}
+        >
           <h3 className="mb-4 text-sm font-[1000] uppercase tracking-tight text-[#1C2434] dark:text-white">
             Facturation (montants TTC)
           </h3>
@@ -589,9 +821,12 @@ export default function BiAdvancedDashboard() {
             </ul>
           )}
         </div>
+        ) : null}
       </div>
+      )}
 
       {/* Activité : histogramme + top jours (plus lisible qu’une grille) */}
+      {showStock ? (
       <div className={cardShell}>
         <h3 className="mb-2 text-base font-[1000] tracking-tight text-[#1C2434] dark:text-white">
           Activité sur les 8 dernières semaines
@@ -683,6 +918,7 @@ export default function BiAdvancedDashboard() {
           </div>
         )}
       </div>
+      ) : null}
     </div>
   );
 }

@@ -1,5 +1,9 @@
-import { graphqlRequest } from "./graphqlClient";
-import { useAuthStore } from "@/store/useAuthStore";
+import {
+  getGraphqlEndpoint,
+  graphqlRequest,
+  readPersistedAuthToken,
+  type GraphqlRequestOptions,
+} from "./graphqlClient";
 import {
   BonLivraison,
   BonLivraisonsPaginatorInfo,
@@ -65,11 +69,19 @@ const LIST_BON_LIVRAISONS = `
   }
 `;
 
-export async function listBonLivraisons(page: number = 1, first: number = 100) {
-  return graphqlRequest<{ bonLivraisons: any }>(LIST_BON_LIVRAISONS, { 
-    page, 
-    first 
-  });
+export async function listBonLivraisons(
+  page: number = 1,
+  first: number = 100,
+  opts?: GraphqlRequestOptions
+) {
+  return graphqlRequest<{ bonLivraisons: any }>(
+    LIST_BON_LIVRAISONS,
+    {
+      page,
+      first,
+    },
+    opts
+  );
 }
 
 const GET_BON_LIVRAISON = `
@@ -106,8 +118,8 @@ export async function createBonLivraisonWithFile(
   input: CreateBonLivraisonInput,
   file: File
 ) {
-  const endpoint = process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT || "http://localhost:8000/graphql";
-  const token = useAuthStore.getState().token;
+  const endpoint = getGraphqlEndpoint();
+  const token = readPersistedAuthToken();
 
   const operations = JSON.stringify({
     query: `
@@ -186,15 +198,13 @@ export async function updateBonLivraison(
   input: UpdateBonLivraisonInput
 ) {
   const sanitizedInput = sanitizeBonLivraisonInput(input);
-  const token = useAuthStore.getState().token;
 
   return graphqlRequest<{ updateBonLivraison: BonLivraison }>(
     UPDATE_BON_LIVRAISON,
     {
       id,
       input: sanitizedInput,
-    },
-    { token: token || undefined }
+    }
   );
 }
 
@@ -207,10 +217,8 @@ const DELETE_BON_LIVRAISON = `
 `;
 
 export async function deleteBonLivraison(id: string | number) {
-  const token = useAuthStore.getState().token;
   return graphqlRequest<{ deleteBonLivraison: BonLivraison }>(
     DELETE_BON_LIVRAISON,
-    { id },
-    { token: token || undefined }
+    { id }
   );
 }

@@ -1,4 +1,4 @@
-import { graphqlRequest } from "./graphqlClient";
+import { graphqlRequest, type GraphqlRequestOptions } from "./graphqlClient";
 import { useAuthStore } from "@/store/useAuthStore";
 import { Contrat } from "../types/contrat";
 
@@ -43,8 +43,8 @@ const LIST_CONTRATS = `
   }
 `;
 
-export async function listContrats() {
-  return graphqlRequest<{ contrats: Contrat[] }>(LIST_CONTRATS);
+export async function listContrats(opts?: GraphqlRequestOptions) {
+  return graphqlRequest<{ contrats: Contrat[] }>(LIST_CONTRATS, {}, opts);
 }
 
 const CREATE_CONTRAT = `

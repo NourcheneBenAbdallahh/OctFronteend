@@ -22,8 +22,8 @@ import { Receipt } from "lucide-react";
 import { Truck } from "lucide-react";
 import { Boxes } from "lucide-react";
 import { ShoppingCart } from "lucide-react";
-import { ArrowLeftRight, BarChart3 } from "lucide-react";
-import { canAccessPath } from "@/lib/access";
+import { ArrowLeftRight, BarChart3, Users } from "lucide-react";
+import { canAccessPath, sidebarBiNavLabel } from "@/lib/access";
 import { useAuthStore } from "@/store/useAuthStore";
 type NavItem = {
   name: string;
@@ -42,6 +42,11 @@ const navItems: NavItem[] = [
     icon: <BarChart3 className="w-5 h-5" />,
     name: "Tableau BI",
     path: "/bi",
+  },
+  {
+    icon: <Users className="w-5 h-5" />,
+    name: "Utilisateurs",
+    path: "/users",
   },
     {
   icon: <BoxCubeIcon />,
@@ -125,7 +130,9 @@ function navItemsVisibleForRole(role: string | undefined): NavItem[] {
       continue;
     }
     if (nav.path && canAccessPath(nav.path, role)) {
-      out.push(nav);
+      const item =
+        nav.path === "/bi" ? { ...nav, name: sidebarBiNavLabel(role) } : nav;
+      out.push(item);
     }
   }
   return out;

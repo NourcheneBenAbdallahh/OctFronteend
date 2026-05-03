@@ -26,7 +26,8 @@ export function readPersistedAuthToken(): string | undefined {
   }
 }
 
-function graphqlEndpoint(): string {
+/** URL HTTP du point d’entrée GraphQL (multipart upload, chatbot custom fetch, etc.). */
+export function getGraphqlEndpoint(): string {
   return (
     process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT ||
     process.env.NEXT_PUBLIC_GRAPHQL_URL ||
@@ -42,10 +43,10 @@ function resolveBearer(options?: GraphqlRequestOptions): string | undefined {
 
 export async function graphqlRequest<T>(
   query: string,
-  variables: Record<string, unknown> = {},
+  variables: object = {},
   options?: GraphqlRequestOptions
 ): Promise<T> {
-  const endpoint = graphqlEndpoint();
+  const endpoint = getGraphqlEndpoint();
   const bearer = resolveBearer(options);
 
   const res = await fetch(endpoint, {

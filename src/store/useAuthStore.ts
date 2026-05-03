@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { syncAuthAccessCookie } from '@/lib/authCookie';
 
 interface User {
   id: string;
@@ -25,13 +26,17 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       isAuthenticated: false,
 
-      setAuth: (user, token) => set({ 
-        user, 
-        token, 
-        isAuthenticated: true 
-      }),
+      setAuth: (user, token) => {
+        syncAuthAccessCookie(token);
+        set({
+          user,
+          token,
+          isAuthenticated: true,
+        });
+      },
 
       logout: () => {
+        syncAuthAccessCookie(null);
         set({ user: null, token: null, isAuthenticated: false });
         localStorage.removeItem('auth-storage');
       },
@@ -39,6 +44,11 @@ export const useAuthStore = create<AuthState>()(
     {
       name: 'auth-storage', // Nom de la clé dans le localStorage
       storage: createJSONStorage(() => localStorage),
+      onRehydrateStorage: () => (state) => {
+        if (state?.token) {
+          syncAuthAccessCookie(state.token);
+        }
+      },
     }
   )
 );

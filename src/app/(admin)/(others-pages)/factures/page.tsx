@@ -1,6 +1,7 @@
 import FacturesTable from "@/components/factures/FacturesTable";
 import { listFactures, normalizeFacture } from "@/lib/factures.api";
-import { listBonLivraisons } from "@/lib/bon-livraisons.api"; 
+import { listBonLivraisons } from "@/lib/bon-livraisons.api";
+import { getServerAccessToken } from "@/lib/getServerAccessToken";
 // Importe le type depuis la source attendue par le composant FacturesTable
 import { BonLivraisonOption, TableFacture } from "@/types/facture";
 
@@ -13,10 +14,12 @@ type PageProps = {
 export default async function FacturesPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const currentPage = Number(params?.page || "1");
+  const token = await getServerAccessToken();
+  const auth = token ? { token } : undefined;
 
   const [facturesResult, blResult] = await Promise.all([
-    listFactures(currentPage),
-    listBonLivraisons(1, 10000), // Augmenté à 10000 pour charger tous les BLs
+    listFactures(currentPage, auth),
+    listBonLivraisons(1, 10000, auth),
   ]);
 
   const rows: TableFacture[] = facturesResult.factures.data.map(normalizeFacture);

@@ -1,4 +1,4 @@
-import { graphqlRequest } from "./graphqlClient";
+import { graphqlRequest, type GraphqlRequestOptions } from "./graphqlClient";
 import {
   CreateFactureInput,
   Facture,
@@ -66,8 +66,8 @@ const LIST_FACTURES = `
   }
 `;
 
-export async function listFactures(page = 1, opts?: { token?: string }) {
-  return graphqlRequest<ListFacturesResponse>(LIST_FACTURES, { page }, { token: opts?.token });
+export async function listFactures(page = 1, opts?: GraphqlRequestOptions) {
+  return graphqlRequest<ListFacturesResponse>(LIST_FACTURES, { page }, opts);
 }
 
 const CREATE_FACTURE = `

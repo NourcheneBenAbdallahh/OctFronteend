@@ -8,6 +8,7 @@ import {
 import { listEmballages } from "@/lib/emballages.api";
 import { listCommandes } from "@/lib/commandes.api";
 import { fetchEntrepots } from "@/lib/entrepot.api";
+import { getServerAccessToken } from "@/lib/getServerAccessToken";
 import {
   CommandeOption,
   EmballageOption,
@@ -26,16 +27,19 @@ export default async function BonLivraisonsPage({
 }: PageProps) {
   await searchParams;
 
+  const token = await getServerAccessToken();
+  const auth = token ? { token } : undefined;
+
   const [
     bonLivraisonsResult,
     emballagesResult,
     commandesResult,
     entrepotsResult,
   ] = await Promise.all([
-    listBonLivraisons(1, 1000),
-    listEmballages(1, 100),
-    listCommandes(1, 100),
-    fetchEntrepots(),
+    listBonLivraisons(1, 1000, auth),
+    listEmballages(1, 100, auth),
+    listCommandes(1, 100, auth),
+    fetchEntrepots(auth),
   ]);
 
   const rows: TableBonLivraison[] =

@@ -1,4 +1,4 @@
-import { graphqlRequest } from "./graphqlClient";
+import { graphqlRequest, type GraphqlRequestOptions } from "./graphqlClient";
 import { StockInventaire, TableInventaire, CreateInventaireInput } from "@/types/inventaire";
 
 // 1. Définition des champs réutilisables
@@ -60,9 +60,15 @@ const DELETE_INVENTAIRE = `
 `;
 
 // 3. Fonctions API avec gestion d'erreurs console
-export async function listInventaires(): Promise<StockInventaire[]> {
+export async function listInventaires(
+  opts?: GraphqlRequestOptions
+): Promise<StockInventaire[]> {
   try {
-    const data = await graphqlRequest<{ stockInventaires: StockInventaire[] }>(LIST_INVENTAIRES);
+    const data = await graphqlRequest<{ stockInventaires: StockInventaire[] }>(
+      LIST_INVENTAIRES,
+      {},
+      opts
+    );
     return data.stockInventaires;
   } catch (error) {
     console.error("[API Inventaire] Erreur lors de la récupération de la liste :", error);

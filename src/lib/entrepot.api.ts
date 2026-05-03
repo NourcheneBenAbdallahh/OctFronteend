@@ -1,4 +1,4 @@
-import { graphqlRequest } from "./graphqlClient";
+import { graphqlRequest, type GraphqlRequestOptions } from "./graphqlClient";
 
 export type Entrepot = {
   id: string;nom: string;
@@ -8,7 +8,7 @@ export type Entrepot = {
   statut: string;
 };
 
-export async function fetchEntrepots() {
+export async function fetchEntrepots(opts?: GraphqlRequestOptions) {
   const query = /* GraphQL */ `
     query {
       entrepots {
@@ -22,7 +22,7 @@ export async function fetchEntrepots() {
     }
   `;
 
-  const res = await graphqlRequest<{ entrepots: Entrepot[] }>(query);
+  const res = await graphqlRequest<{ entrepots: Entrepot[] }>(query, {}, opts);
   return res.entrepots;
 }
 

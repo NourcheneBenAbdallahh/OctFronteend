@@ -12,7 +12,9 @@ import {
 } from "@fullcalendar/core";
 import { Modal } from "@/components/ui/modal";
 import { useModal } from "@/hooks/useModal";
+import { filterCommandesForCalendarUser, isAdminUser } from "@/lib/access";
 import { listCommandes } from "@/lib/commandes.api";
+import { useAuthStore } from "@/store/useAuthStore";
 import type { Commande, CommandeStatut } from "@/types/commandes";
 import frLocale from "@fullcalendar/core/locales/fr";
 
@@ -60,6 +62,7 @@ title: `${commande.numero_commande} • ${commande.quantite}`,    start: formatD
 };
 
 const Calendar: React.FC = () => {
+  const user = useAuthStore((s) => s.user);
   const calendarRef = useRef<FullCalendar>(null);
   const { isOpen, openModal, closeModal } = useModal();
 
@@ -88,7 +91,13 @@ const Calendar: React.FC = () => {
           page += 1;
         } while (page <= lastPage);
 
-        const mappedEvents = pages
+        const mine = filterCommandesForCalendarUser(
+          pages,
+          user?.id ?? null,
+          user?.role ?? null
+        );
+
+        const mappedEvents = mine
           .filter((commande) => !!commande.date_livraison_prevue)
           .map(buildCommandeEvent);
 
@@ -102,7 +111,7 @@ const Calendar: React.FC = () => {
     };
 
     loadCommandes();
-  }, []);
+  }, [user?.id, user?.role]);
 
   const stats = useMemo(() => {
     return {
@@ -122,10 +131,14 @@ const Calendar: React.FC = () => {
         <div className="flex items-center justify-between gap-4">
           <div>
             <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">
-              Calendrier des livraisons prévues
+              Votre calendrier — livraisons prévues
             </h3>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Visualisation des commandes selon la date de livraison prévue
+              {isAdminUser(user?.role ?? null)
+                ? "Toutes les commandes (vue administrateur), par date de livraison prévue."
+                : (user?.role ?? "").trim().toUpperCase() === "LOGISTIQUE"
+                  ? "Toutes les commandes de votre section (logistique)."
+                  : "Uniquement les commandes créées sous votre compte."}
             </p>
           </div>
 

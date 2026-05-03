@@ -1,12 +1,5 @@
 import { Lot } from "@/types/lot";
-
-const GRAPHQL_URL =
-  process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT || "http://localhost:8000/graphql";
-
-type GraphQLResponse<T> = {
-  data?: T;
-  errors?: Array<{ message: string }>;
-};
+import { graphqlRequest, type GraphqlRequestOptions } from "@/lib/graphqlClient";
 
 type LotsQueryResponse = {
   lots: {
@@ -30,41 +23,12 @@ export type PaginatedLots = {
   total: number;
   hasMorePages: boolean;
 };
-async function graphqlFetch<T>(
-  query: string,
-  variables?: Record<string, unknown>,
-  init?: RequestInit
-): Promise<T> {
-  const res = await fetch(GRAPHQL_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers || {}),
-    },
-    body: JSON.stringify({ query, variables }),
-    cache: "no-store",
-    ...init,
-  });
 
-  if (!res.ok) {
-    throw new Error(`GraphQL HTTP error: ${res.status}`);
-  }
-
-  const json: GraphQLResponse<T> = await res.json();
-
-  if (json.errors?.length) {
-    throw new Error(json.errors.map((e) => e.message).join(" | "));
-  }
-
-  if (!json.data) {
-    throw new Error("No GraphQL data returned.");
-  }
-
-  return json.data;
-}
-
-
-export async function getLots(page = 1, first = 12): Promise<PaginatedLots> {
+export async function getLots(
+  page = 1,
+  first = 12,
+  opts?: GraphqlRequestOptions
+): Promise<PaginatedLots> {
   const query = `
     query GetLots($page: Int!, $first: Int!) {
       lots(page: $page, first: $first) {
@@ -99,7 +63,11 @@ export async function getLots(page = 1, first = 12): Promise<PaginatedLots> {
     }
   `;
 
-  const data = await graphqlFetch<LotsQueryResponse>(query, { page, first });
+  const data = await graphqlRequest<LotsQueryResponse>(
+    query,
+    { page, first },
+    opts
+  );
 
   return {
     data: data.lots.data,
@@ -151,7 +119,7 @@ export async function updateLot(
     }
   `;
 
-  const data = await graphqlFetch<{ updateLot: Lot }>(query, { id, input });
+  const data = await graphqlRequest<{ updateLot: Lot }>(query, { id, input });
   return data.updateLot;
 }
 
@@ -165,6 +133,6 @@ export async function deleteLot(id: string | number): Promise<Lot> {
     }
   `;
 
-  const data = await graphqlFetch<DeleteLotResponse>(query, { id });
+  const data = await graphqlRequest<DeleteLotResponse>(query, { id });
   return data.deleteLot;
 }

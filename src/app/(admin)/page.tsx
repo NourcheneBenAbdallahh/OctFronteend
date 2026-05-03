@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { filterStocksForDashboardUser } from "@/lib/access";
 import { getStocks } from "@/lib/stock.api"; 
 import { Stock } from "@/types/stock";
 
@@ -11,15 +12,17 @@ import RecentStockMovements from "@/components/dashboard/RecentStockMovements";
 import StockHealthScore from "@/components/dashboard/StockHealthScore";
 import StockPredictionCard from "@/components/dashboard/StockPredictionCard";
 import FournisseursMapCard from "@/components/fournisseurs/FournisseursMapCard";
+import { useAuthStore } from "@/store/useAuthStore";
 
 export default function Ecommerce() {
+  const user = useAuthStore((s) => s.user);
   const [stocks, setStocks] = useState<Stock[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadData() {
       try {
-        const data = await getStocks(1, 200); // On prend 200 pour avoir assez de data prédictive
+        const data = await getStocks(1, 500);
         setStocks(data);
       } catch (err) {
         console.error("Erreur de chargement BI:", err);
@@ -30,11 +33,15 @@ export default function Ecommerce() {
     loadData();
   }, []);
 
+  const dashboardStocks = useMemo(
+    () => filterStocksForDashboardUser(stocks, user?.id ?? null, user?.role ?? null),
+    [stocks, user?.id, user?.role]
+  );
+
  return (
   <div className="flex flex-col gap-6">
-    
     {/* 1. Les 4 KPI du haut */}
-    <PackagingMetrics stocks={stocks} loading={loading} />
+    <PackagingMetrics stocks={dashboardStocks} loading={loading} />
 
     <div className="grid grid-cols-12 gap-6 items-start">
       
@@ -43,7 +50,7 @@ export default function Ecommerce() {
         
         {/* Le Graphique de Flux */}
         <div className="w-full bg-white p-6 rounded-[40px] border border-gray-100 shadow-sm">
-           <StockTrendChart stocks={stocks} />
+           <StockTrendChart stocks={dashboardStocks} />
         </div>
         
         {/* SECTION INTELLIGENCE PRÉDICTIVE */}
@@ -60,19 +67,19 @@ export default function Ecommerce() {
             
            </div>
            
-           <StockPredictionCard stocks={stocks} />
+           <StockPredictionCard stocks={dashboardStocks} />
         </div>
 
         {/* ✅ AJOUTÉ ICI : Le Journal des Flux (Lots) sous la prédiction */}
         <div className="w-full">
-           <RecentStockMovements stocks={stocks} />
+           <RecentStockMovements stocks={dashboardStocks} />
         </div>
       </div>
 
       {/* --- COLONNE DROITE (4/12) : SANTÉ & GÉO --- */}
       <div className="col-span-12 xl:col-span-4 flex flex-col gap-6">
         {/* Santé globale (Radial bar) */}
-        <StockHealthScore stocks={stocks} />
+        <StockHealthScore stocks={dashboardStocks} />
         
         {/* Carte des fournisseurs */}
         <FournisseursMapCard />

@@ -76,17 +76,15 @@ mutation Logout {
 }`;
 
 export async function login(input: LoginInput): Promise<AuthPayload> {
-  return graphqlRequest<{ login: AuthPayload }>(LOGIN_MUTATION, input as unknown as Record<string, unknown>, {
+  return graphqlRequest<{ login: AuthPayload }>(LOGIN_MUTATION, input, {
     skipAuth: true,
   }).then((d) => d.login);
 }
 
 export async function register(input: RegisterInput): Promise<AuthPayload> {
-  return graphqlRequest<{ register: AuthPayload }>(
-    REGISTER_MUTATION,
-    input as unknown as Record<string, unknown>,
-    { skipAuth: true }
-  ).then((d) => d.register);
+  return graphqlRequest<{ register: AuthPayload }>(REGISTER_MUTATION, input, {
+    skipAuth: true,
+  }).then((d) => d.register);
 }
 
 export async function verifyEmail(token: string): Promise<string> {
@@ -119,11 +117,9 @@ export async function resetPassword(input: {
   password: string;
   password_confirmation: string;
 }): Promise<string> {
-  return graphqlRequest<{ resetPassword: string }>(
-    RESET_PASSWORD_MUTATION,
-    input as unknown as Record<string, unknown>,
-    { skipAuth: true }
-  ).then((d) => d.resetPassword);
+  return graphqlRequest<{ resetPassword: string }>(RESET_PASSWORD_MUTATION, input, {
+    skipAuth: true,
+  }).then((d) => d.resetPassword);
 }
 
 export async function me(token?: string): Promise<User | null> {

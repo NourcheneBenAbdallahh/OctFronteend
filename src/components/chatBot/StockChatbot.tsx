@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import { MessageCircle, Send } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
+import { getGraphqlEndpoint, readPersistedAuthToken } from "@/lib/graphqlClient";
 
 const ASK_MUTATION = `
   mutation AskStockBot($question: String!, $history: [ChatbotHistoryMessageInput!]) {
@@ -11,14 +12,6 @@ const ASK_MUTATION = `
     }
   }
 `;
-
-function graphqlEndpoint(): string {
-  return (
-    process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT ||
-    process.env.NEXT_PUBLIC_GRAPHQL_URL ||
-    "http://localhost:8000/graphql"
-  );
-}
 
 export type StockChatbotVariant = "widget" | "page";
 
@@ -49,13 +42,14 @@ export default function StockChatbot({ variant = "widget" }: StockChatbotProps) 
     setLoading(true);
 
     try {
-      const endpoint = graphqlEndpoint();
+      const endpoint = getGraphqlEndpoint();
+      const bearer = token || readPersistedAuthToken();
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
         Accept: "application/json",
       };
-      if (token) {
-        headers.Authorization = `Bearer ${token}`;
+      if (bearer) {
+        headers.Authorization = `Bearer ${bearer}`;
       }
 
       const res = await fetch(endpoint, {
