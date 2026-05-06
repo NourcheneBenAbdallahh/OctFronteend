@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { ContratHeader } from "./ContratHeader";
 import { ContratListView } from "./ContratListView";
 import { ContratForm } from "./ContratForm";
-import { listContrats, createContrat, updateContrat, deleteContrat } from "@/lib/contrats.api";
+import { listContrats, createContrat, updateContrat, deleteContrat, extractContratFromFile } from "@/lib/contrats.api";
 import { graphqlRequest } from "@/lib/graphqlClient";
 import { useAuthStore } from "@/store/useAuthStore";
 import { listFournisseurs } from "@/lib/fournisseurs.api";
@@ -51,6 +51,7 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
   const token = useAuthStore((state) => state.token);
   const [rows, setRows] = useState<TableContrat[]>(data ? data.map(normalizeContrat) : []);
   const [loading, setLoading] = useState(false);
+  const [extracting, setExtracting] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [editing, setEditing] = useState<TableContrat | null>(null);
   const [query, setQuery] = useState("");
@@ -102,8 +103,10 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
     date_debut: "",
     date_fin: "",
     quantite_contractuelle: 0,
+    unite_quantite: "",
     taux_depassement_autorise: 0.2,
     quantite_realisee: 0,
+    montant_cautionnement: undefined,
     statut: "ACTIF",
     fournisseur_id: "",
     emballage_id: "",
@@ -112,10 +115,11 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
 
   useEffect(() => {
     const loadRefs = async () => {
+      if (!token) return;
       try {
         const [resF, resE] = await Promise.all([
-          listFournisseurs(),
-          listEmballages(1, 100)
+          listFournisseurs({ token }),
+          listEmballages(1, 100, { token })
         ]);
         setFournisseurs(resF.fournisseurs || []);
         setEmballages(resE.emballages.data || []);
@@ -124,7 +128,7 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
       }
     };
     loadRefs();
-  }, []);
+  }, [token]);
 
   useEffect(() => {
     async function loadUsers() {
@@ -353,8 +357,9 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
 
   async function getContratUsageHistory() {
     if (!exportContratId) return [];
+    if (!token) return [];
     try {
-      const res = await listCommandes(1, 1000);
+      const res = await listCommandes(1, 1000, { token });
       const commandes = (res.commandes?.data || []).map(normalizeCommande);
       const linked = commandes
         .filter((c) => String(c.contrat_id ?? "") === exportContratId)
@@ -625,6 +630,68 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
       alert("Erreur de sauvegarde : Vérifiez les champs obligatoires.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleExtractFromFile = async (file: File) => {
+    setExtracting(true);
+    try {
+      const res = await extractContratFromFile(file);
+      const extracted = res.extractContratFromFile;
+      console.log("[OCR] GraphQL extractContratFromFile response:", extracted);
+
+      // Reload references because OCR may create a new fournisseur/emballage
+      // that are not yet present in the current dropdown options.
+      if (token) {
+        const [resF, resE] = await Promise.all([
+          listFournisseurs({ token }),
+          listEmballages(1, 100, { token }),
+        ]);
+        setFournisseurs(resF.fournisseurs || []);
+        setEmballages(resE.emballages.data || []);
+      }
+
+      setForm((prev) => ({
+        ...prev,
+        numero_contrat: extracted.numero_contrat || prev.numero_contrat || "",
+        objet: extracted.objet || prev.objet || "",
+        date_signature: extracted.date_signature || prev.date_signature || "",
+        date_debut: extracted.date_debut || prev.date_debut || "",
+        date_fin: extracted.date_fin || prev.date_fin || "",
+        quantite_contractuelle: Number(extracted.quantite_contractuelle ?? prev.quantite_contractuelle ?? 0),
+        unite_quantite: extracted.unite_quantite ?? prev.unite_quantite ?? "",
+        montant_ht: extracted.montant_ht ?? prev.montant_ht ?? null,
+        montant_tva: extracted.montant_tva ?? prev.montant_tva ?? 0,
+        montant_cautionnement:
+          extracted.montant_cautionnement !== undefined && extracted.montant_cautionnement !== null
+            ? Number(extracted.montant_cautionnement)
+            : prev.montant_cautionnement,
+        taux_cautionnement:
+          extracted.taux_cautionnement !== undefined && extracted.taux_cautionnement !== null
+            ? Number(extracted.taux_cautionnement)
+            : prev.taux_cautionnement,
+        taux_penalite_retard:
+          extracted.taux_penalite_retard !== undefined && extracted.taux_penalite_retard !== null
+            ? Number(extracted.taux_penalite_retard)
+            : prev.taux_penalite_retard,
+        plafond_penalite:
+          extracted.plafond_penalite !== undefined && extracted.plafond_penalite !== null
+            ? Number(extracted.plafond_penalite)
+            : prev.plafond_penalite,
+        taux_depassement_autorise:
+          extracted.taux_depassement_autorise !== undefined && extracted.taux_depassement_autorise !== null
+            ? Number(extracted.taux_depassement_autorise)
+            : prev.taux_depassement_autorise,
+        statut: extracted.statut || prev.statut || "ACTIF",
+        fournisseur_id: extracted.fournisseur_id || prev.fournisseur_id || "",
+        emballage_id: extracted.emballage_id || prev.emballage_id || "",
+      }));
+      alert("Extraction OCR terminee et formulaire pre-rempli.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Extraction OCR impossible.";
+      alert(message);
+    } finally {
+      setExtracting(false);
     }
   };
 
@@ -1287,6 +1354,8 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
         onClose={() => setIsOpen(false)}
         onSubmit={handleSubmit}
         loading={loading}
+        extracting={extracting}
+        onExtractFromFile={handleExtractFromFile}
         fournisseurs={fournisseurs}
         emballages={emballages}
       />

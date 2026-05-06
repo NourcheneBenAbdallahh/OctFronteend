@@ -8,7 +8,7 @@ import Label from "@/components/form/Label";
 import Button from "@/components/ui/button/Button";
 import Checkbox from "@/components/form/input/Checkbox";
 import { login } from "@/lib/auth.api"; 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/store/useAuthStore"; // Import du store
 
 export default function SignInForm() {
@@ -20,7 +20,9 @@ export default function SignInForm() {
   const [errors, setErrors] = useState<{ email?: string; password?: string; general?: string }>({});
 
   const router = useRouter();
+  const searchParams = useSearchParams();
   const setAuth = useAuthStore((state) => state.setAuth); // Récupération de l'action de session
+  const pendingActivation = searchParams.get("pendingActivation") === "1";
 
   const validate = () => {
     const newErrors: typeof errors = {};
@@ -66,7 +68,7 @@ export default function SignInForm() {
             </div>
             <div className="flex flex-col text-white">
               <span className="text-3xl font-[1000] tracking-tighter leading-none uppercase">OCT</span>
-              <span className="text-[10px] font-black uppercase tracking-[0.5em] text-emerald-200/90">Smart Inventory</span>
+              <span className="text-[10px] font-black uppercase tracking-[0.5em] text-emerald-200/90">Gestion des emballages</span>
             </div>
           </div>
           <h2 className="text-7xl font-[1000] leading-[0.95] text-white tracking-tighter uppercase">La gestion <br /><span className="text-emerald-300 italic text-6xl lowercase">réinventée.</span></h2>
@@ -86,6 +88,11 @@ export default function SignInForm() {
           </div>
 
           <form className="space-y-6" onSubmit={handleSubmit} noValidate>
+            {pendingActivation && (
+              <div className="rounded-xl border-l-4 border-amber-500 bg-amber-50 p-4 text-[10px] font-black uppercase tracking-widest text-amber-700">
+                Votre compte a été créé. Un administrateur doit l'activer avant la première connexion.
+              </div>
+            )}
             <div className="space-y-2">
               <Label className={`text-[10px] font-black uppercase tracking-widest ml-2 ${errors.email ? 'text-red-500' : 'text-gray-400'}`}>Email</Label>
               <Input 

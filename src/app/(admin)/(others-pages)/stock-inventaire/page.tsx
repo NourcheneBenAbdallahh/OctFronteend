@@ -19,8 +19,10 @@ import InventaireFormDrawer from "@/components/inventaire/InventaireFormDrawer";
 
 import { listEmballages } from "@/lib/emballages.api"; 
 import { fetchEntrepots } from "@/lib/entrepot.api";   
+import { useAuthStore } from "@/store/useAuthStore";
 
 export default function InventairePage() {
+  const token = useAuthStore((state) => state.token);
   const [data, setData] = useState<TableInventaire[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -40,12 +42,16 @@ export default function InventairePage() {
   });
 
   const load = async () => {
+    if (!token) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const [resInventaires, resEntrepots, resEmballages] = await Promise.all([
-        listInventaires(),
-        fetchEntrepots(),
-        listEmballages(1, 100) 
+        listInventaires({ token }),
+        fetchEntrepots({ token }),
+        listEmballages(1, 100, { token }) 
       ]);
 
       setData(resInventaires.map(normalizeInventaire));
@@ -62,7 +68,7 @@ export default function InventairePage() {
 
   useEffect(() => {
     load();
-  }, []);
+  }, [token]);
 
   const handleNewAudit = () => {
     setEditing(null); 

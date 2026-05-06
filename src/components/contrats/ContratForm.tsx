@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, Save, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Check, FileText, DollarSign, Percent, AlertCircle } from "lucide-react";
+import { X, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Check, AlertCircle } from "lucide-react";
 
-export const ContratForm = ({ isOpen, editing, form, setForm, onClose, onSubmit, loading, fournisseurs, emballages }: any) => {
+export const ContratForm = ({ isOpen, editing, form, setForm, onClose, onSubmit, loading, fournisseurs, emballages, onExtractFromFile, extracting }: any) => {
   const [step, setStep] = useState(1);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -114,6 +114,31 @@ export const ContratForm = ({ isOpen, editing, form, setForm, onClose, onSubmit,
                 placeholder="Ex: Approvisionnement en Sucre..." 
               />
 
+              {!editing && (
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">
+                    Import OCR du contrat (PDF/Image)
+                  </label>
+                  <div className="rounded-2xl border-2 border-dashed border-indigo-100 bg-indigo-50/40 p-4">
+                    <input
+                      type="file"
+                      accept=".pdf,image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        onExtractFromFile(file);
+                        e.currentTarget.value = "";
+                      }}
+                      className="block w-full text-xs font-semibold text-gray-700 file:mr-3 file:rounded-xl file:border-0 file:bg-[#1C2434] file:px-3 file:py-2 file:text-[10px] file:font-black file:uppercase file:tracking-wider file:text-white hover:file:bg-indigo-600"
+                      disabled={extracting || loading}
+                    />
+                    <p className="mt-2 text-[10px] font-semibold text-indigo-700/80">
+                      {extracting ? "Extraction OCR en cours..." : "Le systeme detecte fournisseur, emballage et informations du contrat."}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <SelectField label="Fournisseur" value={form.fournisseur_id} options={fournisseurs} labelKey="raison_sociale" error={errors.fournisseur_id} onChange={(v:any) => setForm({...form, fournisseur_id: v})} disabled={isLocked} />
                 <SelectField label="Emballage" value={form.emballage_id} options={emballages} labelKey="name" error={errors.emballage_id} onChange={(v:any) => setForm({...form, emballage_id: v})} disabled={isLocked} />
@@ -169,9 +194,15 @@ export const ContratForm = ({ isOpen, editing, form, setForm, onClose, onSubmit,
           {step === 3 && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="bg-[#1C2434] p-8 rounded-[2.5rem] text-white space-y-8 shadow-xl">
-                 <InputFieldDark label="Quantité Contractuelle" type="number" value={form.quantite_contractuelle} error={errors.quantite_contractuelle} onChange={(v:any) => setForm({...form, quantite_contractuelle: Number(v)})} disabled={isLocked} />
+                 <div className="grid grid-cols-2 gap-6">
+                   <InputFieldDark label="Quantité Contractuelle" type="number" value={form.quantite_contractuelle} error={errors.quantite_contractuelle} onChange={(v:any) => setForm({...form, quantite_contractuelle: Number(v)})} disabled={isLocked} />
+                   <InputFieldDark label="Unité (Tonnes, kg, m²...)" type="text" value={form.unite_quantite} onChange={(v:any) => setForm({...form, unite_quantite: v})} disabled={isLocked} />
+                 </div>
                  <div className="grid grid-cols-2 gap-6">
                    <InputFieldDark label="Cautionnement (%)" type="number" value={form.taux_cautionnement} onChange={(v:any) => setForm({...form, taux_cautionnement: Number(v)})} />
+                   <InputFieldDark label="Montant cautionnement (DT)" type="number" value={form.montant_cautionnement} onChange={(v:any) => setForm({...form, montant_cautionnement: Number(v)})} />
+                 </div>
+                 <div className="grid grid-cols-2 gap-6">
                    <InputFieldDark label="Dépassement Max (%)" type="number" value={form.taux_depassement_autorise} onChange={(v:any) => setForm({...form, taux_depassement_autorise: Number(v)})} />
                  </div>
                  <div className="grid grid-cols-2 gap-6 border-t border-white/10 pt-6">

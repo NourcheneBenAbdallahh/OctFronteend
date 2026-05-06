@@ -1,5 +1,5 @@
 import LotsClient from "@/components/lots/LotsClient";
-import { getServerAccessToken } from "@/lib/getServerAccessToken";
+import { requireServerAccessToken } from "@/lib/requireServerAccessToken";
 import { getLots, type PaginatedLots } from "@/lib/lot.api"; // Importe le type ici
 
 export default async function LotsPage() {
@@ -12,13 +12,9 @@ export default async function LotsPage() {
     hasMorePages: false
   };
 
-  try {
-    const token = await getServerAccessToken();
-    const res = await getLots(1, 12, token ? { token } : undefined);
-    initialData = res;
-  } catch (error) {
-    console.error("Failed to load lots:", error);
-  }
+  const token = await requireServerAccessToken();
+  const res = await getLots(1, 12, { token });
+  initialData = res;
 
   return (
     <div className="space-y-6">

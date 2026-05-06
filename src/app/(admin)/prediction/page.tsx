@@ -5,6 +5,7 @@ import { fetchStockForecast, PredictDemandResponse } from "@/lib/prediction";
 import StockForecastChart from "@/components/prediction/StockForecastChart";
 import { listEmballages } from "@/lib/emballages.api";
 import jsPDF from "jspdf";
+import { useAuthStore } from "@/store/useAuthStore";
 
 interface Emballage {
   id: string;
@@ -13,6 +14,7 @@ interface Emballage {
 }
 
 export default function ForecastingPage() {
+  const token = useAuthStore((state) => state.token);
   const [emballages, setEmballages] = useState<Emballage[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
   const [selectedEmballage, setSelectedEmballage] = useState<Emballage | null>(null);
@@ -28,9 +30,11 @@ export default function ForecastingPage() {
 
   // ===== Chargement des emballages =====
   useEffect(() => {
+    if (!token) return;
+
     async function init() {
       try {
-        const response = await listEmballages(1, 100);
+        const response = await listEmballages(1, 100, { token });
         const listeBrute = response.emballages.data as Emballage[];
 
         setEmballages(listeBrute);
@@ -46,7 +50,7 @@ export default function ForecastingPage() {
     }
 
     init();
-  }, []);
+  }, [token]);
 
   // ===== Chargement des prédictions =====
   useEffect(() => {

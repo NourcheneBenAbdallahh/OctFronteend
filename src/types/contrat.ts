@@ -9,10 +9,12 @@ id: string;
   date_debut: string;
   date_fin: string;
   quantite_contractuelle: number;
+  unite_quantite?: string | null;
   quantite_realisee?: number | null;
   taux_depassement_autorise?: number | null;
   montant_ht?: number | null;
   montant_tva?: number | null;
+  montant_cautionnement?: number | null;
   taux_cautionnement?: number | null;
   taux_penalite_retard?: number | null;
   plafond_penalite?: number | null;
@@ -35,15 +37,37 @@ export type TableContrat = Omit<Contrat, "statut"> & {
   statut: "ACTIF" | "EXPIRE" | "SUSPENDU";
 };
 
+export type ContratExtractionResult = {
+  numero_contrat?: string | null;
+  objet?: string | null;
+  date_signature?: string | null;
+  date_debut?: string | null;
+  date_fin?: string | null;
+  quantite_contractuelle?: number | null;
+  unite_quantite?: string | null;
+  montant_ht?: number | null;
+  montant_tva?: number | null;
+  montant_cautionnement?: number | null;
+  taux_cautionnement?: number | null;
+  taux_penalite_retard?: number | null;
+  plafond_penalite?: number | null;
+  taux_depassement_autorise?: number | null;
+  statut?: "ACTIF" | "EXPIRE" | "SUSPENDU" | null;
+  fournisseur_id?: string | null;
+  emballage_id?: string | null;
+};
+
 export function normalizeContrat(c: Contrat): Contrat {
   return {
     ...c,
     objet: c.objet ?? null,
     date_signature: c.date_signature ?? null,
     quantite_realisee: c.quantite_realisee ?? 0,
+    unite_quantite: c.unite_quantite ?? null,
     taux_depassement_autorise: c.taux_depassement_autorise ?? 0.2,
     montant_ht: c.montant_ht ?? null,
     montant_tva: c.montant_tva ?? 0,
+    montant_cautionnement: c.montant_cautionnement ?? null,
     taux_cautionnement: c.taux_cautionnement ?? 3,
     taux_penalite_retard: c.taux_penalite_retard ?? 0.002,
     plafond_penalite: c.plafond_penalite ?? 5,
@@ -65,10 +89,12 @@ export function sanitizeContratInput(input: Partial<Contrat>) {
   if (input.date_debut !== undefined) sanitized.date_debut = input.date_debut;
   if (input.date_fin !== undefined) sanitized.date_fin = input.date_fin;
   if (input.quantite_contractuelle !== undefined) sanitized.quantite_contractuelle = input.quantite_contractuelle;
+  if (input.unite_quantite !== undefined) sanitized.unite_quantite = input.unite_quantite || null;
   if (input.quantite_realisee !== undefined) sanitized.quantite_realisee = input.quantite_realisee ?? 0;
   if (input.taux_depassement_autorise !== undefined) sanitized.taux_depassement_autorise = input.taux_depassement_autorise ?? 0.2;
   if (input.montant_ht !== undefined) sanitized.montant_ht = input.montant_ht ?? null;
   if (input.montant_tva !== undefined) sanitized.montant_tva = input.montant_tva ?? 0;
+  if (input.montant_cautionnement !== undefined) sanitized.montant_cautionnement = input.montant_cautionnement ?? null;
   if (input.taux_cautionnement !== undefined) sanitized.taux_cautionnement = input.taux_cautionnement ?? 3;
   if (input.taux_penalite_retard !== undefined) sanitized.taux_penalite_retard = input.taux_penalite_retard ?? 0.002;
   if (input.plafond_penalite !== undefined) sanitized.plafond_penalite = input.plafond_penalite ?? 5;

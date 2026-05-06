@@ -1,6 +1,6 @@
-import { graphqlRequest, type GraphqlRequestOptions } from "./graphqlClient";
+import { graphqlMultipartRequest, graphqlRequest, type GraphqlRequestOptions } from "./graphqlClient";
 import { useAuthStore } from "@/store/useAuthStore";
-import { Contrat } from "../types/contrat";
+import { Contrat, ContratExtractionResult } from "../types/contrat";
 
 export const CONTRAT_FIELDS = `
   id
@@ -10,10 +10,12 @@ export const CONTRAT_FIELDS = `
   date_debut
   date_fin
   quantite_contractuelle
+  unite_quantite
   quantite_realisee
   taux_depassement_autorise
   montant_ht
   montant_tva
+  montant_cautionnement
   taux_cautionnement
   taux_penalite_retard
   plafond_penalite
@@ -111,4 +113,38 @@ const RESTORE_CONTRAT = `
 
 export async function restoreContrat(id: string | number) {
   return graphqlRequest<{ restoreContrat: Contrat }>(RESTORE_CONTRAT, { id });
+}
+
+const EXTRACT_CONTRAT_FROM_FILE = `
+  mutation ExtractContratFromFile($file: Upload!) {
+    extractContratFromFile(file: $file) {
+      numero_contrat
+      objet
+      date_signature
+      date_debut
+      date_fin
+      quantite_contractuelle
+      unite_quantite
+      montant_ht
+      montant_tva
+      montant_cautionnement
+      taux_cautionnement
+      taux_penalite_retard
+      plafond_penalite
+      taux_depassement_autorise
+      statut
+      fournisseur_id
+      emballage_id
+    }
+  }
+`;
+
+export async function extractContratFromFile(file: File) {
+  const token = useAuthStore.getState().token;
+  return graphqlMultipartRequest<{ extractContratFromFile: ContratExtractionResult }>(
+    EXTRACT_CONTRAT_FROM_FILE,
+    { file: null },
+    { file },
+    { token: token || undefined }
+  );
 }

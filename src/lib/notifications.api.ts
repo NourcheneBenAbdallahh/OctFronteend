@@ -7,7 +7,8 @@ export type AlertType =
   | "LOW_STOCK"
   | "WAREHOUSE_CAPACITY_HIGH"
   | "INVENTORY_ANOMALY"
-  | "SUPPLIER_DELAY";
+  | "SUPPLIER_DELAY"
+  | "NEW_USER_PENDING";
 
 export interface Alert {
   id: string;

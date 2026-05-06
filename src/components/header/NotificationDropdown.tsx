@@ -1,7 +1,7 @@
 "use client";
 import Image from "next/image";
 import Link from "next/link";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
 import { getAlerts, getUnreadAlertsCount, markAlertAsRead, markAllAlertsAsRead, Alert, AlertSeverity } from "@/lib/notifications.api";
@@ -13,6 +13,7 @@ export default function NotificationDropdown() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const prevUnreadCountRef = useRef(0);
 
   function toggleDropdown() {
     setIsOpen(!isOpen);
@@ -31,6 +32,11 @@ export default function NotificationDropdown() {
     // Recharger à chaque changement d'utilisateur/token
     setAlerts([]);
     setUnreadCount(0);
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
 
     const loadAlerts = async () => {
@@ -49,7 +55,38 @@ export default function NotificationDropdown() {
     };
 
     loadAlerts();
-  }, [token]);
+    const pollMs = isOpen ? 5000 : 15000;
+    const timer = window.setInterval(loadAlerts, pollMs);
+
+    return () => window.clearInterval(timer);
+  }, [token, isOpen]);
+
+  useEffect(() => {
+    const previous = prevUnreadCountRef.current;
+    const hasNewUnread = unreadCount > previous;
+    const hasPendingUser = alerts.some(
+      (a) => a.type === "NEW_USER_PENDING" && a.status === "unread"
+    );
+
+    if (hasNewUnread && hasPendingUser) {
+      try {
+        const context = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        oscillator.type = "sine";
+        oscillator.frequency.value = 1046;
+        gain.gain.value = 0.03;
+        oscillator.connect(gain);
+        gain.connect(context.destination);
+        oscillator.start();
+        oscillator.stop(context.currentTime + 0.08);
+      } catch {
+        // Ignore audio API failures silently.
+      }
+    }
+
+    prevUnreadCountRef.current = unreadCount;
+  }, [unreadCount, alerts]);
 
   const handleMarkAllAsRead = async () => {
     try {
@@ -88,6 +125,16 @@ export default function NotificationDropdown() {
       case 'info': return 'bg-info-500';
       default: return 'bg-gray-500';
     }
+  };
+
+  const pendingActivationCount = useMemo(
+    () => alerts.filter((a) => a.type === "NEW_USER_PENDING" && a.status === "unread").length,
+    [alerts]
+  );
+
+  const formatAlertType = (type: Alert["type"]) => {
+    if (type === "NEW_USER_PENDING") return "Nouveau compte";
+    return type.replace(/_/g, " ").toLowerCase();
   };
 
   const formatDate = (dateString: string) => {
@@ -139,6 +186,11 @@ export default function NotificationDropdown() {
           <h5 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
             Notification
           </h5>
+          {pendingActivationCount > 0 && (
+            <span className="rounded-full bg-indigo-100 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
+              {pendingActivationCount} activation{pendingActivationCount > 1 ? "s" : ""}
+            </span>
+          )}
           <div className="flex items-center gap-2">
             {unreadCount > 0 && (
               <button
@@ -210,7 +262,12 @@ export default function NotificationDropdown() {
                     </span>
 
                     <span className="flex items-center gap-2 text-gray-500 text-xs dark:text-gray-400">
-                      <span className="capitalize">{alert.type.replace('_', ' ')}</span>
+                      <span className="capitalize">{formatAlertType(alert.type)}</span>
+                      {alert.type === "NEW_USER_PENDING" && (
+                        <span className="rounded-full bg-indigo-100 px-1.5 py-0.5 text-[9px] font-black uppercase text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
+                          Action admin
+                        </span>
+                      )}
                       {alert.created_at && (
                         <>
                           <span className="w-1 h-1 bg-gray-400 rounded-full"></span>

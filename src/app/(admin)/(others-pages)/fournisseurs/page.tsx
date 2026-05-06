@@ -1,13 +1,13 @@
 import FournisseursTable from "@/components/fournisseurs/FournisseursTable";
-import { getServerAccessToken } from "@/lib/getServerAccessToken";
+import { requireServerAccessToken } from "@/lib/requireServerAccessToken";
 import {
   listFournisseurs,
 } from "@/lib/fournisseurs.api";
 import { TableFournisseur,normalizeFournisseur } from "@/types/fournisseur";
 
 export default async function FournisseursPage() {
-  const token = await getServerAccessToken();
-  const result = await listFournisseurs(token ? { token } : undefined);
+  const token = await requireServerAccessToken();
+  const result = await listFournisseurs({ token });
   const rows: TableFournisseur[] = result.fournisseurs.map(normalizeFournisseur);
 
   return (

@@ -6,6 +6,7 @@ import PageBreadcrumb from '@/components/common/PageBreadCrumb';
 import { listEmballages } from '@/lib/emballages.api';
 import EmballagesTable from '@/components/emballages/EmballagesTable';
 import { TableEmballages, normalizeEmballages } from '@/types/emballage';
+import { useAuthStore } from '@/store/useAuthStore';
 
 export default function EmballagesClient() {
   const searchParams = useSearchParams();
@@ -14,6 +15,7 @@ export default function EmballagesClient() {
   const pageParam = searchParams?.get('page');
   const currentPage = pageParam ? parseInt(pageParam) : 1;
   const limit = 10;
+  const token = useAuthStore((state) => state.token);
 
   const [emballages, setEmballages] = useState<TableEmballages[]>([]);
   const [total, setTotal] = useState(0);
@@ -36,8 +38,12 @@ export default function EmballagesClient() {
   }, [limit]);
 
   useEffect(() => {
+    if (!token) {
+      setLoading(false);
+      return;
+    }
     fetchData(currentPage);
-  }, [currentPage, fetchData]);
+  }, [currentPage, fetchData, token]);
 
   const handlePageChange = (newPage: number) => {
     router.push(`/emballages?page=${newPage}`, { scroll: false });
@@ -45,7 +51,6 @@ export default function EmballagesClient() {
 
   return (
     <div className='space-y-6'>
-      <PageBreadcrumb pageTitle='Emballages' />
       <div className='mt-8'>
         <div className={`transition-opacity duration-300 ${loading ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
           <EmballagesTable

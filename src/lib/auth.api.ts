@@ -11,6 +11,8 @@ mutation Login($email: String!, $password: String!) {
       name
       email
       role
+      isActive
+      emailVerifiedAt
     }
   }
 }`;
@@ -24,6 +26,8 @@ mutation Register($name: String!, $email: String!, $password: String!, $role: St
       name
       email
       role
+      isActive
+      emailVerifiedAt
     }
   }
 }`;
@@ -67,6 +71,8 @@ query Me {
     name
     email
     role
+    isActive
+    emailVerifiedAt
   }
 }`;
 

@@ -7,6 +7,8 @@ interface User {
   name: string;
   email: string;
   role: string;
+  isActive?: boolean;
+  emailVerifiedAt?: string | null;
   photo?: string; 
   telephone?: string;
 }

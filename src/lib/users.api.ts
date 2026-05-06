@@ -6,6 +6,9 @@ export type AdminUser = {
   id: string;
   name: string;
   email: string;
+  telephone?: string | null;
+  photo?: string | null;
+  isActive: boolean;
   role: UserRole | string;
   createdAt?: string | null;
   updatedAt?: string | null;
@@ -23,6 +26,9 @@ const USER_FIELDS = `
   id
   name
   email
+  telephone
+  photo
+  isActive
   role
   createdAt
   updatedAt
@@ -89,6 +95,9 @@ export async function adminCreateUser(
   input: {
     name: string;
     email: string;
+    telephone?: string | null;
+    photo?: string | null;
+    is_active?: boolean;
     password: string;
     role: UserRole;
   },
@@ -164,4 +173,49 @@ export async function adminResetUserPassword(
     opts
   );
   return data.adminResetUserPassword;
+}
+
+export async function adminUpdateUser(
+  id: string | number,
+  input: {
+    name?: string;
+    email?: string;
+    telephone?: string | null;
+    photo?: string | null;
+  },
+  opts?: GraphqlRequestOptions
+): Promise<AdminUser> {
+  const mutation = `
+    mutation AdminUpdateUser($id: ID!, $input: AdminUpdateUserInput!) {
+      adminUpdateUser(id: $id, input: $input) {
+        ${USER_FIELDS}
+      }
+    }
+  `;
+  const data = await graphqlRequest<{ adminUpdateUser: AdminUser }>(
+    mutation,
+    { id, input },
+    opts
+  );
+  return data.adminUpdateUser;
+}
+
+export async function adminSetUserActive(
+  id: string | number,
+  is_active: boolean,
+  opts?: GraphqlRequestOptions
+): Promise<AdminUser> {
+  const mutation = `
+    mutation AdminSetUserActive($id: ID!, $is_active: Boolean!) {
+      adminSetUserActive(id: $id, is_active: $is_active) {
+        ${USER_FIELDS}
+      }
+    }
+  `;
+  const data = await graphqlRequest<{ adminSetUserActive: AdminUser }>(
+    mutation,
+    { id, is_active },
+    opts
+  );
+  return data.adminSetUserActive;
 }

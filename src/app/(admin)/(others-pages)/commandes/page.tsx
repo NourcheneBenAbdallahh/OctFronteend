@@ -18,7 +18,7 @@ import {
   FournisseurOption,
   TableCommande,
 } from "@/types/commandes";
-import { getServerAccessToken } from "@/lib/getServerAccessToken";
+import { requireServerAccessToken } from "@/lib/requireServerAccessToken";
 
 type PageProps = {
   searchParams?: Promise<{
@@ -29,8 +29,8 @@ type PageProps = {
 export default async function CommandesPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const currentPage = Number(params?.page || "1");
-  const token = await getServerAccessToken();
-  const auth = token ? { token } : undefined;
+  const token = await requireServerAccessToken();
+  const auth = { token };
 
   const [
     commandesResult,

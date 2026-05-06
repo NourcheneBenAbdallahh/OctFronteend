@@ -9,7 +9,6 @@ import Button from "@/components/ui/button/Button";
 import Checkbox from "@/components/form/input/Checkbox";
 import { register } from "@/lib/auth.api"; 
 import { useRouter } from "next/navigation";
-import { useAuthStore } from "@/store/useAuthStore"; // Import du store
 
 export default function SignUpForm() {
   const [firstName, setFirstName] = useState("");
@@ -22,7 +21,6 @@ export default function SignUpForm() {
   const [errors, setErrors] = useState<any>({});
 
   const router = useRouter();
-  const setAuth = useAuthStore((state) => state.setAuth); // Récupération de l'action de session
 
   const validate = () => {
     const e: any = {};
@@ -52,11 +50,10 @@ export default function SignUpForm() {
     setLoading(true);
     try {
       const fullName = `${firstName} ${lastName}`;
-      const data = await register({ name: fullName, email, password });
-      
-      setAuth(data.user, data.token);
-      
-      router.push("/"); 
+      await register({ name: fullName, email, password });
+
+      // Nouveau flux: inscription => compte inactif, attente activation admin.
+      router.push("/signin?pendingActivation=1");
     } catch (err: any) {
       setErrors({ general: err.message || "Erreur lors de l'inscription" });
     } finally {

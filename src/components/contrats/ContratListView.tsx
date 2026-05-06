@@ -72,7 +72,9 @@ export const ContratListView = ({ rows, userNamesById, onEdit, onDelete }: Props
 
               <td className="px-8 py-6 text-right font-black text-gray-900">
                 {qteContractuelle.toLocaleString()}
-                <span className="text-[10px] font-bold text-gray-400 block uppercase tracking-tighter">Unités</span>
+                <span className="text-[10px] font-bold text-gray-400 block uppercase tracking-tighter">
+                  {c.unite_quantite?.trim() || "unitées"}
+                </span>
                 <span className="text-[10px] font-bold text-indigo-500 block mt-1">
                   Taux depassement: {tauxDepassementPercent.toFixed(2)}%
                 </span>

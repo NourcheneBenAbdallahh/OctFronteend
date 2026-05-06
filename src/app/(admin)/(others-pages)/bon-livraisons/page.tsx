@@ -8,7 +8,7 @@ import {
 import { listEmballages } from "@/lib/emballages.api";
 import { listCommandes } from "@/lib/commandes.api";
 import { fetchEntrepots } from "@/lib/entrepot.api";
-import { getServerAccessToken } from "@/lib/getServerAccessToken";
+import { requireServerAccessToken } from "@/lib/requireServerAccessToken";
 import {
   CommandeOption,
   EmballageOption,
@@ -27,8 +27,8 @@ export default async function BonLivraisonsPage({
 }: PageProps) {
   await searchParams;
 
-  const token = await getServerAccessToken();
-  const auth = token ? { token } : undefined;
+  const token = await requireServerAccessToken();
+  const auth = { token };
 
   const [
     bonLivraisonsResult,

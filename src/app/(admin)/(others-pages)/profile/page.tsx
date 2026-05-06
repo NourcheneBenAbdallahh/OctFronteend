@@ -1,6 +1,7 @@
 import UserAddressCard from "@/components/user-profile/UserAddressCard";
 import UserInfoCard from "@/components/user-profile/UserInfoCard";
 import UserMetaCard from "@/components/user-profile/UserMetaCard";
+import OnboardingAndVerificationCard from "@/components/user-profile/OnboardingAndVerificationCard";
 import { Metadata } from "next";
 import React from "react";
 
@@ -27,6 +28,10 @@ export default function Profile() {
         {/* 1. La Meta Card prend toute la largeur en haut (Bannière) */}
         <section>
           <UserMetaCard />
+        </section>
+
+        <section>
+          <OnboardingAndVerificationCard />
         </section>
 
         {/* 2. Grid pour les informations détaillées */}
