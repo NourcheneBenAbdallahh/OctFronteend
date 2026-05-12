@@ -9,6 +9,7 @@ import { useAuthStore } from "@/store/useAuthStore";
 
 export default function NotificationDropdown() {
   const token = useAuthStore((state) => state.token);
+  const userId = useAuthStore((state) => state.user?.id);
   const [isOpen, setIsOpen] = useState(false);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -60,6 +61,55 @@ export default function NotificationDropdown() {
 
     return () => window.clearInterval(timer);
   }, [token, isOpen]);
+
+  useEffect(() => {
+    if (!token || !userId) return;
+    const hubUrl = process.env.NEXT_PUBLIC_MERCURE_HUB_URL;
+    if (!hubUrl) return;
+
+    const topic = `https://oct.tn/users/${userId}/alerts`;
+    const subscribeUrl = `${hubUrl}?topic=${encodeURIComponent(topic)}`;
+    const source = new EventSource(subscribeUrl);
+
+    source.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data) as Partial<Alert> & { id?: string | number };
+        if (!payload.id) return;
+        const incomingId = String(payload.id);
+        setAlerts((prev) => {
+          if (prev.some((a) => String(a.id) === incomingId)) {
+            return prev;
+          }
+          const incoming: Alert = {
+            id: incomingId,
+            type: (payload.type as Alert["type"]) ?? "LOW_STOCK",
+            title: payload.title ?? "Nouvelle alerte",
+            message: payload.message ?? "",
+            severity: (payload.severity as AlertSeverity) ?? "info",
+            status: (payload.status as Alert["status"]) ?? "unread",
+            entity_type: payload.entity_type ?? null,
+            entity_id: payload.entity_id ?? null,
+            action_url: payload.action_url ?? null,
+            is_active: true,
+            metadata: null,
+            read_at: null,
+            created_at: payload.created_at ?? new Date().toISOString(),
+            updated_at: payload.updated_at ?? payload.created_at ?? new Date().toISOString(),
+          };
+          return [incoming, ...prev];
+        });
+        setUnreadCount((prev) => prev + 1);
+      } catch {
+        // Ignore malformed mercure payloads.
+      }
+    };
+
+    source.onerror = () => {
+      // EventSource auto-reconnects by default.
+    };
+
+    return () => source.close();
+  }, [token, userId]);
 
   useEffect(() => {
     const previous = prevUnreadCountRef.current;
@@ -137,16 +187,50 @@ export default function NotificationDropdown() {
     return type.replace(/_/g, " ").toLowerCase();
   };
 
+  const getSafeAlertUrl = (alert: Alert): string | null => {
+    const rawUrl = (alert.action_url || "").trim();
+    if (!rawUrl) return null;
+
+    // Legacy backend URLs used route-group names that are not public routes.
+    if (rawUrl.startsWith("/admin/(others-pages)/")) {
+      const legacy = rawUrl.replace("/admin/(others-pages)/", "/");
+      const [legacyPath, maybeId] = legacy.split("/").filter(Boolean);
+
+      if (!legacyPath) return "/notifications";
+      if (maybeId && /^\d+$/.test(maybeId)) {
+        return `/${legacyPath}?focus=${maybeId}`;
+      }
+      return `/${legacyPath}`;
+    }
+
+    return rawUrl;
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    
-    if (diffMins < 1) return 'à l\'instant';
-    if (diffMins < 60) return `il y a ${diffMins} min`;
-    if (diffMins < 1440) return `il y a ${Math.floor(diffMins / 60)}h`;
-    return `il y a ${Math.floor(diffMins / 1440)}j`;
+    if (diffMs < 0) {
+      return 'à l\'instant';
+    }
+
+    const diffSecs = Math.floor(diffMs / 1000);
+    if (diffSecs < 60) {
+      return `il y a ${diffSecs} ${diffSecs > 1 ? "secondes" : "seconde"}`;
+    }
+
+    const diffMins = Math.floor(diffSecs / 60);
+    if (diffMins < 60) {
+      return `il y a ${diffMins} ${diffMins > 1 ? "minutes" : "minute"}`;
+    }
+
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) {
+      return `il y a ${diffHours} ${diffHours > 1 ? "heures" : "heure"}`;
+    }
+
+    const diffDays = Math.floor(diffHours / 24);
+    return `il y a ${diffDays} ${diffDays > 1 ? "jours" : "jour"}`;
   };
 
   return (
@@ -238,9 +322,8 @@ export default function NotificationDropdown() {
                     if (alert.status === 'unread') {
                       handleMarkAsRead(alert.id);
                     }
-                    if (alert.action_url) {
-                      window.location.href = alert.action_url;
-                    }
+                    const targetUrl = getSafeAlertUrl(alert);
+                    if (targetUrl) window.location.href = targetUrl;
                     closeDropdown();
                   }}
                   className={`flex gap-3 rounded-lg border-b border-gray-100 p-3 px-4.5 py-3 hover:bg-gray-100 dark:border-gray-800 dark:hover:bg-white/5 ${

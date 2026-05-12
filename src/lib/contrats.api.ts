@@ -1,6 +1,6 @@
 import { graphqlMultipartRequest, graphqlRequest, type GraphqlRequestOptions } from "./graphqlClient";
 import { useAuthStore } from "@/store/useAuthStore";
-import { Contrat, ContratExtractionResult } from "../types/contrat";
+import { Contrat, ContratExtractionResult, sanitizeContratInput } from "../types/contrat";
 
 export const CONTRAT_FIELDS = `
   id
@@ -59,9 +59,10 @@ const CREATE_CONTRAT = `
 
 export async function createContrat(input: Partial<Contrat> & { numero_contrat: string; date_debut: string; date_fin: string; quantite_contractuelle: number; fournisseur_id: string | number; emballage_id: string | number; }) {
   const token = useAuthStore.getState().token;
+  const safeInput = sanitizeContratInput(input);
   return graphqlRequest<{ createContrat: Contrat }>(
     CREATE_CONTRAT,
-    { input },
+    { input: safeInput },
     { token: token || undefined }
   );
 }
@@ -76,9 +77,10 @@ const UPDATE_CONTRAT = `
 
 export async function updateContrat(id: string | number, input: Partial<Contrat>) {
   const token = useAuthStore.getState().token;
+  const safeInput = sanitizeContratInput(input);
   return graphqlRequest<{ updateContrat: Contrat }>(
     UPDATE_CONTRAT,
-    { id, input },
+    { id, input: safeInput },
     { token: token || undefined }
   );
 }

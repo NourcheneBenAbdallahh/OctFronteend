@@ -4,11 +4,13 @@ import { MapPin, Plus } from "lucide-react";
 interface EntrepotsListViewProps {
   rows: Entrepot[];
   onEdit: (i: Entrepot) => void;
+  focusedId?: string | number | null;
 }
 
 export const EntrepotsListView = ({
   rows,
   onEdit,
+  focusedId,
 }: EntrepotsListViewProps) => (
   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 p-6 bg-[#F0F4F4] items-start">
     {rows.map((it) => {
@@ -22,9 +24,14 @@ export const EntrepotsListView = ({
 
       return (
         <div
+          id={`entrepot-card-${it.id}`}
           key={it.id}
           onClick={() => onEdit(it)}
-          className="self-start relative bg-white rounded-[2rem] p-1 shadow-sm hover:shadow-2xl hover:-translate-y-1 transition-all duration-500 cursor-pointer group overflow-hidden border border-transparent hover:border-[#00A09D]/20"
+          className={`self-start relative rounded-[2rem] p-1 transition-all duration-500 cursor-pointer group overflow-hidden border ${
+            String(focusedId ?? "") === String(it.id)
+              ? "bg-indigo-50 ring-2 ring-indigo-300 border-indigo-200"
+              : "bg-white border-transparent hover:border-[#00A09D]/20"
+          } hover:shadow-2xl hover:-translate-y-1 shadow-sm`}
         >
           <div className="p-6">
             <div

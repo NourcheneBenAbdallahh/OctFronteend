@@ -8,9 +8,11 @@ import {
   deleteFacture,
   normalizeFacture
 } from "@/lib/factures.api";
+import { exportFacturesPdf } from "@/lib/factures.pdf";
+import { exportFacturesCsv } from "@/lib/factures.csv";
 import { 
   Edit2, Trash2, ChevronDown, ChevronRight, Truck, Calendar, 
-  AlertCircle, Search, Plus, User, FileText, Banknote, X, Check, TrendingUp, Save
+  AlertCircle, Search, Plus, User, FileText, Banknote, X, Check, TrendingUp, Save, Printer, FileSpreadsheet
 } from "lucide-react";
 import Pagination from "@/components/tables/Pagination";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -26,6 +28,9 @@ const formatMoney = (amount: number | string) => {
   return num.toFixed(3).replace(".", ",");
 };
 
+const asIdString = (value?: string | number | null) =>
+  value === undefined || value === null ? "" : String(value);
+
 type Id = string | number;
 
 type FactureForm = {
@@ -33,6 +38,8 @@ type FactureForm = {
   date_facture: string;
   montant_ht: string;
   bon_livraison_ids: string[]; // Changé en tableau pour le multi-sélection
+  fournisseur_id: string;
+  contrat_id: string;
   statut: FactureStatut;
 };
 const LocalPagination = ({
@@ -71,6 +78,8 @@ const emptyForm: FactureForm = {
   date_facture: new Date().toISOString().split('T')[0],
   montant_ht: "0",
   bon_livraison_ids: [],
+  fournisseur_id: "",
+  contrat_id: "",
   statut: "BROUILLON",
 };
 
@@ -108,6 +117,7 @@ export default function FacturesTable({
   const [errorMessage, setErrorMessage] = useState("");
   const [blDropdownOpen, setBlDropdownOpen] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState<string | number | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
 
   const router = useRouter();
   const pathname = usePathname();
@@ -156,26 +166,122 @@ const filteredRows = useMemo(() => {
 
   // Sinon, recherche textuelle (Numéro ou fournisseur)
   return rows.filter(r => 
-    r.numero_facture?.toLowerCase().includes(query.toLowerCase())
+    r.numero_facture?.toLowerCase().includes(query.toLowerCase()) ||
+    r.fournisseur?.raison_sociale?.toLowerCase().includes(query.toLowerCase()) ||
+    r.contrat?.numero_contrat?.toLowerCase().includes(query.toLowerCase())
   );
 }, [rows, query]);
 
-  // --- AUTO-REMPLISSAGE DES VALEURS ---
-  useEffect(() => {
-    if (!editing && form.bon_livraison_ids.length > 0) {
-      const selectedBLs = bonsLivraison.filter(bl => form.bon_livraison_ids.includes(String(bl.id)));
-      
-      // Calcul du montant HT total basé sur la quantité totale
-      // Note: prix_unitaire n'est pas disponible depuis l'API, l'utilisateur doit saisir le montant
-      const totalQuantite = selectedBLs.reduce((sum, bl) => sum + bl.quantite_recue, 0);
+  const fournisseurOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    bonsLivraison.forEach((bl) => {
+      const fid = asIdString(bl.fournisseur_id ?? bl.commande?.fournisseur_id);
+      const name = bl.fournisseur_name ?? bl.commande?.fournisseur?.raison_sociale;
+      if (fid && name && !map.has(fid)) map.set(fid, name);
+    });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [bonsLivraison]);
 
-      // Si le montant HT est vide ou zéro, on le met à jour avec une valeur par défaut
-      // L'utilisateur devra ajuster manuellement le montant HT
-      if (!form.montant_ht || form.montant_ht === "0") {
-        setForm(prev => ({ ...prev, montant_ht: (totalQuantite * 100).toFixed(3) })); // Valeur par défaut: 100 DT par unité
+  const contratOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    bonsLivraison.forEach((bl) => {
+      const cid = asIdString(bl.contrat_id ?? bl.commande?.contrat_id);
+      const name = bl.contrat_name ?? bl.commande?.contrat?.numero_contrat;
+      const fid = asIdString(bl.fournisseur_id ?? bl.commande?.fournisseur_id);
+      if (!cid || !name) return;
+      if (form.fournisseur_id && fid !== form.fournisseur_id) return;
+      if (!map.has(cid)) map.set(cid, name);
+    });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [bonsLivraison, form.fournisseur_id]);
+
+  const selectedCount = useMemo(() => {
+    const ids = new Set(filteredRows.map((r) => String(r.id)));
+    let n = 0;
+    selectedIds.forEach((id) => {
+      if (ids.has(id)) n += 1;
+    });
+    return n;
+  }, [filteredRows, selectedIds]);
+
+  const allFilteredSelected =
+    filteredRows.length > 0 &&
+    filteredRows.every((r) => selectedIds.has(String(r.id)));
+
+  const toggleSelectRow = (id: string | number) => {
+    const sid = String(id);
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(sid)) next.delete(sid);
+      else next.add(sid);
+      return next;
+    });
+  };
+
+  const toggleSelectAllFiltered = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      const every = filteredRows.length > 0 && filteredRows.every((r) => next.has(String(r.id)));
+      if (every) {
+        filteredRows.forEach((r) => next.delete(String(r.id)));
+      } else {
+        filteredRows.forEach((r) => next.add(String(r.id)));
       }
+      return next;
+    });
+  };
+
+  const handlePrintPdf = () => {
+    const list = filteredRows.filter((r) => selectedIds.has(String(r.id)));
+    if (!list.length) {
+      alert("Sélectionnez au moins une facture à imprimer.");
+      return;
     }
-  }, [form.bon_livraison_ids, bonsLivraison, editing, form.montant_ht]);
+    try {
+      exportFacturesPdf(list);
+    } catch (e) {
+      console.error(e);
+      alert("Erreur lors de la génération du PDF.");
+    }
+  };
+
+  const handleExportCsv = () => {
+    const list = filteredRows.filter((r) => selectedIds.has(String(r.id)));
+    if (!list.length) {
+      alert("Sélectionnez au moins une facture à exporter.");
+      return;
+    }
+    try {
+      exportFacturesCsv(list);
+    } catch (e) {
+      console.error(e);
+      alert("Erreur lors de l'export CSV.");
+    }
+  };
+
+  // --- AUTO-REMPLISSAGE DES VALEURS + FOURNISSEUR/CONTRAT ---
+  useEffect(() => {
+    if (!form.bon_livraison_ids.length) return;
+    const selectedBLs = bonsLivraison.filter((bl) =>
+      form.bon_livraison_ids.includes(String(bl.id))
+    );
+    if (!selectedBLs.length) return;
+
+    const first = selectedBLs[0];
+    const fournisseurId = asIdString(first.fournisseur_id ?? first.commande?.fournisseur_id);
+    const contratId = asIdString(first.contrat_id ?? first.commande?.contrat_id);
+    const totalQuantite = selectedBLs.reduce((sum, bl) => sum + bl.quantite_recue, 0);
+
+    setForm((prev) => {
+      const next = { ...prev };
+      if (fournisseurId && prev.fournisseur_id !== fournisseurId) next.fournisseur_id = fournisseurId;
+      if (contratId && prev.contrat_id !== contratId) next.contrat_id = contratId;
+      if (!prev.montant_ht || prev.montant_ht === "0") {
+        next.montant_ht = (totalQuantite * 100).toFixed(3);
+      }
+      return next;
+    });
+  }, [form.bon_livraison_ids, bonsLivraison]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -189,40 +295,65 @@ const filteredRows = useMemo(() => {
 
   const filteredBL = useMemo(() => {
     const s = blSearch.trim().toLowerCase();
-    
-    // Si aucun BL n'est sélectionné, montrer tous les BLs non facturés
-    if (form.bon_livraison_ids.length === 0) {
-      return bonsLivraison.filter(b => 
-        b.numero_bl.toLowerCase().includes(s) && 
-        !b.is_factured
-      );
+
+    let list = bonsLivraison.filter((b) => {
+      const isSelected = form.bon_livraison_ids.includes(String(b.id));
+      return b.numero_bl.toLowerCase().includes(s) && (!b.is_factured || isSelected);
+    });
+
+    if (form.fournisseur_id) {
+      list = list.filter((b) => {
+        const fid = asIdString(b.fournisseur_id ?? b.commande?.fournisseur_id);
+        return fid === form.fournisseur_id;
+      });
     }
-    
-    // Si un BL est déjà sélectionné, montrer seulement les BLs de la même commande
-    const firstBLId = form.bon_livraison_ids[0];
-    const firstBL = bonsLivraison.find(b => String(b.id) === firstBLId);
-    
-    if (!firstBL) {
-      return [];
+
+    if (form.contrat_id) {
+      list = list.filter((b) => {
+        const cid = asIdString(b.contrat_id ?? b.commande?.contrat_id);
+        return cid === form.contrat_id;
+      });
     }
-    
-    return bonsLivraison.filter(b => 
-      b.numero_bl.toLowerCase().includes(s) && 
-      !b.is_factured &&
-      b.commande_id === firstBL.commande_id
-    );
-  }, [bonsLivraison, blSearch, form.bon_livraison_ids]);
+
+    // Si un BL est déjà sélectionné, on garde la contrainte "même commande"
+    if (form.bon_livraison_ids.length > 0) {
+      const firstBLId = form.bon_livraison_ids[0];
+      const firstBL = bonsLivraison.find((b) => String(b.id) === firstBLId);
+      if (!firstBL) return [];
+      list = list.filter((b) => b.commande_id === firstBL.commande_id);
+    }
+
+    return list;
+  }, [bonsLivraison, blSearch, form.bon_livraison_ids, form.fournisseur_id, form.contrat_id]);
 
   const toggleBL = (id: string) => {
-    setForm(prev => ({
-      ...prev,
-      bon_livraison_ids: prev.bon_livraison_ids.includes(id)
-        ? prev.bon_livraison_ids.filter(i => i !== id)
-        : [...prev.bon_livraison_ids, id]
-    }));
+    const bl = bonsLivraison.find((b) => String(b.id) === id);
+    setForm((prev) => {
+      if (prev.bon_livraison_ids.includes(id)) {
+        return {
+          ...prev,
+          bon_livraison_ids: prev.bon_livraison_ids.filter((i) => i !== id),
+        };
+      }
+
+      const fournisseurId = asIdString(bl?.fournisseur_id ?? bl?.commande?.fournisseur_id);
+      const contratId = asIdString(bl?.contrat_id ?? bl?.commande?.contrat_id);
+
+      return {
+        ...prev,
+        bon_livraison_ids: [...prev.bon_livraison_ids, id],
+        fournisseur_id: prev.fournisseur_id || fournisseurId,
+        contrat_id: prev.contrat_id || contratId,
+      };
+    });
   };
 
-  const openNew = () => { setEditing(null); setForm(emptyForm); setBlSearch(""); setIsDrawerOpen(true); };
+  const openNew = () => {
+    setEditing(null);
+    setForm(emptyForm);
+    setBlSearch("");
+    setIsDrawerOpen(true);
+  };
   
   const openEdit = (item: TableFacture) => {
     setEditing(item);
@@ -231,6 +362,8 @@ const filteredRows = useMemo(() => {
       date_facture: formatDate(item.date_facture),
       montant_ht: String(item.montant_ht || ""),
       bon_livraison_ids: item.bon_livraisons?.map(bl => String(bl.id)) || [],
+      fournisseur_id: asIdString(item.fournisseur_id ?? item.fournisseur?.id),
+      contrat_id: asIdString(item.contrat_id ?? item.contrat?.id),
       statut: item.statut,
     });
     setIsDrawerOpen(true);
@@ -238,18 +371,53 @@ const filteredRows = useMemo(() => {
 
   const closeDrawer = () => { if (!submitLoading) { setIsDrawerOpen(false); setErrorMessage(""); } };
 
+  const handleFournisseurChange = (value: string) => {
+    setForm((prev) => ({
+      ...prev,
+      fournisseur_id: value,
+      contrat_id: value ? prev.contrat_id : "",
+      bon_livraison_ids: [],
+    }));
+  };
+
+  const handleContratChange = (value: string) => {
+    setForm((prev) => ({
+      ...prev,
+      contrat_id: value,
+      bon_livraison_ids: [],
+    }));
+  };
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (form.bon_livraison_ids.length === 0) return setErrorMessage("Sélectionnez au moins un Bon de Livraison");
+    if (!form.fournisseur_id || !form.contrat_id) {
+      return setErrorMessage("Sélectionnez un fournisseur et un contrat, ou choisissez un BL pour auto-remplir.");
+    }
     
     setSubmitLoading(true);
     try {
-      const payload = { ...form, montant_ht: Number(form.montant_ht) };
       if (editing) {
-        const res = await updateFacture(editing.id, payload as UpdateFactureInput);
+        const payload: UpdateFactureInput = {
+          numero_facture: form.numero_facture,
+          date_facture: form.date_facture,
+          montant_ht: Number(form.montant_ht),
+          bon_livraison_ids: form.bon_livraison_ids,
+          statut: form.statut,
+        };
+        const res = await updateFacture(editing.id, payload);
         setRows(prev => prev.map(r => String(r.id) === String(editing.id) ? normalizeFacture(res.updateFacture) : r));
       } else {
-        const res = await createFacture(payload as any); // Le service Laravel gérera le tableau bon_livraison_ids
+        const payload: CreateFactureInput = {
+          numero_facture: form.numero_facture,
+          date_facture: form.date_facture,
+          montant_ht: Number(form.montant_ht),
+          bon_livraison_ids: form.bon_livraison_ids,
+          fournisseur_id: form.fournisseur_id || undefined,
+          contrat_id: form.contrat_id || undefined,
+          statut: form.statut,
+        };
+        const res = await createFacture(payload);
         setRows(prev => [normalizeFacture(res.createFacture), ...prev]);
       }
       closeDrawer();
@@ -268,6 +436,11 @@ const filteredRows = useMemo(() => {
       
       // Mise à jour locale de l'état pour un feedback instantané (Optimistic UI)
       setRows(prev => prev.filter(r => String(r.id) !== String(id)));
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(String(id));
+        return next;
+      });
       
       // Optionnel : Notifier l'utilisateur (si tu as une lib de toast)
       console.log(`Facture ${id} supprimée avec succès`);
@@ -316,11 +489,31 @@ const filteredRows = useMemo(() => {
           </h1>
         </div>
 
-        <div className="flex items-center gap-6">
+        <div className="flex flex-wrap items-center justify-end gap-3 sm:gap-6">
           <div className="text-right hidden sm:block">
             <span className="text-[10px] font-black text-gray-400 uppercase block">Total Actif</span>
             <span className="text-2xl font-black text-gray-900 leading-none">{filteredRows.length} Factures</span>
           </div>
+          <button
+            type="button"
+            onClick={handlePrintPdf}
+            disabled={selectedCount === 0}
+            className="flex items-center gap-2 border-2 border-[#00A09D] text-[#00A09D] px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-[#00A09D] hover:text-white transition-all shadow-sm disabled:opacity-40 disabled:pointer-events-none"
+          >
+            <Printer className="h-4 w-4" />
+            Imprimer PDF
+            {selectedCount > 0 ? ` (${selectedCount})` : ""}
+          </button>
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            disabled={selectedCount === 0}
+            className="flex items-center gap-2 border-2 border-gray-700 text-gray-800 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all shadow-sm disabled:opacity-40 disabled:pointer-events-none"
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            Exporter CSV
+            {selectedCount > 0 ? ` (${selectedCount})` : ""}
+          </button>
           <button
             onClick={openNew}
             className="bg-white text-gray-900 border-2 border-gray-900 px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all shadow-[8px_8px_0px_rgba(0,160,157,0.2)]"
@@ -388,6 +581,22 @@ const filteredRows = useMemo(() => {
           <table className="w-full">
             <thead className="bg-gray-50/80 border-b border-gray-100">
               <tr>
+                <th className="w-12 px-3 py-4 text-center text-[10px] font-black uppercase text-gray-500 tracking-wider">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-gray-300 text-[#00A09D] focus:ring-[#00A09D] cursor-pointer"
+                    checked={allFilteredSelected && filteredRows.length > 0}
+                    ref={(el) => {
+                      if (el) {
+                        el.indeterminate =
+                          selectedCount > 0 && !allFilteredSelected;
+                      }
+                    }}
+                    onChange={toggleSelectAllFiltered}
+                    disabled={filteredRows.length === 0}
+                    title="Tout sélectionner sur cette vue"
+                  />
+                </th>
                 <th className="px-6 py-4 text-left text-[10px] font-black uppercase text-gray-500 tracking-wider">
                   <FileText className="h-3 w-3" />
                   N° Facture
@@ -395,6 +604,12 @@ const filteredRows = useMemo(() => {
                 <th className="px-6 py-4 text-left text-[10px] font-black uppercase text-gray-500 tracking-wider">
                   <Calendar className="h-3 w-3" />
                   Date
+                </th>
+                <th className="px-6 py-4 text-left text-[10px] font-black uppercase text-gray-500 tracking-wider">
+                  Fournisseur
+                </th>
+                <th className="px-6 py-4 text-left text-[10px] font-black uppercase text-gray-500 tracking-wider">
+                  Contrat
                 </th>
                 <th className="px-6 py-4 text-left text-[10px] font-black uppercase text-gray-500 tracking-wider">
                   <Banknote className="h-3 w-3" />
@@ -420,6 +635,18 @@ const filteredRows = useMemo(() => {
               {filteredRows.map((item) => (
                 <React.Fragment key={item.id}>
                   <tr className="hover:bg-gray-50 transition-all duration-300 cursor-pointer group" onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}>
+                    <td
+                      className="w-12 px-3 py-4 text-center"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-gray-300 text-[#00A09D] focus:ring-[#00A09D] cursor-pointer"
+                        checked={selectedIds.has(String(item.id))}
+                        onChange={() => toggleSelectRow(item.id)}
+                        aria-label={`Sélectionner la facture ${item.numero_facture}`}
+                      />
+                    </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-12 h-12 bg-gradient-to-br from-indigo-100 to-cyan-100 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-sm">
@@ -446,6 +673,16 @@ const filteredRows = useMemo(() => {
                           <p className="text-xs text-gray-500">Émise</p>
                         </div>
                       </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="text-sm font-semibold text-gray-900">
+                        {item.fournisseur?.raison_sociale || "-"}
+                      </p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="text-sm font-semibold text-gray-900">
+                        {item.contrat?.numero_contrat || "-"}
+                      </p>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-col gap-1">
@@ -536,7 +773,7 @@ const filteredRows = useMemo(() => {
                   </tr>
                   {expandedId === item.id && (
                     <tr className="bg-gray-50 animate-in fade-in duration-500">
-                      <td colSpan={7} className="p-8">
+                      <td colSpan={10} className="p-8">
                         <div className="space-y-6">
                           {/* Header des détails */}
                           <div className="flex items-center gap-3 mb-6">
@@ -707,6 +944,39 @@ const filteredRows = useMemo(() => {
             <form onSubmit={handleSubmit} className="space-y-6 flex-1 overflow-y-auto pr-2 custom-scrollbar">
               {errorMessage && <div className="p-4 bg-red-50 text-red-600 rounded-2xl text-[10px] font-black border border-red-100 uppercase">{errorMessage}</div>}
 
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400">Fournisseur</label>
+                  <select
+                    className="w-full bg-gray-50 rounded-2xl p-4 text-sm font-bold border-2 border-transparent focus:border-indigo-600 outline-none"
+                    value={form.fournisseur_id}
+                    onChange={(e) => handleFournisseurChange(e.target.value)}
+                  >
+                    <option value="">Choisir un fournisseur</option>
+                    {fournisseurOptions.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400">Contrat</label>
+                  <select
+                    className="w-full bg-gray-50 rounded-2xl p-4 text-sm font-bold border-2 border-transparent focus:border-indigo-600 outline-none"
+                    value={form.contrat_id}
+                    onChange={(e) => handleContratChange(e.target.value)}
+                  >
+                    <option value="">Choisir un contrat</option>
+                    {contratOptions.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               {/* MULTI-SELECT BL DROPDOWN */}
               <div className="space-y-2 relative" ref={dropdownRef}>
                 <label className="text-[10px] font-black uppercase text-gray-400">Sélectionner un ou plusieurs BL</label>
@@ -734,7 +1004,13 @@ const filteredRows = useMemo(() => {
                   <div className="absolute z-30 w-full mt-2 bg-white border border-gray-100 rounded-2xl shadow-2xl max-h-56 overflow-y-auto p-2">
                     {filteredBL.length > 0 ? filteredBL.map(bl => (
                       <button key={bl.id} type="button" onClick={() => toggleBL(String(bl.id))} className={`w-full p-3 rounded-xl text-left text-xs font-black mb-1 flex justify-between items-center transition-colors ${form.bon_livraison_ids.includes(String(bl.id)) ? 'bg-indigo-50 text-indigo-600' : 'hover:bg-gray-50'}`}>
-                        <span>{bl.numero_bl} <span className="text-gray-400 ml-2">({bl.quantite_recue} reçus)</span></span>
+                        <span>
+                          {bl.numero_bl}
+                          <span className="text-gray-400 ml-2">({bl.quantite_recue} reçus)</span>
+                          <span className="block text-[10px] text-gray-400 font-semibold mt-1">
+                            {bl.fournisseur_name || bl.commande?.fournisseur?.raison_sociale || "Fournisseur N/A"} - {bl.contrat_name || bl.commande?.contrat?.numero_contrat || "Contrat N/A"}
+                          </span>
+                        </span>
                         {form.bon_livraison_ids.includes(String(bl.id)) && <Check className="h-4 w-4" />}
                       </button>
                     )) : <div className="p-4 text-center text-xs text-gray-400 uppercase font-black">Aucun BL disponible</div>}

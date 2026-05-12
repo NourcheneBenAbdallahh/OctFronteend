@@ -40,8 +40,27 @@ export default async function FacturesPage({ searchParams }: PageProps) {
       commande: item.commande ? {
         id: item.commande.id,
         numero_commande: item.commande.numero_commande,
-        prix_unitaire: 0 // Valeur par défaut, sera calculé différemment
+        prix_unitaire: 0, // Valeur par défaut, sera calculé différemment
+        fournisseur_id: item.commande.fournisseur_id,
+        contrat_id: item.commande.contrat_id,
+        fournisseur: item.commande.fournisseur
+          ? {
+              id: item.commande.fournisseur.id,
+              raison_sociale: item.commande.fournisseur.raison_sociale,
+            }
+          : undefined,
+        contrat: item.commande.contrat
+          ? {
+              id: item.commande.contrat.id,
+              numero_contrat: item.commande.contrat.numero_contrat,
+            }
+          : undefined,
       } : undefined
+      ,
+      fournisseur_id: item.commande?.fournisseur_id,
+      contrat_id: item.commande?.contrat_id,
+      fournisseur_name: item.commande?.fournisseur?.raison_sociale,
+      contrat_name: item.commande?.contrat?.numero_contrat,
     })
   );
 

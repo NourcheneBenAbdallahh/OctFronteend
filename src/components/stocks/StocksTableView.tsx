@@ -7,9 +7,10 @@ interface Props {
   rows: Stock[];
   onView?: (stock: Stock) => void;
   onDelete?: (stock: Stock) => void;
+  focusedId?: string | number | null;
 }
 
-export default function StocksTableView({ rows, onView, onDelete }: Props) {
+export default function StocksTableView({ rows, onView, onDelete, focusedId }: Props) {
   if (!rows.length) return null;
 
   return (
@@ -29,7 +30,15 @@ export default function StocksTableView({ rows, onView, onDelete }: Props) {
           {rows.map((stock) => {
             const isEntree = stock.sens === "entree";
             return (
-              <tr key={stock.id} className="group hover:bg-[#F2F7F7]/50 transition-colors">
+              <tr
+                id={`stock-row-${stock.id}`}
+                key={stock.id}
+                className={`group transition-colors ${
+                  String(focusedId ?? "") === String(stock.id)
+                    ? "bg-indigo-50 ring-2 ring-indigo-300"
+                    : "hover:bg-[#F2F7F7]/50"
+                }`}
+              >
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isEntree ? 'bg-emerald-50 text-emerald-600' : 'bg-orange-50 text-orange-600'}`}>

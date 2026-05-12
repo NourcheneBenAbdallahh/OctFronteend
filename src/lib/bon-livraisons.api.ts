@@ -49,6 +49,16 @@ const BON_LIVRAISON_FIELDS = `
   commande {
     id
     numero_commande
+    fournisseur_id
+    contrat_id
+    fournisseur {
+      id
+      raison_sociale
+    }
+    contrat {
+      id
+      numero_contrat
+    }
   }
 `;
 

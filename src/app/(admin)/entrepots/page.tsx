@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   fetchEntrepots,
   createEntrepot,
@@ -47,6 +48,8 @@ const LocalPagination = ({
 );
 
 export default function EntrepotsPage() {
+  const searchParams = useSearchParams();
+  const focusId = searchParams.get("focus");
   const [items, setItems] = useState<Entrepot[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -72,6 +75,18 @@ export default function EntrepotsPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (!focusId || items.length === 0) return;
+    const target = items.find((it) => String(it.id) === String(focusId));
+    if (!target) return;
+
+    const timer = window.setTimeout(() => {
+      const el = document.getElementById(`entrepot-card-${target.id}`);
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 180);
+    return () => window.clearTimeout(timer);
+  }, [focusId, items]);
 
   const filteredItems = useMemo(() => {
     return items.filter((it) => {
@@ -177,6 +192,7 @@ export default function EntrepotsPage() {
           <>
             <EntrepotsListView
               rows={paginatedItems}
+              focusedId={focusId}
               onEdit={(it) => {
                 setEditingItem(it);
                 setIsModalOpen(true);

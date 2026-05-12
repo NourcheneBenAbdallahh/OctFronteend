@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { LayoutGrid, List } from "lucide-react";
 import type {
   Stock,
@@ -53,6 +54,8 @@ const LocalPagination = ({
 );
 
 export default function StocksClient({ initialStocks }: Props) {
+  const searchParams = useSearchParams();
+  const focusId = searchParams.get("focus");
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
   const [rows, setRows] = useState<Stock[]>(initialStocks);
   const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
@@ -173,6 +176,29 @@ if (filters.sort === "quantite_asc") {
   }, [filteredRows, currentPage, itemsPerPage]);
 
   useEffect(() => {
+    if (!focusId) return;
+    setViewMode("table");
+  }, [focusId]);
+
+  useEffect(() => {
+    if (!focusId || viewMode !== "table") return;
+    const targetIndex = filteredRows.findIndex((row) => String(row.id) === String(focusId));
+    if (targetIndex === -1) return;
+
+    const targetPage = Math.floor(targetIndex / itemsPerPage) + 1;
+    if (targetPage !== currentPage) {
+      setCurrentPage(targetPage);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      const el = document.getElementById(`stock-row-${focusId}`);
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 180);
+    return () => window.clearTimeout(timer);
+  }, [focusId, filteredRows, currentPage, itemsPerPage, viewMode]);
+
+  useEffect(() => {
     setCurrentPage(1);
   }, [filters, viewMode]);
 
@@ -275,6 +301,7 @@ if (filters.sort === "quantite_asc") {
         ) : (
           <StocksTableView
             rows={paginatedRows}
+            focusedId={focusId}
             onView={handleView}
             onDelete={handleDelete}
           />

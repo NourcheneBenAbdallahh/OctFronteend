@@ -41,6 +41,14 @@ const FACTURE_FIELDS = `
   montant_ttc
   jours_retard_total
   statut
+  fournisseur {
+    id
+    raison_sociale
+  }
+  contrat {
+    id
+    numero_contrat
+  }
 
   bon_livraisons {
     id

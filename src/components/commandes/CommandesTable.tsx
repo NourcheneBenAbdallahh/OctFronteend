@@ -187,8 +187,22 @@ const goToPage = (page: number) => {
   router.push(`${pathname}?${params.toString()}`);
 };
 
+  const focusId = searchParams.get("focus");
 
   useEffect(() => { setRows(data); }, [data]);
+
+  useEffect(() => {
+    if (!focusId) return;
+    const target = rows.find((r) => String(r.id) === String(focusId));
+    if (!target) return;
+
+    setExpandedId(target.id);
+    const timer = window.setTimeout(() => {
+      const el = document.getElementById(`commande-row-${target.id}`);
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 180);
+    return () => window.clearTimeout(timer);
+  }, [focusId, rows]);
 
   useEffect(() => {
     async function loadUserNames() {
@@ -488,8 +502,15 @@ const filteredRows = useMemo(() => {
               {filteredRows.map((item) => (
                 <React.Fragment key={item.id}>
                   <tr 
+                    id={`commande-row-${item.id}`}
                     onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
-                    className={`group cursor-pointer transition-all ${expandedId === item.id ? 'bg-indigo-50/40' : 'hover:bg-gray-50/50'}`}
+                    className={`group cursor-pointer transition-all ${
+                      String(focusId ?? "") === String(item.id)
+                        ? "bg-indigo-50 ring-2 ring-indigo-300"
+                        : expandedId === item.id
+                        ? "bg-indigo-50/40"
+                        : "hover:bg-gray-50/50"
+                    }`}
                   >
                     <td className="px-8 py-5">
                        <ChevronDown className={`h-4 w-4 text-gray-300 transition-transform duration-500 ${expandedId === item.id ? 'rotate-180 text-indigo-600' : ''}`} />

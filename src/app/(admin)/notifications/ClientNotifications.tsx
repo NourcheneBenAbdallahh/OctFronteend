@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import PageBreadcrumb from '@/components/common/PageBreadCrumb';
 import { getAlerts, getUnreadAlertsCount, markAlertAsRead, markAllAlertsAsRead, archiveAlert, Alert, AlertSeverity, AlertStatus } from '@/lib/notifications.api';
+import { useAuthStore } from '@/store/useAuthStore';
 
 const severityColors: Record<AlertSeverity, string> = {
   info: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
@@ -37,7 +38,36 @@ const typeLabels: Record<string, string> = {
 
 interface ClientNotificationsProps {}
 
+function formatRelativeDate(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  if (diffMs < 0) {
+    return "a l'instant";
+  }
+
+  const diffSecs = Math.floor(diffMs / 1000);
+  if (diffSecs < 60) {
+    return `il y a ${diffSecs} ${diffSecs > 1 ? "secondes" : "seconde"}`;
+  }
+
+  const diffMins = Math.floor(diffSecs / 60);
+  if (diffMins < 60) {
+    return `il y a ${diffMins} ${diffMins > 1 ? "minutes" : "minute"}`;
+  }
+
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) {
+    return `il y a ${diffHours} ${diffHours > 1 ? "heures" : "heure"}`;
+  }
+
+  const diffDays = Math.floor(diffHours / 24);
+  return `il y a ${diffDays} ${diffDays > 1 ? "jours" : "jour"}`;
+}
+
 export default function ClientNotifications({}: ClientNotificationsProps) {
+  const token = useAuthStore((state) => state.token);
+  const userId = useAuthStore((state) => state.user?.id);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -60,6 +90,24 @@ export default function ClientNotifications({}: ClientNotificationsProps) {
   useEffect(() => {
     fetchAlerts();
   }, [fetchAlerts]);
+
+  useEffect(() => {
+    if (!token || !userId) return;
+    const hubUrl = process.env.NEXT_PUBLIC_MERCURE_HUB_URL;
+    if (!hubUrl) return;
+
+    const topic = `https://oct.tn/users/${userId}/alerts`;
+    const subscribeUrl = `${hubUrl}?topic=${encodeURIComponent(topic)}`;
+    const source = new EventSource(subscribeUrl);
+    source.onmessage = () => {
+      fetchAlerts();
+    };
+    source.onerror = () => {
+      // EventSource retries automatically.
+    };
+
+    return () => source.close();
+  }, [token, userId, fetchAlerts]);
 
   const handleMarkRead = async (id: string) => {
     try {
@@ -205,7 +253,7 @@ export default function ClientNotifications({}: ClientNotificationsProps) {
                           </span>
                         </td>
                         <td className='px-6 py-4 text-gray-500 dark:text-gray-400'>
-                          {alert.created_at ? new Date(alert.created_at).toLocaleString('fr-FR') : '-'}
+                          {alert.created_at ? formatRelativeDate(alert.created_at) : '-'}
                         </td>
                         <td className='px-6 py-4 text-right'>
                           <div className='flex items-center justify-end gap-2'>

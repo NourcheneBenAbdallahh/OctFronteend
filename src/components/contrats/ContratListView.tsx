@@ -8,9 +8,10 @@ interface Props {
   userNamesById: Record<string, string>;
   onEdit: (c: TableContrat) => void;
   onDelete: (id: string | number) => void;
+  focusedId?: string | number | null;
 }
 
-export const ContratListView = ({ rows, userNamesById, onEdit, onDelete }: Props) => (
+export const ContratListView = ({ rows, userNamesById, onEdit, onDelete, focusedId }: Props) => (
   <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
     <table className="w-full text-left border-collapse">
       <thead>
@@ -40,7 +41,15 @@ export const ContratListView = ({ rows, userNamesById, onEdit, onDelete }: Props
           const isLocked = qteRealisee > 0;
 
           return (
-            <tr key={c.id} className="hover:bg-gray-50/50 group transition-all text-[13px]">
+            <tr
+              id={`contrat-row-${c.id}`}
+              key={c.id}
+              className={`group transition-all text-[13px] ${
+                String(focusedId ?? "") === String(c.id)
+                  ? "bg-indigo-50 ring-2 ring-indigo-300"
+                  : "hover:bg-gray-50/50"
+              }`}
+            >
               <td className="px-8 py-6">
                 <span className="text-sm font-black text-gray-900 tracking-tighter uppercase">{c.numero_contrat}</span>
                 <div className="flex flex-col gap-0.5 text-[9px] font-bold text-gray-400 mt-1 uppercase">

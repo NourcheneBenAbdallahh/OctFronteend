@@ -12,9 +12,11 @@ import { listCommandes, normalizeCommande } from "@/lib/commandes.api";
 import { normalizeContrat, TableContrat } from "@/types/contrat";
 import { TableEmballages } from "@/types/emballage";
 import { TableFournisseur } from "@/types/fournisseur";
-import { Calendar, RotateCcw, Filter, ChevronDown, ChevronUp, Download } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { Calendar, RotateCcw, Filter, ChevronDown, ChevronUp, Download, FileSpreadsheet } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { exportContratsCsv, type ContratUsageHistoryCsvRow } from "@/lib/contrats.csv";
 
 // Sous-composant interne pour la pagination en français
 const LocalPagination = ({ 
@@ -48,6 +50,8 @@ const LocalPagination = ({
 );
 
 export default function ContratTable({ data }: { data?: TableContrat[] }) {
+  const searchParams = useSearchParams();
+  const focusId = searchParams.get("focus");
   const token = useAuthStore((state) => state.token);
   const [rows, setRows] = useState<TableContrat[]>(data ? data.map(normalizeContrat) : []);
   const [loading, setLoading] = useState(false);
@@ -89,6 +93,7 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
   const [exportYearSearch, setExportYearSearch] = useState<string>("");
   const [exportMonthSearch, setExportMonthSearch] = useState<string>("");
   const [exporting, setExporting] = useState(false);
+  const [exportingCsv, setExportingCsv] = useState(false);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -492,12 +497,48 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
   };
 
   const handleExport = async () => {
-    if (exporting) return;
+    if (exporting || exportingCsv) return;
     setExporting(true);
     try {
       await handleExportPdf();
     } finally {
       setExporting(false);
+    }
+  };
+
+  const handleExportCsv = async () => {
+    if (!exportRows.length) {
+      alert("Aucune donnee a exporter avec ces parametres.");
+      return;
+    }
+    if (exporting || exportingCsv) return;
+    setExportingCsv(true);
+    try {
+      const period =
+        exportPeriodType === "month" && exportMonth
+          ? `${monthLabel(exportMonth)} ${exportYear || ""}`
+          : exportYear || "Toutes periodes";
+
+      let history: ContratUsageHistoryCsvRow[] = [];
+      if (exportContratId) {
+        const raw = await getContratUsageHistory();
+        history = raw.map((h) => ({
+          date: h.date,
+          numero: h.numero,
+          statut: h.statut,
+          qteCommandee: h.qteCommandee,
+          qteRecue: h.qteRecue,
+          cumulRealise: h.cumulRealise,
+          resteCommande: h.resteCommande,
+        }));
+      }
+
+      exportContratsCsv(exportRows, exportStats, period, history);
+    } catch (e) {
+      console.error(e);
+      alert("Erreur lors de l'export CSV.");
+    } finally {
+      setExportingCsv(false);
     }
   };
 
@@ -563,6 +604,24 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
     const start = (currentPage - 1) * itemsPerPage;
     return filteredRows.slice(start, start + itemsPerPage);
   }, [filteredRows, currentPage]);
+
+  useEffect(() => {
+    if (!focusId) return;
+    const targetIndex = filteredRows.findIndex((row) => String(row.id) === String(focusId));
+    if (targetIndex === -1) return;
+
+    const targetPage = Math.floor(targetIndex / itemsPerPage) + 1;
+    if (targetPage !== currentPage) {
+      setCurrentPage(targetPage);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      const el = document.getElementById(`contrat-row-${focusId}`);
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 180);
+    return () => window.clearTimeout(timer);
+  }, [focusId, filteredRows, currentPage]);
 
   // Reset la page si on recherche
   useEffect(() => {
@@ -1306,15 +1365,24 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
           </div>
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex flex-wrap justify-end gap-2">
           <button
             type="button"
             onClick={handleExport}
-            disabled={exporting}
+            disabled={exporting || exportingCsv}
             className="inline-flex items-center gap-2 rounded-2xl bg-gray-900 text-white px-6 py-3 text-[11px] font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-lg shadow-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Download className="h-4 w-4" />
-            {exporting ? "Export en cours..." : "Exporter PDF"}
+            {exporting ? "Export PDF..." : "Exporter PDF"}
+          </button>
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            disabled={exporting || exportingCsv}
+            className="inline-flex items-center gap-2 rounded-2xl border-2 border-gray-900 bg-white text-gray-900 px-6 py-3 text-[11px] font-black uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all shadow-lg shadow-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            {exportingCsv ? "Export CSV..." : "Exporter CSV"}
           </button>
         </div>
         </>
@@ -1324,6 +1392,7 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
       <div className="flex-1">
         <ContratListView
           rows={paginatedRows}
+          focusedId={focusId}
           userNamesById={userNamesById}
           onEdit={(c) => { setEditing(c); setForm(c); setIsOpen(true); }}
           onDelete={async (id) => {
