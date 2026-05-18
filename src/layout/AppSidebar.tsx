@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useRef, useState,useCallback } from "react";
+import React, { useEffect, useMemo, useRef, useState,useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -22,7 +22,9 @@ import { Receipt } from "lucide-react";
 import { Truck } from "lucide-react";
 import { Boxes } from "lucide-react";
 import { ShoppingCart } from "lucide-react";
-import { ArrowLeftRight } from "lucide-react";
+import { ArrowLeftRight, BarChart3, Ruler, Users } from "lucide-react";
+import { canAccessPath, sidebarBiNavLabel } from "@/lib/access";
+import { useAuthStore } from "@/store/useAuthStore";
 type NavItem = {
   name: string;
   icon: React.ReactNode;
@@ -35,6 +37,21 @@ const navItems: NavItem[] = [
     icon: <GridIcon />,
     name: "Dashboard",
     path: "/",
+  },
+  {
+    icon: <BarChart3 className="w-5 h-5" />,
+    name: "Tableau BI",
+    path: "/bi",
+  },
+  {
+    icon: <Users className="w-5 h-5" />,
+    name: "Utilisateurs",
+    path: "/users",
+  },
+  {
+    icon: <Ruler className="w-5 h-5" />,
+    name: "Unités de mesure",
+    path: "/unites-mesure",
   },
     {
   icon: <BoxCubeIcon />,
@@ -98,36 +115,43 @@ const navItems: NavItem[] = [
     path: "/calendar",
   },
   {
-    icon: <UserCircleIcon />,
-    name: "User Profile",
-    path: "/profile",
-  },
-
-  {
-    name: "Pages",
-    icon: <PageIcon />,
-    subItems: [
-      { name: "404 Error", path: "/error-404", pro: false },
-    ],
-  },
-];
-
-const othersItems: NavItem[] = [
-  {
     icon: <PieChartIcon />,
-    name: "Charts",
-    subItems: [
-      { name: "Line Chart", path: "/line-chart", pro: false },
-      { name: "Bar Chart", path: "/bar-chart", pro: false },
-    ],
-  },
- 
- 
+    name: "Analytics",  
+    path: "/prediction",
+  }
+  
+
 ];
+
+function navItemsVisibleForRole(role: string | undefined): NavItem[] {
+  const out: NavItem[] = [];
+  for (const nav of navItems) {
+    if (nav.subItems?.length) {
+      const subs = nav.subItems.filter(
+        (s) => s.path && canAccessPath(s.path, role)
+      );
+      if (subs.length === 0) continue;
+      out.push({ ...nav, subItems: subs });
+      continue;
+    }
+    if (nav.path && canAccessPath(nav.path, role)) {
+      const item =
+        nav.path === "/bi" ? { ...nav, name: sidebarBiNavLabel(role) } : nav;
+      out.push(item);
+    }
+  }
+  return out;
+}
 
 const AppSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const pathname = usePathname();
+  const userRole = useAuthStore((s) => s.user?.role);
+
+  const visibleNavItems = useMemo(
+    () => navItemsVisibleForRole(userRole),
+    [userRole]
+  );
 
   const renderMenuItems = (
     navItems: NavItem[],
@@ -268,32 +292,6 @@ const AppSidebar: React.FC = () => {
    const isActive = useCallback((path: string) => path === pathname, [pathname]);
 
   useEffect(() => {
-    // Check if the current path matches any submenu item
-    let submenuMatched = false;
-    ["main", "others"].forEach((menuType) => {
-      const items = menuType === "main" ? navItems : othersItems;
-      items.forEach((nav, index) => {
-        if (nav.subItems) {
-          nav.subItems.forEach((subItem) => {
-            if (isActive(subItem.path)) {
-              setOpenSubmenu({
-                type: menuType as "main" | "others",
-                index,
-              });
-              submenuMatched = true;
-            }
-          });
-        }
-      });
-    });
-
-    // If no submenu item matches, close the open submenu
-    if (!submenuMatched) {
-      setOpenSubmenu(null);
-    }
-  }, [pathname,isActive]);
-
-  useEffect(() => {
     // Set the height of the submenu items when the submenu is opened
     if (openSubmenu !== null) {
       const key = `${openSubmenu.type}-${openSubmenu.index}`;
@@ -334,39 +332,45 @@ const AppSidebar: React.FC = () => {
       onMouseEnter={() => !isExpanded && setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div
-        className={`py-8 flex  ${
-          !isExpanded && !isHovered ? "lg:justify-center" : "justify-start"
-        }`}
-      >
-        <Link href="/">
-          {isExpanded || isHovered || isMobileOpen ? (
-            <>
-              <Image
-                className="dark:hidden"
-                src="/images/logo/logo.svg"
-                alt="Logo"
-                width={150}
-                height={40}
-              />
-              <Image
-                className="hidden dark:block"
-                src="/images/logo/logo-dark.svg"
-                alt="Logo"
-                width={150}
-                height={40}
-              />
-            </>
-          ) : (
-            <Image
-              src="/images/logo/logo-icon.svg"
-              alt="Logo"
-              width={32}
-              height={32}
-            />
-          )}
-        </Link>
+     <div
+  className={`py-10 flex items-center transition-all duration-300 ${
+    !isExpanded && !isHovered ? "justify-center" : "justify-start px-6"
+  }`}
+>
+  <Link href="/" className="flex items-center justify-center w-full">
+    {isExpanded || isHovered || isMobileOpen ? (
+      <div className="relative w-full flex justify-start">
+        <Image
+          className="dark:hidden object-contain"
+          src="/images/logo/logoOCT.png"
+          alt="Logo"
+          width={160} // Taille augmentée pour la visibilité
+          height={45} 
+          style={{ width: "auto", height: "auto" }}
+          priority
+        />
+        {/* Si tu n'as pas encore de logo dark, tu peux utiliser un filtre CSS temporaire */}
+        <Image
+          className="hidden dark:block object-contain dark:brightness-200"
+          src="/images/logo/logoOCT.png" 
+          alt="Logo"
+          width={160}
+          height={45}
+          style={{ width: "auto", height: "auto" }}
+        />
       </div>
+    ) : (
+      /* Version réduite (Sidebar repliée) : On utilise l'icône seule */
+      <Image
+        src="/images/logo/logo-icon.svg"
+        alt="Logo Icon"
+        width={35}
+        height={35}
+        className="min-w-[35px]"
+      />
+    )}
+  </Link>
+</div>
       <div className="flex flex-col overflow-y-auto duration-300 ease-linear no-scrollbar">
         <nav className="mb-6">
           <div className="flex flex-col gap-4">
@@ -384,25 +388,10 @@ const AppSidebar: React.FC = () => {
                   <HorizontaLDots />
                 )}
               </h2>
-              {renderMenuItems(navItems, "main")}
+              {renderMenuItems(visibleNavItems, "main")}
             </div>
 
-            <div className="">
-              <h2
-                className={`mb-4 text-xs uppercase flex leading-[20px] text-gray-400 ${
-                  !isExpanded && !isHovered
-                    ? "lg:justify-center"
-                    : "justify-start"
-                }`}
-              >
-                {isExpanded || isHovered || isMobileOpen ? (
-                  "Others"
-                ) : (
-                  <HorizontaLDots />
-                )}
-              </h2>
-              {renderMenuItems(othersItems, "others")}
-            </div>
+       
           </div>
         </nav>
         {isExpanded || isHovered || isMobileOpen ? <SidebarWidget /> : null}

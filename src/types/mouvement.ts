@@ -9,8 +9,10 @@ export type EmballageRef = {
 
 export type EntrepotRef = {
   id: string;
+  nom: string; 
   adresse: string;
 };
+
 
 export type LotRef = {
   id: string;
@@ -43,6 +45,7 @@ export type MouvementStock = {
   lot?: LotRef | null;
   entrepotSource?: EntrepotRef | null;
   entrepotDestination?: EntrepotRef | null;
+  user?: { id: string; name: string } | null;
 };
 
 export type MouvementFormState = {
@@ -63,4 +66,12 @@ export type MouvementsPageStats = {
   sortiesProduction: number;
   pertes: number;
   surplus: number;
+};  
+
+export type PaginationInfo = {
+  currentPage: number;
+  lastPage: number;
+  total: number;
+  perPage: number;
+  hasMorePages: boolean;
 };

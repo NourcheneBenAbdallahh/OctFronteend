@@ -293,6 +293,21 @@
   }
 }
 
+/** Liste déroulante unités : scrollbar visible, marque OCT (#00A09D). */
+@utility unite-mesure-picker-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(0 160 157 / 0.55) rgb(241 245 249);
+  &::-webkit-scrollbar {
+    @apply w-2;
+  }
+  &::-webkit-scrollbar-track {
+    @apply rounded-full bg-gray-100 dark:bg-gray-800/80;
+  }
+  &::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-[#00A09D]/35 hover:bg-[#00A09D]/60 dark:bg-[#00A09D]/45;
+  }
+}
+
 .dark .custom-scrollbar::-webkit-scrollbar-thumb {
   background-color: #344054;
 }

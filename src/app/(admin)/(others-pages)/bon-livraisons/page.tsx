@@ -8,6 +8,9 @@ import {
 import { listEmballages } from "@/lib/emballages.api";
 import { listCommandes } from "@/lib/commandes.api";
 import { fetchEntrepots } from "@/lib/entrepot.api";
+import { listUnitesMesure } from "@/lib/unites-mesure.api";
+import { requireServerAccessToken } from "@/lib/requireServerAccessToken";
+import type { UniteMesure } from "@/types/unite-mesure";
 import {
   CommandeOption,
   EmballageOption,
@@ -24,19 +27,23 @@ type PageProps = {
 export default async function BonLivraisonsPage({
   searchParams,
 }: PageProps) {
-  const params = await searchParams;
-  const currentPage = Number(params?.page || "1");
+  await searchParams;
+
+  const token = await requireServerAccessToken();
+  const auth = { token };
 
   const [
     bonLivraisonsResult,
     emballagesResult,
     commandesResult,
     entrepotsResult,
+    unitesMesureResult,
   ] = await Promise.all([
-    listBonLivraisons(currentPage),
-    listEmballages(1, 100),
-    listCommandes(1, 100),
-    fetchEntrepots(),
+    listBonLivraisons(1, 1000, auth),
+    listEmballages(1, 100, auth),
+    listCommandes(1, 100, auth),
+    fetchEntrepots(auth),
+    listUnitesMesure(auth),
   ]);
 
   const rows: TableBonLivraison[] =
@@ -46,12 +53,17 @@ export default async function BonLivraisonsPage({
     emballagesResult.emballages.data.map((item: any) => ({
       id: item.id,
       label: `${item.code} - ${item.name}`,
+      capacity_unit: item.capacity_unit ?? null,
     }));
+
+  const unitesMesure: UniteMesure[] = unitesMesureResult.unitesMesure ?? [];
   const commandes: CommandeOption[] =
     commandesResult.commandes.data.map((item: any) => ({
       id: item.id,
       numero_commande: item.numero_commande,
       quantite: item.quantite,
+      quantite_recue_total: Number(item.quantite_recue_total ?? 0),
+      reste: Number(item.reste ?? 0),
       emballage_id: item.emballage_id,
       entrepot_id: item.entrepot_id,
       statut: item.statut,
@@ -61,8 +73,6 @@ export default async function BonLivraisonsPage({
     id: item.id,
     label: item.nom || `Entrepot #${item.id}`,
   }));
-console.log(commandes);
-
   return (
     <div>
       <div className="space-y-6">
@@ -72,6 +82,7 @@ console.log(commandes);
             emballages={emballages}
             commandes={commandes}
             entrepots={entrepots}
+            unitesMesure={unitesMesure}
           />
       </div>
     </div>

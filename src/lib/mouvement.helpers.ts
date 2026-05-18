@@ -5,6 +5,7 @@ import {
   MouvementFormState,
   MouvementsPageStats,
   MouvementStock,
+  MouvementType,
 } from "@/types/mouvement";
 import { MOUVEMENT_TYPES, needsDestination, needsLot, needsSource } from "./mouvement.config";
 
@@ -24,6 +25,13 @@ export function formatQuantity(value?: number | null) {
 export function formatEmballageLabel(emballage?: EmballageRef | null) {
   if (!emballage) return "-";
   return `${emballage.code} · ${emballage.name}`;
+}
+
+/** Statut API GraphQL : BROUILLON → boutons Valider / Supprimer affichés. */
+export function isMouvementBrouillon(statut: string | undefined | null): boolean {
+  return String(statut ?? "")
+    .toUpperCase()
+    .trim() === "BROUILLON";
 }
 
 export function formatFlow(m: MouvementStock) {
@@ -106,6 +114,17 @@ export function getSelectedLotAvailable(lots: LotDisponible[], lotId: string) {
   return lots.find((l) => l.lot_id === lotId)?.stock_disponible ?? null;
 }
 
+/** Entrepôt servant au calcul des lots disponibles (transferts/production → source ; surplus → destination). */
+export function getEntrepotIdForLots(type: MouvementType, form: MouvementFormState): string {
+  if (needsSource(type)) {
+    return form.sourceId;
+  }
+  if (needsDestination(type) && !needsSource(type)) {
+    return form.destId;
+  }
+  return "";
+}
+
 export function validateForm(form: MouvementFormState) {
   if (!form.emballageId) return "L'emballage est requis.";
 
@@ -138,12 +157,16 @@ export function validateQuantityAgainstLot(
 ) {
   if (selectedLotAvailable == null) return null;
 
-  if (["PRD", "CDD", "PTE"].includes(form.type)) {
-    if (form.quantite !== "" && Number(form.quantite) > selectedLotAvailable) {
-      return `La quantité demandée dépasse le stock disponible du lot (${formatQuantity(
-        selectedLotAvailable
-      )}).`;
-    }
+  const checkQty =
+    ["PRD", "CDD", "PTE", "EMC"].includes(form.type) ||
+    (form.type === "SPL" && Boolean(form.lotId));
+
+  if (!checkQty) return null;
+
+  if (form.quantite !== "" && Number(form.quantite) > selectedLotAvailable) {
+    return `La quantité dépasse le stock disponible pour ce lot (${formatQuantity(
+      selectedLotAvailable
+    )} disponible).`;
   }
 
   return null;

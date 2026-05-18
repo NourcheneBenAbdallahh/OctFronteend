@@ -57,6 +57,8 @@ export type CommandesPaginatorInfo = {
 export type EmballageOption = {
   id: string | number;
   label: string;
+  /** Unité de capacité / quantité de référence sur l'emballage (ex. KG, G, L). */
+  capacity_unit: string | null;
 };
 
 export type EntrepotOption = {

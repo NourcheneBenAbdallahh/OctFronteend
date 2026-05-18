@@ -18,7 +18,6 @@ interface Props {
   stock: Stock;
   onView?: (stock: Stock) => void;
   onEdit?: (stock: Stock) => void;
-  onDelete?: (stock: Stock) => void;
 }
 
 function formatDate(date?: string | null) {
@@ -32,7 +31,7 @@ function formatDate(date?: string | null) {
   });
 }
 
-export default function StockCard({ stock, onView, onDelete }: Props) {
+export default function StockCard({ stock, onView }: Props) {
   const isEntree = stock.sens === "entree";
 
   return (
@@ -66,12 +65,7 @@ export default function StockCard({ stock, onView, onDelete }: Props) {
           >
             <Eye size={20} />
           </button>
-          <button
-            onClick={() => onDelete?.(stock)}
-            className="w-12 h-12 flex items-center justify-center rounded-2xl bg-red-50 text-red-300 hover:text-red-600 hover:bg-red-100 transition-all"
-          >
-            <Trash2 size={20} />
-          </button>
+          
         </div>
       </div>
 

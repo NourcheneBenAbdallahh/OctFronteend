@@ -11,6 +11,7 @@ import {
 import {normalizeFournisseur } from "@/types/fournisseur";
 
 import { listContrats } from "@/lib/contrats.api";
+import { listUnitesMesure } from "@/lib/unites-mesure.api";
 import {
   ContratForCommande,
   EmballageOption,
@@ -18,6 +19,8 @@ import {
   FournisseurOption,
   TableCommande,
 } from "@/types/commandes";
+import type { UniteMesure } from "@/types/unite-mesure";
+import { requireServerAccessToken } from "@/lib/requireServerAccessToken";
 
 type PageProps = {
   searchParams?: Promise<{
@@ -28,6 +31,8 @@ type PageProps = {
 export default async function CommandesPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const currentPage = Number(params?.page || "1");
+  const token = await requireServerAccessToken();
+  const auth = { token };
 
   const [
     commandesResult,
@@ -35,12 +40,14 @@ export default async function CommandesPage({ searchParams }: PageProps) {
     entrepotsResult,
     fournisseursResult,
     contratsResult,
+    unitesMesureResult,
   ] = await Promise.all([
-    listCommandes(currentPage, 10),
-    listEmballages(1, 100),
-    fetchEntrepots(),
-    listFournisseurs(),
-    listContrats(),
+    listCommandes(currentPage, 10, auth),
+    listEmballages(1, 100, auth),
+    fetchEntrepots(auth),
+    listFournisseurs(auth),
+    listContrats(auth),
+    listUnitesMesure(auth),
   ]);
 
   const rows: TableCommande[] =
@@ -50,7 +57,10 @@ export default async function CommandesPage({ searchParams }: PageProps) {
     emballagesResult.emballages.data.map((item: any) => ({
       id: item.id,
       label: `${item.code} - ${item.name}`,
+      capacity_unit: item.capacity_unit ?? null,
     }));
+
+  const unitesMesure: UniteMesure[] = unitesMesureResult.unitesMesure ?? [];
 
   const entrepots: EntrepotOption[] = entrepotsResult.map((item) => ({
     id: item.id,
@@ -83,6 +93,7 @@ export default async function CommandesPage({ searchParams }: PageProps) {
             data={rows}
             pagination={commandesResult.commandes.paginatorInfo}
             emballages={emballages}
+            unitesMesure={unitesMesure}
             entrepots={entrepots}
             fournisseurs={fournisseurs}
             contrats={contrats}

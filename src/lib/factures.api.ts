@@ -1,4 +1,4 @@
-import { graphqlRequest } from "./graphqlClient";
+import { graphqlRequest, type GraphqlRequestOptions } from "./graphqlClient";
 import {
   CreateFactureInput,
   Facture,
@@ -7,12 +7,18 @@ import {
   UpdateFactureInput,
 } from "@/types/facture";
 
-export function normalizeFacture(f: Facture): TableFacture {
+export function normalizeFacture(f: any): TableFacture {
   return {
     ...f,
     id: f.id,
+    bon_livraisons: Array.isArray(f.bon_livraisons) ? f.bon_livraisons : [],
+    montant_ht: Number(f.montant_ht || 0),
+    montant_penalites: Number(f.montant_penalites || 0),
+    montant_ht_net: Number(f.montant_ht_net || 0),
+    montant_ttc: Number(f.montant_ttc || 0),
+    jours_retard_total: Number(f.jours_retard_total || 0),
     statut:
-      f.statut === "VALIDE" || f.statut === "PAYE"
+      f.statut === "VALIDE" || f.statut === "PAYE" || f.statut === "ANNULE"
         ? f.statut
         : "BROUILLON",
   };
@@ -30,17 +36,27 @@ const FACTURE_FIELDS = `
   numero_facture
   date_facture
   montant_ht
+  montant_penalites
+  montant_ht_net
   montant_ttc
+  jours_retard_total
   statut
-  emballage_id
-  quantite_facturee
-  fournisseur_id
-  contrat_id
-  commande_id
-  bon_livraison_id
-  valide_par
-  created_at
-  updated_at
+  fournisseur {
+    id
+    raison_sociale
+  }
+  contrat {
+    id
+    numero_contrat
+  }
+
+  bon_livraisons {
+    id
+    numero_bl
+    date_reception
+    quantite_recue
+    is_factured
+  }
 `;
 
 const LIST_FACTURES = `
@@ -50,30 +66,16 @@ const LIST_FACTURES = `
         ${FACTURE_FIELDS}
       }
       paginatorInfo {
-        count
         currentPage
         lastPage
-        perPage
         total
       }
     }
   }
 `;
 
-export async function listFactures(page = 1) {
-  return graphqlRequest<ListFacturesResponse>(LIST_FACTURES, { page });
-}
-
-const GET_FACTURE = `
-  query GetFacture($id: ID!) {
-    facture(id: $id) {
-      ${FACTURE_FIELDS}
-    }
-  }
-`;
-
-export async function getFacture(id: string | number) {
-  return graphqlRequest<{ facture: Facture | null }>(GET_FACTURE, { id });
+export async function listFactures(page = 1, opts?: GraphqlRequestOptions) {
+  return graphqlRequest<ListFacturesResponse>(LIST_FACTURES, { page }, opts);
 }
 
 const CREATE_FACTURE = `
@@ -96,28 +98,22 @@ const UPDATE_FACTURE = `
   }
 `;
 
-function sanitizeFactureInput(input: UpdateFactureInput) {
-  const {
-    numero_facture,
-    date_facture,
-    montant_ht,
-    emballage_id,
-    quantite_facturee,
-    commande_id,
-    statut,
-  } = input;
+function sanitizeFactureInput(input: Partial<UpdateFactureInput>) {
+  const allowedFields = [
+    "numero_facture",
+    "date_facture",
+    "montant_ht",
+    "bon_livraison_ids",
+    "statut",
+  ];
 
-  const sanitized: UpdateFactureInput = {};
+  const sanitized: Record<string, unknown> = {};
 
-  if (numero_facture !== undefined) sanitized.numero_facture = numero_facture;
-  if (date_facture !== undefined) sanitized.date_facture = date_facture;
-  if (montant_ht !== undefined) sanitized.montant_ht = montant_ht;
-  if (emballage_id !== undefined) sanitized.emballage_id = emballage_id;
-  if (quantite_facturee !== undefined) {
-    sanitized.quantite_facturee = quantite_facturee;
-  }
-  if (commande_id !== undefined) sanitized.commande_id = commande_id;
-  if (statut !== undefined) sanitized.statut = statut;
+  allowedFields.forEach((field) => {
+    if (input[field as keyof UpdateFactureInput] !== undefined) {
+      sanitized[field] = input[field as keyof UpdateFactureInput];
+    }
+  });
 
   return sanitized;
 }

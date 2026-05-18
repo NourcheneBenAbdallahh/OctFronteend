@@ -1,11 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import type { Stock, StockFiltersState, StocksStats as StocksStatsType } from "@/types/stock";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { LayoutGrid, List } from "lucide-react";
+import type {
+  Stock,
+  StockFiltersState,
+  StocksStats as StocksStatsType,
+} from "@/types/stock";
 import StocksHeader from "./StocksHeader";
 import StocksStats from "./StocksStats";
 import StocksFilters from "./StocksFilters";
 import StocksCardsView from "./StocksCardsView";
+import StocksTableView from "./StocksTableView";
 import StockDetailsDrawer from "./StockDetailsDrawer";
 import StockEditDrawer from "./StockEditDrawer";
 import { deleteStock, updateStock } from "@/lib/stock.api";
@@ -14,31 +21,45 @@ interface Props {
   initialStocks: Stock[];
 }
 
-function isToday(dateStr?: string | null) {
-  if (!dateStr) return false;
-  const date = new Date(dateStr);
-  const now = new Date();
+const LocalPagination = ({
+  currentPage,
+  totalPages,
+  onPageChange,
+}: {
+  currentPage: number;
+  totalPages: number;
+  onPageChange: (p: number) => void;
+}) => (
+  <div className="flex items-center gap-4">
+    <button
+      onClick={() => onPageChange(currentPage - 1)}
+      disabled={currentPage === 1}
+      className="px-4 py-2 text-xs font-bold uppercase tracking-widest bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-30 transition-all shadow-sm"
+    >
+      Précédent
+    </button>
 
-  return (
-    date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate()
-  );
-}
+    <div className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-x px-6 border-gray-100">
+      Page {currentPage} sur {totalPages}
+    </div>
 
-function normalizeDateStart(dateStr: string) {
-  return new Date(`${dateStr}T00:00:00`);
-}
-
-function normalizeDateEnd(dateStr: string) {
-  return new Date(`${dateStr}T23:59:59`);
-}
+    <button
+      onClick={() => onPageChange(currentPage + 1)}
+      disabled={currentPage === totalPages || totalPages === 0}
+      className="px-4 py-2 text-xs font-bold uppercase tracking-widest bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-30 transition-all shadow-sm"
+    >
+      Suivant
+    </button>
+  </div>
+);
 
 export default function StocksClient({ initialStocks }: Props) {
+  const searchParams = useSearchParams();
+  const focusId = searchParams.get("focus");
+  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
   const [rows, setRows] = useState<Stock[]>(initialStocks);
   const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-
   const [editingStock, setEditingStock] = useState<Stock | null>(null);
   const [editOpen, setEditOpen] = useState(false);
 
@@ -53,16 +74,18 @@ export default function StocksClient({ initialStocks }: Props) {
     dateTo: "",
   });
 
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = viewMode === "grid" ? 6 : 8;
+
   const filteredRows = useMemo(() => {
     let data = [...rows];
     const q = filters.search.trim().toLowerCase();
 
     if (q) {
       data = data.filter((stock) => {
-        const entrepot =
-          stock.entrepot?.nom || stock.entrepot?.name || "";
-        const emballage =
-          stock.emballage?.name || stock.emballage?.code || "";
+        const entrepot = stock.entrepot?.nom || stock.entrepot?.name || "";
+        const emballage = stock.emballage?.name || stock.emballage?.code || "";
         const user = stock.user?.name || stock.user?.email || "";
         const lot = stock.lot?.code_lot || "";
 
@@ -77,21 +100,24 @@ export default function StocksClient({ initialStocks }: Props) {
     }
 
     if (filters.entrepot) {
-      data = data.filter(
-        (stock) => String(stock.entrepot?.id || stock.entrepot_id) === filters.entrepot
-      );
+      data = data.filter((stock) => {
+        const entrepot = stock.entrepot?.nom || stock.entrepot?.name || "";
+        return entrepot === filters.entrepot;
+      });
     }
 
     if (filters.emballage) {
-      data = data.filter(
-        (stock) => String(stock.emballage?.id || stock.emballage_id) === filters.emballage
-      );
+      data = data.filter((stock) => {
+        const emballage = stock.emballage?.name || stock.emballage?.code || "";
+        return emballage === filters.emballage;
+      });
     }
 
     if (filters.user) {
-      data = data.filter(
-        (stock) => String(stock.user?.id || stock.user_id) === filters.user
-      );
+      data = data.filter((stock) => {
+        const user = stock.user?.name || stock.user?.email || "";
+        return user === filters.user;
+      });
     }
 
     if (filters.sens) {
@@ -99,33 +125,82 @@ export default function StocksClient({ initialStocks }: Props) {
     }
 
     if (filters.dateFrom) {
-      const from = normalizeDateStart(filters.dateFrom);
-      data = data.filter((stock) => new Date(stock.date_stock) >= from);
+      const from = new Date(filters.dateFrom);
+      data = data.filter((stock) => {
+        if (!stock.date_stock) return false;
+        return new Date(stock.date_stock) >= from;
+      });
     }
 
     if (filters.dateTo) {
-      const to = normalizeDateEnd(filters.dateTo);
-      data = data.filter((stock) => new Date(stock.date_stock) <= to);
+      const to = new Date(filters.dateTo);
+      to.setHours(23, 59, 59, 999);
+      data = data.filter((stock) => {
+        if (!stock.date_stock) return false;
+        return new Date(stock.date_stock) <= to;
+      });
     }
 
-    data.sort((a, b) => {
-      if (filters.sort === "recent") {
-        return new Date(b.date_stock).getTime() - new Date(a.date_stock).getTime();
-      }
+if (filters.sort === "recent") {
+  data.sort(
+    (a, b) =>
+      new Date(b.date_stock || 0).getTime() -
+      new Date(a.date_stock || 0).getTime()
+  );
+}
 
-      if (filters.sort === "oldest") {
-        return new Date(a.date_stock).getTime() - new Date(b.date_stock).getTime();
-      }
+if (filters.sort === "oldest") {
+  data.sort(
+    (a, b) =>
+      new Date(a.date_stock || 0).getTime() -
+      new Date(b.date_stock || 0).getTime()
+  );
+}
 
-      if (filters.sort === "quantite_desc") {
-        return Number(b.quantite) - Number(a.quantite);
-      }
+if (filters.sort === "quantite_desc") {
+  data.sort((a, b) => Number(b.quantite || 0) - Number(a.quantite || 0));
+}
 
-      return Number(a.quantite) - Number(b.quantite);
-    });
+if (filters.sort === "quantite_asc") {
+  data.sort((a, b) => Number(a.quantite || 0) - Number(b.quantite || 0));
+}
 
     return data;
   }, [rows, filters]);
+
+  const totalPages = Math.ceil(filteredRows.length / itemsPerPage);
+
+  const paginatedRows = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredRows.slice(start, start + itemsPerPage);
+  }, [filteredRows, currentPage, itemsPerPage]);
+
+  useEffect(() => {
+    if (!focusId) return;
+    setViewMode("table");
+  }, [focusId]);
+
+  useEffect(() => {
+    if (!focusId || viewMode !== "table") return;
+    const targetIndex = filteredRows.findIndex((row) => String(row.id) === String(focusId));
+    if (targetIndex === -1) return;
+
+    const targetPage = Math.floor(targetIndex / itemsPerPage) + 1;
+    if (targetPage !== currentPage) {
+      setCurrentPage(targetPage);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      const el = document.getElementById(`stock-row-${focusId}`);
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 180);
+    return () => window.clearTimeout(timer);
+  }, [focusId, filteredRows, currentPage, itemsPerPage, viewMode]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters, viewMode]);
 
   const stats: StocksStatsType = useMemo(() => {
     return {
@@ -136,7 +211,12 @@ export default function StocksClient({ initialStocks }: Props) {
       totalSorties: rows
         .filter((r) => r.sens === "sortie")
         .reduce((acc, r) => acc + Number(r.quantite || 0), 0),
-      mouvementsToday: rows.filter((r) => isToday(r.date_stock)).length,
+      mouvementsToday: rows.filter((r) => {
+        if (!r.date_stock) return false;
+        const d = new Date(r.date_stock);
+        const today = new Date();
+        return d.toDateString() === today.toDateString();
+      }).length,
     };
   }, [rows]);
 
@@ -146,94 +226,107 @@ export default function StocksClient({ initialStocks }: Props) {
   };
 
   const handleEdit = (stock: Stock) => {
-    setDrawerOpen(false);
-    setSelectedStock(null);
     setEditingStock(stock);
     setEditOpen(true);
   };
 
   const handleDelete = async (stock: Stock) => {
-    const ok = window.confirm(`Supprimer le mouvement #${stock.id} ?`);
-    if (!ok) return;
-
+    if (!window.confirm(`Supprimer le mouvement #${stock.id} ?`)) return;
     try {
       await deleteStock(stock.id);
       setRows((prev) => prev.filter((r) => r.id !== stock.id));
-
-      if (selectedStock?.id === stock.id) {
-        setDrawerOpen(false);
-        setSelectedStock(null);
-      }
-
-      if (editingStock?.id === stock.id) {
-        setEditOpen(false);
-        setEditingStock(null);
-      }
     } catch (error) {
       console.error(error);
-      window.alert("Erreur lors de la suppression du mouvement.");
     }
   };
 
-  const handleSubmitEdit = async (payload: {
-    entrepot_id: string | number;
-    emballage_id: string | number;
-    lot_id?: string | number | null;
-    date_stock: string;
-    quantite: number;
-    sens: "entree" | "sortie";
-    user_id?: string | number | null;
-  }) => {
+  const handleSubmitEdit = async (payload: any) => {
     if (!editingStock) return;
-
     try {
       const updated = await updateStock(editingStock.id, payload);
-
       setRows((prev) =>
         prev.map((row) => (row.id === updated.id ? updated : row))
       );
-
-      if (selectedStock?.id === updated.id) {
-        setSelectedStock(updated);
-      }
-
       setEditOpen(false);
-      setEditingStock(null);
     } catch (error) {
       console.error(error);
-      window.alert("Erreur lors de la mise à jour du mouvement.");
     }
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 pb-20">
       <StocksHeader />
       <StocksStats stats={stats} />
-      <StocksFilters rows={rows} filters={filters} onChange={setFilters} />
 
-      <StocksCardsView
-        rows={filteredRows}
-        onView={handleView}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-      />
+      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+        <div className="flex-1">
+          <StocksFilters rows={rows} filters={filters} onChange={setFilters} />
+        </div>
+
+        <div className="flex bg-white border-2 border-gray-100 p-1.5 rounded-[20px] shadow-[8px_8px_0px_rgba(0,160,157,0.2)] self-start gap-1">
+          <button
+            onClick={() => setViewMode("grid")}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-[14px] transition-all duration-300 font-bold text-[11px] uppercase tracking-wider ${
+              viewMode === "grid"
+                ? "bg-[#1C2434] text-white shadow-lg"
+                : "text-gray-400 hover:bg-gray-50"
+            }`}
+          >
+            <LayoutGrid size={16} />
+            Grille
+          </button>
+
+          <button
+            onClick={() => setViewMode("table")}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-[14px] transition-all duration-300 font-bold text-[11px] uppercase tracking-wider ${
+              viewMode === "table"
+                ? "bg-[#1C2434] text-white shadow-lg"
+                : "text-gray-400 hover:bg-gray-50"
+            }`}
+          >
+            <List size={16} />
+            Tableau
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-6">
+        {viewMode === "grid" ? (
+          <StocksCardsView
+            rows={paginatedRows}
+            onView={handleView}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+          />
+        ) : (
+          <StocksTableView
+            rows={paginatedRows}
+            focusedId={focusId}
+            onView={handleView}
+            onDelete={handleDelete}
+          />
+        )}
+      </div>
+
+      {totalPages > 1 && (
+        <div className="mt-4 flex justify-center items-center py-6 bg-white rounded-[2rem] border border-gray-50 shadow-sm">
+          <LocalPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+          />
+        </div>
+      )}
 
       <StockDetailsDrawer
         stock={selectedStock}
         open={drawerOpen}
-        onClose={() => {
-          setDrawerOpen(false);
-          setSelectedStock(null);
-        }}
+        onClose={() => setDrawerOpen(false)}
       />
-
       <StockEditDrawer
         stock={editingStock}
         open={editOpen}
-        onClose={() => {
-          setEditOpen(false);
-          setEditingStock(null);
-        }}
+        onClose={() => setEditOpen(false)}
         onSubmit={handleSubmitEdit}
       />
     </div>

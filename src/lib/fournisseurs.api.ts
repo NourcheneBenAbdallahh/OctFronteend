@@ -1,4 +1,4 @@
-import { graphqlRequest } from "./graphqlClient";
+import { graphqlRequest, type GraphqlRequestOptions } from "./graphqlClient";
 import { Fournisseur} from "@/types/fournisseur";
 
 
@@ -30,8 +30,12 @@ const LIST_FOURNISSEURS = `
   }
 `;
 
-export async function listFournisseurs() {
-  return graphqlRequest<{ fournisseurs: Fournisseur[] }>(LIST_FOURNISSEURS);
+export async function listFournisseurs(opts?: GraphqlRequestOptions) {
+  return graphqlRequest<{ fournisseurs: Fournisseur[] }>(
+    LIST_FOURNISSEURS,
+    {},
+    opts
+  );
 }
 
 const CREATE_FOURNISSEUR = `

@@ -1,5 +1,6 @@
-import { graphqlRequest } from "./graphqlClient";
-import { Contrat } from "../types/contrat";
+import { graphqlMultipartRequest, graphqlRequest, type GraphqlRequestOptions } from "./graphqlClient";
+import { useAuthStore } from "@/store/useAuthStore";
+import { Contrat, ContratExtractionResult, sanitizeContratInput } from "../types/contrat";
 
 export const CONTRAT_FIELDS = `
   id
@@ -9,10 +10,12 @@ export const CONTRAT_FIELDS = `
   date_debut
   date_fin
   quantite_contractuelle
+  unite_quantite
   quantite_realisee
   taux_depassement_autorise
   montant_ht
   montant_tva
+  montant_cautionnement
   taux_cautionnement
   taux_penalite_retard
   plafond_penalite
@@ -27,6 +30,8 @@ export const CONTRAT_FIELDS = `
     id
     name
   }
+  created_by
+  modified_by
   created_at
   updated_at
 `;
@@ -40,8 +45,8 @@ const LIST_CONTRATS = `
   }
 `;
 
-export async function listContrats() {
-  return graphqlRequest<{ contrats: Contrat[] }>(LIST_CONTRATS);
+export async function listContrats(opts?: GraphqlRequestOptions) {
+  return graphqlRequest<{ contrats: Contrat[] }>(LIST_CONTRATS, {}, opts);
 }
 
 const CREATE_CONTRAT = `
@@ -53,7 +58,13 @@ const CREATE_CONTRAT = `
 `;
 
 export async function createContrat(input: Partial<Contrat> & { numero_contrat: string; date_debut: string; date_fin: string; quantite_contractuelle: number; fournisseur_id: string | number; emballage_id: string | number; }) {
-  return graphqlRequest<{ createContrat: Contrat }>(CREATE_CONTRAT, { input });
+  const token = useAuthStore.getState().token;
+  const safeInput = sanitizeContratInput(input);
+  return graphqlRequest<{ createContrat: Contrat }>(
+    CREATE_CONTRAT,
+    { input: safeInput },
+    { token: token || undefined }
+  );
 }
 
 const UPDATE_CONTRAT = `
@@ -65,17 +76,32 @@ const UPDATE_CONTRAT = `
 `;
 
 export async function updateContrat(id: string | number, input: Partial<Contrat>) {
-  return graphqlRequest<{ updateContrat: Contrat }>(UPDATE_CONTRAT, { id, input });
+  const token = useAuthStore.getState().token;
+  const safeInput = sanitizeContratInput(input);
+  return graphqlRequest<{ updateContrat: Contrat }>(
+    UPDATE_CONTRAT,
+    { id, input: safeInput },
+    { token: token || undefined }
+  );
 }
 
 const DELETE_CONTRAT = `
   mutation DeleteContrat($id: ID!) {
-    deleteContrat(id: $id)
+    deleteContrat(id: $id) {
+      id
+      numero_contrat
+      statut
+    }
   }
 `;
 
 export async function deleteContrat(id: string | number) {
-  return graphqlRequest<{ deleteContrat: boolean }>(DELETE_CONTRAT, { id });
+  const token = useAuthStore.getState().token;
+  return graphqlRequest<{ deleteContrat: Contrat }>(
+    DELETE_CONTRAT,
+    { id },
+    { token: token || undefined }
+  );
 }
 
 const RESTORE_CONTRAT = `
@@ -89,4 +115,38 @@ const RESTORE_CONTRAT = `
 
 export async function restoreContrat(id: string | number) {
   return graphqlRequest<{ restoreContrat: Contrat }>(RESTORE_CONTRAT, { id });
+}
+
+const EXTRACT_CONTRAT_FROM_FILE = `
+  mutation ExtractContratFromFile($file: Upload!) {
+    extractContratFromFile(file: $file) {
+      numero_contrat
+      objet
+      date_signature
+      date_debut
+      date_fin
+      quantite_contractuelle
+      unite_quantite
+      montant_ht
+      montant_tva
+      montant_cautionnement
+      taux_cautionnement
+      taux_penalite_retard
+      plafond_penalite
+      taux_depassement_autorise
+      statut
+      fournisseur_id
+      emballage_id
+    }
+  }
+`;
+
+export async function extractContratFromFile(file: File) {
+  const token = useAuthStore.getState().token;
+  return graphqlMultipartRequest<{ extractContratFromFile: ContratExtractionResult }>(
+    EXTRACT_CONTRAT_FROM_FILE,
+    { file: null },
+    { file },
+    { token: token || undefined }
+  );
 }

@@ -1,58 +1,5 @@
 import type { Stock } from "@/types/stock";
-
-const GRAPHQL_URL =
-  process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT || "http://localhost:8000/graphql";
-
-type GraphQLResponse<T> = {
-  data?: T;
-  errors?: Array<{ message: string }>;
-};
-async function graphqlFetch<T>(
-  query: string,
-  variables?: Record<string, unknown>,
-  init?: RequestInit
-): Promise<T> {
-  const res = await fetch(GRAPHQL_URL, {
-    ...init,
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers || {}),
-    },
-    body: JSON.stringify({ query, variables }),
-    cache: "no-store",
-  });
-
-  const rawText = await res.text();
-
-  let json: GraphQLResponse<T>;
-  try {
-    json = JSON.parse(rawText) as GraphQLResponse<T>;
-  } catch {
-    console.error("Invalid JSON response:", rawText);
-    throw new Error("Réponse serveur invalide.");
-  }
-
-  if (!res.ok) {
-    console.error("GraphQL HTTP error:", {
-      status: res.status,
-      statusText: res.statusText,
-      body: json,
-    });
-    throw new Error(`GraphQL HTTP error: ${res.status}`);
-  }
-
-  if (json.errors?.length) {
-    console.error("GraphQL errors detailed:", JSON.stringify(json.errors, null, 2));
-    throw new Error(json.errors.map((e) => e.message).join(" | "));
-  }
-
-  if (!json.data) {
-    throw new Error("No GraphQL data returned.");
-  }
-
-  return json.data;
-}
+import { graphqlRequest, type GraphqlRequestOptions } from "@/lib/graphqlClient";
 
 
 type StocksQueryResponse = {
@@ -75,7 +22,11 @@ type DeleteStockResponse = {
   deleteStock: Stock;
 };
 
-export async function getStocks(page = 1, first = 50): Promise<Stock[]> {
+export async function getStocks(
+  page = 1,
+  first = 50,
+  opts?: GraphqlRequestOptions
+): Promise<Stock[]> {
   const query = `
     query GetStocks($page: Int!, $first: Int!) {
       stocks(page: $page, first: $first) {
@@ -122,8 +73,81 @@ export async function getStocks(page = 1, first = 50): Promise<Stock[]> {
     }
   `;
 
-  const data = await graphqlFetch<StocksQueryResponse>(query, { page, first });
+  const data = await graphqlRequest<StocksQueryResponse>(
+    query,
+    { page, first },
+    opts
+  );
   return data.stocks?.data ?? [];
+}
+
+const STOCKS_PAGE_QUERY = `
+  query GetStocksPage($page: Int!, $first: Int!) {
+    stocks(page: $page, first: $first) {
+      data {
+        id
+        entrepot_id
+        emballage_id
+        lot_id
+        date_stock
+        quantite
+        sens
+        user_id
+        created_at
+        updated_at
+        entrepot {
+          id
+          nom
+          adresse
+        }
+        emballage {
+          id
+          name
+          code
+          min_stock
+        }
+        lot {
+          id
+          code_lot
+        }
+        user {
+          id
+          name
+          email
+        }
+      }
+      paginatorInfo {
+        currentPage
+        lastPage
+        total
+        hasMorePages
+      }
+    }
+  }
+`;
+
+/** Charge toutes les pages de mouvements stock (limite de sécurité sur le nombre de pages). */
+export async function getAllStocks(
+  firstPerPage = 250,
+  maxPages = 80,
+  opts?: GraphqlRequestOptions
+): Promise<Stock[]> {
+  const acc: Stock[] = [];
+  for (let page = 1; page <= maxPages; page++) {
+    const data = await graphqlRequest<StocksQueryResponse>(
+      STOCKS_PAGE_QUERY,
+      {
+        page,
+        first: firstPerPage,
+      },
+      opts
+    );
+    const chunk = data.stocks?.data ?? [];
+    acc.push(...chunk);
+    const p = data.stocks?.paginatorInfo;
+    if (!p?.hasMorePages || page >= (p.lastPage ?? page)) break;
+  }
+  return acc;
 }
 
 export async function updateStock(
@@ -176,7 +200,7 @@ export async function updateStock(
     }
   `;
 
-  const data = await graphqlFetch<UpdateStockResponse>(query, { id, input });
+  const data = await graphqlRequest<UpdateStockResponse>(query, { id, input });
   return data.updateStock;
 }
 
@@ -191,6 +215,6 @@ export async function deleteStock(id: string | number): Promise<Stock> {
     }
   `;
 
-  const data = await graphqlFetch<DeleteStockResponse>(query, { id });
+  const data = await graphqlRequest<DeleteStockResponse>(query, { id });
   return data.deleteStock;
 }

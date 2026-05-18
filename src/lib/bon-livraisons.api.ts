@@ -1,4 +1,9 @@
-import { graphqlRequest } from "./graphqlClient";
+import {
+  getGraphqlEndpoint,
+  graphqlRequest,
+  readPersistedAuthToken,
+  type GraphqlRequestOptions,
+} from "./graphqlClient";
 import {
   BonLivraison,
   BonLivraisonsPaginatorInfo,
@@ -13,7 +18,7 @@ export function normalizeBonLivraison(
   return {
     ...item,
     id: item.id,
-    statut: item.statut === "VALIDE" ? "VALIDE" : "EN_ATTENTE",
+    statut: item.statut === "ANNULE" ? "ANNULE" : "VALIDE",
   };
 }
 
@@ -35,16 +40,31 @@ const BON_LIVRAISON_FIELDS = `
   commande_id
   entrepot_id
   receptionne_par
+  created_by
+  modified_by
   document_bl
   date_validation
-  validated_by
   created_at
   updated_at
+  commande {
+    id
+    numero_commande
+    fournisseur_id
+    contrat_id
+    fournisseur {
+      id
+      raison_sociale
+    }
+    contrat {
+      id
+      numero_contrat
+    }
+  }
 `;
 
 const LIST_BON_LIVRAISONS = `
-  query ListBonLivraisons($page: Int!) {
-    bonLivraisons(page: $page) {
+  query ListBonLivraisons($page: Int!, $first: Int!) {
+    bonLivraisons(page: $page, first: $first) {
       data {
         ${BON_LIVRAISON_FIELDS}
       }
@@ -59,10 +79,19 @@ const LIST_BON_LIVRAISONS = `
   }
 `;
 
-export async function listBonLivraisons(page = 1) {
-  return graphqlRequest<ListBonLivraisonsResponse>(LIST_BON_LIVRAISONS, {
-    page,
-  });
+export async function listBonLivraisons(
+  page: number = 1,
+  first: number = 100,
+  opts?: GraphqlRequestOptions
+) {
+  return graphqlRequest<{ bonLivraisons: any }>(
+    LIST_BON_LIVRAISONS,
+    {
+      page,
+      first,
+    },
+    opts
+  );
 }
 
 const GET_BON_LIVRAISON = `
@@ -99,7 +128,8 @@ export async function createBonLivraisonWithFile(
   input: CreateBonLivraisonInput,
   file: File
 ) {
-  const endpoint = process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT || "http://localhost:8000/graphql";
+  const endpoint = getGraphqlEndpoint();
+  const token = readPersistedAuthToken();
 
   const operations = JSON.stringify({
     query: `
@@ -129,6 +159,9 @@ export async function createBonLivraisonWithFile(
 
   const response = await fetch(endpoint, {
     method: "POST",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: formData,
   });
 

@@ -1,12 +1,13 @@
-import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import FournisseursTable from "@/components/fournisseurs/FournisseursTable";
+import { requireServerAccessToken } from "@/lib/requireServerAccessToken";
 import {
   listFournisseurs,
 } from "@/lib/fournisseurs.api";
 import { TableFournisseur,normalizeFournisseur } from "@/types/fournisseur";
 
 export default async function FournisseursPage() {
-  const result = await listFournisseurs();
+  const token = await requireServerAccessToken();
+  const result = await listFournisseurs({ token });
   const rows: TableFournisseur[] = result.fournisseurs.map(normalizeFournisseur);
 
   return (

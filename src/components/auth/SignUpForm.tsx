@@ -1,8 +1,8 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, FormEvent } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ChevronLeftIcon, EyeCloseIcon, EyeIcon } from "@/icons"; 
+import { EyeCloseIcon, EyeIcon } from "@/icons"; 
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import Button from "@/components/ui/button/Button";
@@ -17,174 +17,192 @@ export default function SignUpForm() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isChecked, setIsChecked] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<any>({});
 
   const router = useRouter();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const validate = () => {
+    const e: any = {};
+    if (!firstName.trim()) e.firstName = "Prénom requis";
+    if (!lastName.trim()) e.lastName = "Nom requis";
+    if (!/\S+@\S+\.\S+/.test(email)) e.email = "Email invalide";
+    if (password.length < 8) e.password = "Min. 8 caractères";
+    if (!isChecked) e.terms = "Acceptation requise";
+    
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const handleInputChange = (field: string, value: string | boolean, setter: Function) => {
+    setter(value);
+    if (errors[field]) {
+      const newErrors = { ...errors };
+      delete newErrors[field];
+      setErrors(newErrors);
+    }
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setError(null);
+    if (!validate()) return;
+
     setLoading(true);
     try {
       const fullName = `${firstName} ${lastName}`;
-      const data = await register({ name: fullName, email, password });
-      // Sauvegarde token si nécessaire
-      localStorage.setItem("token", data.token);
-      // Redirection vers dashboard ou autre
-      router.push("/");
+      await register({ name: fullName, email, password });
+
+      // Nouveau flux: inscription => compte inactif, attente activation admin.
+      router.push("/signin?pendingActivation=1");
     } catch (err: any) {
-      setError(err.message || "Erreur lors de l'inscription");
+      setErrors({ general: err.message || "Erreur lors de l'inscription" });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex min-h-screen w-full bg-white flex-col-reverse lg:flex-row">
+    <div className="flex min-h-screen w-full bg-[#F8FAFC] flex-col-reverse lg:flex-row">
       
-      <div className="flex flex-col justify-center flex-1 px-10 sm:px-16 lg:px-28 bg-white overflow-y-auto py-12">
+      {/* SECTION FORMULAIRE */}
+      <div className="flex flex-col justify-center flex-1 px-10 lg:px-28 bg-white py-12">
         <div className="w-full max-w-md mx-auto">
-          
-          <Link
-            href="/"
-            className="group inline-flex items-center text-[10px] font-black uppercase tracking-[0.3em] text-gray-400 hover:text-[#00A09D] transition-all mb-12"
-          >
-            <div className="p-2 rounded-full border border-gray-100 mr-3 group-hover:border-[#00A09D]/30 transition-colors">
-              <ChevronLeftIcon className="transform group-hover:-translate-x-1 transition-transform" />
-            </div>
-            Retour au Dashboard
-          </Link>
-
-          <div className="mb-10">
-            <h1 className="text-5xl font-black text-gray-900 mb-4 tracking-tighter">Créer un compte</h1>
-            <div className="h-1.5 w-12 bg-[#00A09D] rounded-full mb-4"></div>
-            <p className="text-gray-400 font-medium">Remplissez les informations pour accéder au système.</p>
+          <div className="mb-10 text-center lg:text-left">
+            <h1 className="text-5xl font-[1000] text-[#1C2434] mb-4 tracking-tighter uppercase">Inscription</h1>
+            <div className="h-2 w-16 bg-[#00A09D] rounded-full mb-6 mx-auto lg:mx-0"></div>
           </div>
 
-          <form className="space-y-6" onSubmit={handleSubmit}>
+          <form className="space-y-5" onSubmit={handleSubmit} noValidate>
             
+            {/* PRÉNOM & NOM */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-1">Prénom</Label>
+                <Label className={`text-[10px] font-black uppercase tracking-widest ml-2 ${errors.firstName ? 'text-red-500' : 'text-gray-400'}`}>Prénom</Label>
                 <Input 
-                  defaultValue={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
+                  onChange={(e) => handleInputChange('firstName', e.target.value, setFirstName)} 
+                  className={`w-full py-4 px-6 rounded-[22px] border-2 font-bold transition-all ${errors.firstName ? 'border-red-500 bg-red-50' : 'border-gray-100 bg-[#F8FAFA] focus:border-[#00A09D]'}`} 
                   placeholder="Jean" 
-                  className="w-full border-gray-100 bg-gray-50/50 focus:bg-white focus:border-[#00A09D] focus:ring-[6px] focus:ring-[#00A09D]/5 transition-all py-4 px-6 rounded-2xl border-2 text-sm font-semibold shadow-inner"
                 />
+                {errors.firstName && <p className="text-[9px] font-black text-red-500 uppercase ml-4">{errors.firstName}</p>}
               </div>
               <div className="space-y-2">
-                <Label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-1">Nom</Label>
+                <Label className={`text-[10px] font-black uppercase tracking-widest ml-2 ${errors.lastName ? 'text-red-500' : 'text-gray-400'}`}>Nom</Label>
                 <Input 
-                  defaultValue={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
+                  onChange={(e) => handleInputChange('lastName', e.target.value, setLastName)} 
+                  className={`w-full py-4 px-6 rounded-[22px] border-2 font-bold transition-all ${errors.lastName ? 'border-red-500 bg-red-50' : 'border-gray-100 bg-[#F8FAFA] focus:border-[#00A09D]'}`} 
                   placeholder="Dupont" 
-                  className="w-full border-gray-100 bg-gray-50/50 focus:bg-white focus:border-[#00A09D] focus:ring-[6px] focus:ring-[#00A09D]/5 transition-all py-4 px-6 rounded-2xl border-2 text-sm font-semibold shadow-inner"
                 />
+                {errors.lastName && <p className="text-[9px] font-black text-red-500 uppercase ml-4">{errors.lastName}</p>}
               </div>
             </div>
 
+            {/* EMAIL */}
             <div className="space-y-2">
-              <Label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-1">Email Professionnel / Matricule</Label>
+              <Label className={`text-[10px] font-black uppercase tracking-widest ml-2 ${errors.email ? 'text-red-500' : 'text-gray-400'}`}>Email Professionnel</Label>
               <Input 
-                defaultValue={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => handleInputChange('email', e.target.value, setEmail)} 
                 type="email" 
-                placeholder="gestionnaire.pfe@stockmaster.com" 
-                className="w-full border-gray-100 bg-gray-50/50 focus:bg-white focus:border-[#00A09D] focus:ring-[6px] focus:ring-[#00A09D]/5 transition-all py-4 px-6 rounded-2xl border-2 text-sm font-semibold shadow-inner"
+                className={`w-full py-4 px-6 rounded-[22px] border-2 font-bold transition-all ${errors.email ? 'border-red-500 bg-red-50' : 'border-gray-100 bg-[#F8FAFA] focus:border-[#00A09D]'}`} 
+                placeholder="votre@email.com" 
               />
+              {errors.email && <p className="text-[9px] font-black text-red-500 uppercase ml-4">{errors.email}</p>}
             </div>
 
+            {/* MOT DE PASSE */}
             <div className="space-y-2">
-              <Label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-1">Mot de passe</Label>
-              <div className="relative group">
-                <Input
-                  defaultValue={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  type={showPassword ? "text" : "password"}
-                  placeholder="••••••••••••"
-                  className="w-full border-gray-100 bg-gray-50/50 focus:bg-white focus:border-[#00A09D] focus:ring-[6px] focus:ring-[#00A09D]/5 transition-all py-4 px-6 rounded-2xl border-2 text-sm font-semibold shadow-inner"
+              <Label className={`text-[10px] font-black uppercase tracking-widest ml-2 ${errors.password ? 'text-red-500' : 'text-gray-400'}`}>Mot de passe</Label>
+              <div className="relative">
+                <Input 
+                  onChange={(e) => handleInputChange('password', e.target.value, setPassword)} 
+                  type={showPassword ? "text" : "password"} 
+                  className={`w-full py-4 px-6 rounded-[22px] border-2 font-bold transition-all ${errors.password ? 'border-red-500 bg-red-50' : 'border-gray-100 bg-[#F8FAFA] focus:border-[#00A09D]'}`} 
+                  placeholder="••••••••" 
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-6 top-1/2 -translate-y-1/2 text-gray-300 hover:text-[#00A09D] transition-colors"
+                <button 
+                  type="button" 
+                  onClick={() => setShowPassword(!showPassword)} 
+                  className={`absolute right-6 top-1/2 -translate-y-1/2 transition-colors ${showPassword ? 'text-[#00A09D]' : 'text-gray-300'}`}
                 >
                   {showPassword ? <EyeIcon size={20} /> : <EyeCloseIcon size={20} />}
                 </button>
               </div>
+              {errors.password && <p className="text-[9px] font-black text-red-500 uppercase ml-4">{errors.password}</p>}
             </div>
 
-            <div className="flex items-start gap-4 py-2">
-              <div className="pt-1">
-                <Checkbox checked={isChecked} onChange={setIsChecked} />
+            {/* CONDITIONS COCHÉES */}
+            <div className="space-y-1">
+              <div className="flex items-start gap-4 py-2 ml-2">
+                <Checkbox 
+                  checked={isChecked} 
+                  onChange={(val) => handleInputChange('terms', val, setIsChecked)} 
+                />
+                <p className={`text-[10px] font-[1000] uppercase leading-relaxed select-none cursor-pointer ${errors.terms ? 'text-red-500' : 'text-gray-400'}`} onClick={() => handleInputChange('terms', !isChecked, setIsChecked)}>
+                  J'accepte les conditions de StockMaster.
+                </p>
               </div>
-              <p className="text-[11px] text-gray-500 font-bold leading-relaxed select-none">
-                J'accepte les <span className="text-[#00A09D] cursor-pointer hover:underline font-extrabold tracking-tighter">Conditions d'Utilisation</span> et la <span className="text-[#00A09D] cursor-pointer hover:underline font-extrabold tracking-tighter">Politique de Confidentialité</span> de StockMaster.
-              </p>
+              {errors.terms && <p className="text-[9px] font-black text-red-500 uppercase ml-4">{errors.terms}</p>}
             </div>
 
-            {error && <p className="text-red-500 font-bold text-sm">{error}</p>}
+            {/* ERREUR GÉNÉRALE API */}
+            {errors.general && (
+              <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-xl">
+                <p className="text-red-600 font-black text-[10px] uppercase tracking-widest">{errors.general}</p>
+              </div>
+            )}
 
             <Button 
-              className="w-full py-7 bg-[#00A09D] hover:bg-[#008784] text-white font-black text-[11px] uppercase tracking-[0.3em] rounded-2xl shadow-[0_20px_40px_rgba(0,160,157,0.25)] transition-all transform hover:-translate-y-1.5 active:scale-[0.97]"
+              className="w-full py-7 bg-[#00A09D] text-white font-[1000] text-[12px] uppercase tracking-[0.3em] rounded-[22px] shadow-[0_15px_30px_rgba(0,160,157,0.3)] hover:-translate-y-1 active:scale-95 transition-all disabled:opacity-50" 
               disabled={loading}
             >
-              {loading ? "Création en cours..." : "Créer mon accès gestionnaire"}
+              {loading ? "Création en cours..." : "Créer mon accès"}
             </Button>
           </form>
 
-          <div className="mt-12 text-center pt-8 border-t border-gray-100">
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-              Déjà un compte ? {" "}
-              <Link href="/signin" className="text-[#00A09D] hover:text-[#008784] transition-colors ml-1 font-black uppercase tracking-tighter border-b-2 border-[#00A09D]/20">
+          <div className="mt-10 text-center">
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.15em]">
+              Déjà un compte ? 
+              <Link href="/signin" className="text-[#00A09D] ml-2 border-b-2 border-[#00A09D]/20 hover:border-[#00A09D] transition-all font-black">
                 Se connecter
               </Link>
             </p>
           </div>
-          
         </div>
       </div>
 
-      {/* template droit inchangé */}
-      <div className="hidden lg:flex w-1/2 bg-[#00A09D] relative flex-col justify-between p-20 overflow-hidden group">
-        <div className="absolute inset-0 z-0 transition-transform duration-1000 group-hover:scale-110">
+      {/* SECTION VISUELLE DROITE */}
+      <div className="hidden lg:flex w-1/2 bg-[#00A09D] relative p-20 flex-col justify-between overflow-hidden group">
+        <div className="absolute inset-0 z-0">
           <Image 
             src="/images/stock.png" 
-            alt="Logistique Entrepôt"
-            fill
-            className="object-cover opacity-40"
-            priority
+            alt="Stock" 
+            fill 
+            className="object-cover opacity-30 transition-transform duration-1000 group-hover:scale-110" 
+            priority 
           />
-          <div className="absolute inset-0 bg-gradient-to-bl from-[#00A09D] via-[#00A09D]/60 to-transparent"></div>
+          <div className="absolute inset-0 bg-gradient-to-bl from-[#00A09D] via-[#00A09D]/80 to-transparent"></div>
         </div>
-
+        
         <div className="relative z-20">
           <div className="flex items-center gap-4 mb-14">
-            <div className="bg-white p-3 rounded-2xl shadow-2xl transform rotate-3 transition-transform group-hover:rotate-0">
-              <div className="w-12 h-12 bg-[#00A09D] rounded-xl flex items-center justify-center font-black text-3xl italic text-white shadow-inner">S</div>
+            <div className="bg-white p-3 rounded-[22px] shadow-2xl">
+              <div className="w-12 h-12 bg-[#00A09D] rounded-[15px] flex items-center justify-center font-[1000] text-3xl italic text-white shadow-inner">S</div>
             </div>
             <div className="flex flex-col text-white">
-              <span className="text-3xl font-black tracking-tighter leading-none">OCT</span>
-              <span className="text-[11px] font-bold uppercase tracking-[0.4em] text-emerald-200/80">Gestion Intégrée </span>
+              <span className="text-3xl font-[1000] tracking-tighter uppercase leading-none text-white">OCT</span>
+              <span className="text-[10px] font-black uppercase tracking-[0.4em] text-emerald-200/80 italic">Smart Solution</span>
             </div>
           </div>
-
-          <h2 className="text-6xl font-black leading-[1.05] text-white tracking-tighter mb-6">
-            L'excellence <br /> 
-            <span className="text-emerald-300 italic">à chaque flux.</span>
+          <h2 className="text-7xl font-[1000] leading-[0.95] text-white tracking-tighter mb-8 uppercase">
+            L'excellence <br />
+            <span className="text-emerald-300 italic text-6xl lowercase">à chaque flux.</span>
           </h2>
-          <p className="text-emerald-50/80 text-xl max-w-sm leading-relaxed font-light">
-            Gérez vos emballages de produits alimentaires avec une traçabilité totale et sécurisée.
-          </p>
         </div>
 
-        <div className="relative z-20 self-start flex items-center gap-5 bg-white/10 backdrop-blur-xl p-5 rounded-[2rem] border border-white/20 shadow-2xl transition-transform hover:translate-x-2">
-          <div className="w-12 h-12 rounded-full bg-emerald-400 flex items-center justify-center font-black text-[#00A09D] text-xl shadow-[0_0_20px_rgba(52,211,153,0.4)]">✓</div>
+        <div className="relative z-20 self-start flex items-center gap-5 bg-white/10 backdrop-blur-xl p-5 rounded-[30px] border border-white/20 transition-transform hover:translate-x-2">
+          <div className="w-10 h-10 rounded-full bg-emerald-400 flex items-center justify-center font-black text-[#00A09D] text-lg">✓</div>
           <div className="flex flex-col">
-            <p className="text-sm font-black text-white uppercase tracking-wider">Inscrivez-vous</p>
-            <p className="text-xs text-emerald-100/70">@2026 — Certifié Logistique</p>
+            <p className="text-[10px] font-black text-white uppercase tracking-widest leading-none mb-1">Inscription Ouverte</p>
+            <p className="text-[11px] font-bold text-emerald-100/70 uppercase tracking-tighter leading-none">Certifié Logistique @2026</p>
           </div>
         </div>
       </div>

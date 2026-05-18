@@ -8,6 +8,7 @@ interface ModalProps {
   children: React.ReactNode;
   showCloseButton?: boolean; // New prop to control close button visibility
   isFullscreen?: boolean; // Default to false for backwards compatibility
+  position?: "center" | "right";
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -17,6 +18,7 @@ export const Modal: React.FC<ModalProps> = ({
   className,
   showCloseButton = true, // Default to true for backwards compatibility
   isFullscreen = false,
+  position = "center",
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -50,21 +52,33 @@ export const Modal: React.FC<ModalProps> = ({
 
   if (!isOpen) return null;
 
+  const isRightPanel = position === "right" && !isFullscreen;
+
   const contentClasses = isFullscreen
     ? "w-full h-full"
+    : isRightPanel
+    ? "relative h-screen w-full max-w-2xl rounded-none bg-white dark:bg-gray-900"
     : "relative w-full rounded-3xl bg-white  dark:bg-gray-900";
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center overflow-y-auto modal z-99999">
+    <div
+      className={`fixed inset-0 flex modal z-99999 ${
+        isRightPanel ? "items-stretch justify-end" : "items-center justify-center overflow-y-auto"
+      }`}
+    >
       {!isFullscreen && (
         <div
-          className="fixed inset-0 h-full w-full bg-gray-400/50 backdrop-blur-[32px]"
+          className={`fixed inset-0 h-full w-full transition-all duration-300 ${
+            isRightPanel
+              ? "bg-gray-900/40 backdrop-blur-sm"
+              : "bg-gray-400/50 backdrop-blur-[32px]"
+          }`}
           onClick={onClose}
         ></div>
       )}
       <div
         ref={modalRef}
-        className={`${contentClasses}  ${className}`}
+        className={`${contentClasses} ${isRightPanel ? "animate-[slideInRight_220ms_ease-out]" : ""} ${className}`}
         onClick={(e) => e.stopPropagation()}
       >
         {showCloseButton && (
@@ -90,6 +104,18 @@ export const Modal: React.FC<ModalProps> = ({
         )}
         <div>{children}</div>
       </div>
+      <style jsx>{`
+        @keyframes slideInRight {
+          from {
+            transform: translateX(100%);
+            opacity: 0.6;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+      `}</style>
     </div>
   );
 };
