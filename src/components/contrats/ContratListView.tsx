@@ -6,12 +6,13 @@ import { getProgressColor } from "@/lib/contratAnalytics";
 interface Props {
   rows: TableContrat[];
   userNamesById: Record<string, string>;
+  uniteLabelByCode?: Record<string, string>;
   onEdit: (c: TableContrat) => void;
   onDelete: (id: string | number) => void;
   focusedId?: string | number | null;
 }
 
-export const ContratListView = ({ rows, userNamesById, onEdit, onDelete, focusedId }: Props) => (
+export const ContratListView = ({ rows, userNamesById, uniteLabelByCode, onEdit, onDelete, focusedId }: Props) => (
   <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
     <table className="w-full text-left border-collapse">
       <thead>
@@ -82,7 +83,12 @@ export const ContratListView = ({ rows, userNamesById, onEdit, onDelete, focused
               <td className="px-8 py-6 text-right font-black text-gray-900">
                 {qteContractuelle.toLocaleString()}
                 <span className="text-[10px] font-bold text-gray-400 block uppercase tracking-tighter">
-                  {c.unite_quantite?.trim() || "unitées"}
+                  {(() => {
+                    const u = c.unite_quantite?.trim();
+                    if (!u) return "—";
+                    const lbl = uniteLabelByCode?.[u];
+                    return lbl ? `${lbl} (${u})` : u;
+                  })()}
                 </span>
                 <span className="text-[10px] font-bold text-indigo-500 block mt-1">
                   Taux depassement: {tauxDepassementPercent.toFixed(2)}%

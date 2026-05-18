@@ -1,17 +1,21 @@
 "use client";
 
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   AlertTriangle,
   ArrowDownRight,
   ArrowUpRight,
+  ChevronDown,
   Download,
+  FileText,
   Layers,
   Package,
   RefreshCw,
+  Search,
   ShoppingCart,
   Wallet,
+  Warehouse,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -43,7 +47,13 @@ import type { Facture } from "@/types/facture";
 import {
   type BiActivityDay,
   type BiPeriodKey,
+  aggregateFacturesByFournisseur,
+  buildFacturesDailyTtcSeries,
   computeBiModel,
+  facturesAvecRetardSurPeriode,
+  facturesEncoursSurPeriode,
+  facturesMontantHtSurPeriode,
+  facturesPenalitesSurPeriode,
   fetchAllCommandes,
   fetchAllFactures,
   filterStocksByEntrepot,
@@ -121,6 +131,9 @@ export default function BiAdvancedDashboard() {
 
   const [period, setPeriod] = useState<BiPeriodKey>("90d");
   const [entrepot, setEntrepot] = useState<string | "all">("all");
+  const [entrepotMenuOpen, setEntrepotMenuOpen] = useState(false);
+  const [entrepotQuery, setEntrepotQuery] = useState("");
+  const entrepotMenuRef = useRef<HTMLDivElement>(null);
   const [stocks, setStocks] = useState<Stock[]>([]);
   const [commandes, setCommandes] = useState<Commande[]>([]);
   const [factures, setFactures] = useState<Facture[]>([]);
@@ -187,6 +200,33 @@ export default function BiAdvancedDashboard() {
     [stocks]
   );
 
+  const entrepotsFiltered = useMemo(() => {
+    const q = entrepotQuery.trim().toLowerCase();
+    if (!q) return entrepotsOptions;
+    return entrepotsOptions.filter((n) => n.toLowerCase().includes(q));
+  }, [entrepotsOptions, entrepotQuery]);
+
+  useEffect(() => {
+    if (!entrepotMenuOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (
+        entrepotMenuRef.current &&
+        !entrepotMenuRef.current.contains(e.target as Node)
+      ) {
+        setEntrepotMenuOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setEntrepotMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [entrepotMenuOpen]);
+
   const {
     kpis,
     prevKpis,
@@ -205,6 +245,19 @@ export default function BiAdvancedDashboard() {
     () => facturesStat.reduce((a, f) => a + f.count, 0),
     [facturesStat]
   );
+
+  const financeAgg = useMemo(() => {
+    if (scope !== "finance") return null;
+    const { start, end } = model.range;
+    return {
+      dailyTtc: buildFacturesDailyTtcSeries(factures, start, end),
+      parFn: aggregateFacturesByFournisseur(factures, start, end, 10),
+      encours: facturesEncoursSurPeriode(factures, start, end),
+      penalites: facturesPenalitesSurPeriode(factures, start, end),
+      ht: facturesMontantHtSurPeriode(factures, start, end),
+      retard: facturesAvecRetardSurPeriode(factures, start, end),
+    };
+  }, [scope, model.range, factures]);
 
   const roleUi =
     ROLE_LABEL_FR[(user?.role ?? "").trim().toUpperCase()] ??
@@ -371,18 +424,113 @@ export default function BiAdvancedDashboard() {
           </div>
 
           {showStock ? (
-          <select
-            value={entrepot}
-            onChange={(e) => setEntrepot(e.target.value as typeof entrepot)}
-            className="rounded-full border border-gray-200 bg-white px-4 py-2 text-xs font-bold text-[#1C2434] dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-          >
-            <option value="all">Tous les entrepôts</option>
-            {entrepotsOptions.map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
+            <div className="relative" ref={entrepotMenuRef}>
+              <button
+                type="button"
+                aria-expanded={entrepotMenuOpen}
+                aria-haspopup="listbox"
+                onClick={() => {
+                  setEntrepotMenuOpen((o) => {
+                    const next = !o;
+                    if (next) setEntrepotQuery("");
+                    return next;
+                  });
+                }}
+                className="inline-flex min-w-[11.5rem] max-w-[16rem] items-center justify-between gap-2 rounded-full border border-gray-200 bg-white px-3.5 py-2 text-left text-xs font-bold text-[#1C2434] shadow-sm transition hover:border-[#00A09D]/40 hover:shadow-md dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:hover:border-[#00A09D]/50"
+              >
+                <span className="flex min-w-0 flex-1 items-center gap-2">
+                  <Warehouse className="h-4 w-4 shrink-0 text-[#00A09D]" />
+                  <span className="truncate">
+                    {entrepot === "all"
+                      ? "Tous les entrepôts"
+                      : entrepot}
+                  </span>
+                </span>
+                <ChevronDown
+                  className={`h-4 w-4 shrink-0 text-gray-400 transition-transform duration-200 ${
+                    entrepotMenuOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+
+              {entrepotMenuOpen ? (
+                <div
+                  role="listbox"
+                  className="absolute right-0 z-50 mt-2 w-[min(calc(100vw-2rem),20rem)] overflow-hidden rounded-2xl border border-gray-200/95 bg-white shadow-[0_18px_50px_-12px_rgba(15,23,42,0.18)] ring-1 ring-black/[0.04] dark:border-gray-700 dark:bg-gray-900 dark:ring-white/10"
+                >
+                  <div className="border-b border-gray-100 bg-gradient-to-b from-gray-50 to-white px-2 py-2 dark:border-gray-800 dark:from-gray-800/90 dark:to-gray-900">
+                    <div className="relative">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="search"
+                        autoComplete="off"
+                        value={entrepotQuery}
+                        onChange={(e) => setEntrepotQuery(e.target.value)}
+                        placeholder="Rechercher un entrepôt…"
+                        className="w-full rounded-xl border border-gray-200/90 bg-white py-2 pl-9 pr-3 text-xs font-semibold text-[#1C2434] outline-none transition placeholder:text-gray-400 focus:border-[#00A09D] focus:ring-2 focus:ring-[#00A09D]/20 dark:border-gray-600 dark:bg-gray-950 dark:text-white dark:focus:border-[#00A09D]"
+                      />
+                    </div>
+                  </div>
+
+                  <div
+                    className="max-h-[min(16rem,calc(100vh-12rem))] overflow-y-auto overscroll-y-contain py-1.5 [scrollbar-color:#cbd5e1_#f1f5f9] [scrollbar-width:thin] dark:[scrollbar-color:#475569_#1e293b] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-gray-800 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-600 hover:[&::-webkit-scrollbar-thumb]:bg-gray-400 dark:hover:[&::-webkit-scrollbar-thumb]:bg-gray-500"
+                  >
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={entrepot === "all"}
+                      onClick={() => {
+                        setEntrepot("all");
+                        setEntrepotMenuOpen(false);
+                        setEntrepotQuery("");
+                      }}
+                      className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs font-bold transition ${
+                        entrepot === "all"
+                          ? "bg-[#00A09D]/10 text-[#00A09D]"
+                          : "text-gray-800 hover:bg-gray-50 dark:text-gray-100 dark:hover:bg-gray-800/80"
+                      }`}
+                    >
+                      <Warehouse className="h-3.5 w-3.5 shrink-0 opacity-70" />
+                      <span className="truncate">Tous les entrepôts</span>
+                    </button>
+
+                    {entrepotsFiltered.length === 0 ? (
+                      <p className="px-3 py-4 text-center text-[11px] font-medium text-gray-500 dark:text-gray-400">
+                        {entrepotQuery.trim() ? (
+                          <>
+                            Aucun entrepôt ne correspond à « {entrepotQuery.trim()} »
+                          </>
+                        ) : (
+                          "Aucun entrepôt disponible dans les données."
+                        )}
+                      </p>
+                    ) : (
+                      entrepotsFiltered.map((n) => (
+                        <button
+                          key={n}
+                          type="button"
+                          role="option"
+                          aria-selected={entrepot === n}
+                          onClick={() => {
+                            setEntrepot(n);
+                            setEntrepotMenuOpen(false);
+                            setEntrepotQuery("");
+                          }}
+                          className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs font-semibold transition ${
+                            entrepot === n
+                              ? "bg-[#00A09D]/10 font-bold text-[#00A09D]"
+                              : "text-gray-800 hover:bg-gray-50 dark:text-gray-100 dark:hover:bg-gray-800/80"
+                          }`}
+                        >
+                          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#00A09D]/60" />
+                          <span className="truncate">{n}</span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              ) : null}
+            </div>
           ) : null}
 
           <button
@@ -565,33 +713,223 @@ export default function BiAdvancedDashboard() {
             tint="bg-indigo-50 text-indigo-600"
           />
         </section>
-      ) : (
-        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <KpiCard
-            loading={loading}
-            icon={Wallet}
-            label="CA factures (période)"
-            value={fmtMoney(kpis.chiffreFacturesTtc)}
-            hint={
-              prevKpis
-                ? delta(
-                    kpis.chiffreFacturesTtc,
-                    prevKpis.chiffreFacturesTtc,
-                    "money"
-                  )
-                : null
-            }
-            tint="bg-emerald-50 text-emerald-700"
-          />
-          <KpiCard
-            loading={loading}
-            icon={Wallet}
-            label="Nombre de factures (période)"
-            value={fmt(facturesCountPeriod)}
-            tint="bg-teal-50 text-[#00A09D]"
-          />
-        </section>
-      )}
+      ) : scope === "finance" ? (
+        <>
+          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <KpiCard
+              loading={loading}
+              icon={Wallet}
+              label="CA factures TTC (période)"
+              value={fmtMoney(kpis.chiffreFacturesTtc)}
+              hint={
+                prevKpis
+                  ? delta(
+                      kpis.chiffreFacturesTtc,
+                      prevKpis.chiffreFacturesTtc,
+                      "money"
+                    )
+                  : null
+              }
+              tint="bg-emerald-50 text-emerald-700"
+            />
+            <KpiCard
+              loading={loading}
+              icon={FileText}
+              label="Nombre de factures (période)"
+              value={fmt(facturesCountPeriod)}
+              tint="bg-teal-50 text-[#00A09D]"
+            />
+            <KpiCard
+              loading={loading}
+              icon={Wallet}
+              label="Encours à payer (non payées)"
+              value={
+                financeAgg
+                  ? fmtMoney(financeAgg.encours.encoursTtc)
+                  : fmtMoney(0)
+              }
+              hint={
+                <span className="text-[10px] font-bold text-gray-400">
+                  {financeAgg ? `${fmt(financeAgg.encours.encoursCount)} facture(s)` : "—"}{" "}
+                  hors annulées / payées
+                </span>
+              }
+              tint="bg-amber-50 text-amber-800"
+            />
+            <KpiCard
+              loading={loading}
+              icon={Package}
+              label="Montant HT facturé"
+              value={financeAgg ? fmtMoney(financeAgg.ht) : fmtMoney(0)}
+              hint={
+                <span className="text-[10px] font-bold text-gray-400">
+                  Hors factures annulées
+                </span>
+              }
+              tint="bg-sky-50 text-sky-700"
+            />
+            <KpiCard
+              loading={loading}
+              icon={AlertTriangle}
+              label="Pénalités (période)"
+              value={financeAgg ? fmtMoney(financeAgg.penalites) : fmtMoney(0)}
+              tint="bg-rose-50 text-rose-700"
+            />
+            <KpiCard
+              loading={loading}
+              icon={AlertTriangle}
+              label="Factures avec retard"
+              value={
+                financeAgg
+                  ? `${fmt(financeAgg.retard.count)} · ${fmtMoney(financeAgg.retard.ttc)}`
+                  : "—"
+              }
+              hint={
+                <span className="text-[10px] font-bold text-gray-400">
+                  Jours de retard &gt; 0 (montant TTC)
+                </span>
+              }
+              tint="bg-orange-50 text-orange-800"
+            />
+          </section>
+
+          <div className="rounded-[28px] border border-dashed border-teal-200/80 bg-teal-50/40 p-4 text-sm text-[#1C2434] dark:border-teal-900/50 dark:bg-teal-950/30 dark:text-gray-200">
+            <p className="text-[10px] font-black uppercase tracking-widest text-teal-700 dark:text-teal-300">
+              Lecture finance
+            </p>
+            <p className="mt-2 font-medium leading-relaxed">
+              Comparez le <strong>CA TTC</strong> à l&apos;<strong>encours</strong> pour suivre
+              l&apos;encaissement. Les <strong>pénalités</strong> et les factures avec{" "}
+              <strong>retard</strong> isolent les risques fournisseurs. Les graphiques ci-dessous montrent la
+              tendance journalière et le poids par <strong>fournisseur</strong>.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+            <div className={`${cardShell} min-h-[320px]`}>
+              <h3 className="mb-4 text-sm font-[1000] uppercase tracking-tight text-[#1C2434] dark:text-white">
+                CA TTC par jour (date d&apos;émission)
+              </h3>
+              {loading ? (
+                <div className="h-[280px] animate-pulse rounded-2xl bg-gray-50 dark:bg-gray-800" />
+              ) : !financeAgg || financeAgg.dailyTtc.every((d) => d.ttc === 0) ? (
+                <p className="text-sm text-gray-400">Aucun montant sur la période.</p>
+              ) : (
+                <ResponsiveContainer width="100%" height={280}>
+                  <ComposedChart data={financeAgg.dailyTtc}>
+                    <CartesianGrid strokeDasharray="4 4" stroke="#e5e7eb" />
+                    <XAxis dataKey="label" tick={{ fontSize: 9 }} interval="preserveStartEnd" />
+                    <YAxis tick={{ fontSize: 10 }} />
+                    <Tooltip
+                      formatter={(v, name) =>
+                        String(name) === "ttc"
+                          ? [fmtMoney(Number(v ?? 0)), "TTC"]
+                          : [fmt(Number(v ?? 0)), "Factures"]
+                      }
+                    />
+                    <Legend />
+                    <Area
+                      type="monotone"
+                      dataKey="ttc"
+                      name="TTC"
+                      fill="#00A09D"
+                      stroke="#00A09D"
+                      fillOpacity={0.2}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="count"
+                      name="Nombre"
+                      stroke="#6366F1"
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+
+            <div className={`${cardShell} min-h-[320px]`}>
+              <h3 className="mb-4 text-sm font-[1000] uppercase tracking-tight text-[#1C2434] dark:text-white">
+                Top fournisseurs (TTC période)
+              </h3>
+              {loading ? (
+                <div className="h-[280px] animate-pulse rounded-2xl bg-gray-50 dark:bg-gray-800" />
+              ) : !financeAgg || financeAgg.parFn.length === 0 ? (
+                <p className="text-sm text-gray-400">Aucune donnée fournisseur.</p>
+              ) : (
+                <ResponsiveContainer width="100%" height={280}>
+                  <BarChart data={financeAgg.parFn} layout="vertical" margin={{ left: 8 }}>
+                    <CartesianGrid strokeDasharray="4 4" horizontal={false} />
+                    <XAxis type="number" tick={{ fontSize: 10 }} />
+                    <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 9 }} />
+                    <Tooltip
+                      formatter={(v, _n, item) => {
+                        const c = (item?.payload as { count?: number })?.count;
+                        return [
+                          `${fmtMoney(Number(v ?? 0))} (${fmt(Number(c ?? 0))} fact.)`,
+                          "TTC",
+                        ];
+                      }}
+                    />
+                    <Bar dataKey="montantTtc" name="TTC" fill="#00A09D" radius={[0, 6, 6, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </div>
+
+          <div className={`${cardShell} min-h-[300px]`}>
+            <h3 className="mb-4 text-sm font-[1000] uppercase tracking-tight text-[#1C2434] dark:text-white">
+              Répartition par statut (nombre)
+            </h3>
+            {loading ? (
+              <div className="h-[260px] animate-pulse rounded-2xl bg-gray-50 dark:bg-gray-800" />
+            ) : facturesStat.length === 0 ? (
+              <p className="text-sm text-gray-400">Aucune facture sur la période.</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={260}>
+                <PieChart>
+                  <Pie
+                    data={facturesStat as unknown as Record<string, unknown>[]}
+                    dataKey="count"
+                    nameKey="statut"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={56}
+                    outerRadius={100}
+                    paddingAngle={2}
+                    label={false}
+                  >
+                    {facturesStat.map((_, i) => (
+                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(value, _name, item) => {
+                      const statut =
+                        item?.payload &&
+                        typeof item.payload === "object" &&
+                        "statut" in item.payload
+                          ? String((item.payload as { statut: string }).statut)
+                          : "";
+                      return [
+                        fmt(Number(value ?? 0)),
+                        FACTURE_FR[statut] ?? statut,
+                      ];
+                    }}
+                  />
+                  <Legend
+                    formatter={(value) =>
+                      FACTURE_FR[String(value)] ?? String(value)
+                    }
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </>
+      ) : null}
 
       {/* Charts row 1 */}
       {(showStock || showCmd) && (

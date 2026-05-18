@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   createBonLivraisonWithFile,
   updateBonLivraison,
@@ -17,9 +17,18 @@ import {
   CommandeOption,
 } from "@/types/bon-livraison";
 import { 
-  X, Plus, FileText, Calendar, Package, MapPin, 
-  Upload, Trash2, Edit2, AlertCircle, ChevronDown, Hash, ShoppingCart, Truck, CheckCircle2, Search, ArrowRight
+  X, FileText, Upload, Edit2, AlertCircle, ShoppingCart, Truck, CheckCircle2, Search, ArrowRight
 } from "lucide-react";
+import { CommandeSearchablePicker } from "@/components/bon-livraisons/CommandeSearchablePicker";
+import { UniteMesureSearchablePicker } from "@/components/unites-mesure/UniteMesureSearchablePicker";
+import {
+  convertQuantityBetweenUnites,
+  formatQuantitePrincipale,
+  normalizeUnitCode,
+  resolvePrincipalUnitCode,
+  unitesCompatibleQuantiteCommande,
+} from "@/lib/unite-conversion";
+import type { UniteMesure } from "@/types/unite-mesure";
 const PER_PAGE = 10;
 const LocalPagination = ({
   currentPage,
@@ -53,7 +62,18 @@ const LocalPagination = ({
   </div>
 );
 // --- SOUS-COMPOSANT : TIMELINE BUS ---
-const CommandeTimeline = ({ total, dejaRecu, actuel }: { total: number; dejaRecu: number; actuel: number }) => {
+const CommandeTimeline = ({
+  total,
+  dejaRecu,
+  actuel,
+  uniteCode,
+}: {
+  total: number;
+  dejaRecu: number;
+  actuel: number;
+  /** Code unité principale (ex. KG) pour l'affichage */
+  uniteCode?: string;
+}) => {
   const totalApresSaisie = Math.min(dejaRecu + actuel, total);
   const pourcentageAncien = (dejaRecu / total) * 100;
   const pourcentageNouveau = (totalApresSaisie / total) * 100;
@@ -66,7 +86,9 @@ const CommandeTimeline = ({ total, dejaRecu, actuel }: { total: number; dejaRecu
           <span className="text-[9px] font-black uppercase text-indigo-400 tracking-widest block mb-1">Progression de réception</span>
           <div className="flex items-baseline gap-1">
             <span className="text-2xl font-black text-gray-900">{totalApresSaisie}</span>
-            <span className="text-[10px] font-bold text-gray-400 uppercase">/ {total} UNITÉS</span>
+            <span className="text-[10px] font-bold text-gray-400 uppercase">
+              / {total} {uniteCode ? uniteCode : "—"}
+            </span>
           </div>
         </div>
         <div className="text-right">
@@ -127,12 +149,14 @@ export default function BonLivraisonsTable({
   emballages,
   commandes,
   entrepots,
+  unitesMesure,
 }: {
   data: TableBonLivraison[];
   pagination: BonLivraisonsPaginatorInfo;
   emballages: EmballageOption[];
   commandes: CommandeOption[];
   entrepots: EntrepotOption[];
+  unitesMesure: UniteMesure[];
 }) {
   const token = useAuthStore((state) => state.token);
   const [rows, setRows] = useState<TableBonLivraison[]>(data);
@@ -142,8 +166,8 @@ export default function BonLivraisonsTable({
   const [submitLoading, setSubmitLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [file, setFile] = useState<File | null>(null);
-  const [isCmdOpen, setIsCmdOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [quantiteUniteSaisie, setQuantiteUniteSaisie] = useState("");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"TOUS" | "VALIDE" | "ANNULE">("TOUS");
   const isEditMode = Boolean(editing);
@@ -151,20 +175,9 @@ export default function BonLivraisonsTable({
   const isCancelledBL = isEditMode && editing?.statut === "ANNULE";
   const [userNamesById, setUserNamesById] = useState<Record<string, string>>({});
 
-  const dropdownRef = useRef<HTMLDivElement>(null);
   const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => setRows(data), [data]);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsCmdOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   useEffect(() => {
     async function loadUsers() {
@@ -198,6 +211,17 @@ export default function BonLivraisonsTable({
     return commandes.filter((c: any) => c.statut !== "RECEPTIONNEE");
   }, [commandes]);
 
+  const commandesPourPicker = useMemo(() => {
+    if (isEditMode && editing) {
+      const cur = commandes.find((c) => c.numero_commande === editing.numero_commande);
+      const ids = new Set(commandesEnAttente.map((c) => String(c.id)));
+      if (cur && !ids.has(String(cur.id))) {
+        return [cur, ...commandesEnAttente];
+      }
+    }
+    return commandesEnAttente;
+  }, [isEditMode, editing, commandes, commandesEnAttente]);
+
   const selectedCommande = useMemo(
     () => commandes.find((c) => c.numero_commande === form.numero_commande),
     [commandes, form.numero_commande]
@@ -223,15 +247,74 @@ export default function BonLivraisonsTable({
     return Number(selectedCommandeForForm.quantite) - Number(selectedCommandeForForm.quantite_recue_total ?? 0);
   }, [selectedCommandeForForm]);
 
+  const commandeUnitByNumero = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of commandes) {
+      const emb = emballages.find((e) => String(e.id) === String(c.emballage_id));
+      m.set(c.numero_commande, resolvePrincipalUnitCode(emb?.capacity_unit ?? null, unitesMesure));
+    }
+    return m;
+  }, [commandes, emballages, unitesMesure]);
+
+  const principalUnitCode = useMemo(() => {
+    if (!selectedCommandeForForm) return "";
+    const emb = emballages.find((e) => String(e.id) === String(selectedCommandeForForm.emballage_id));
+    return resolvePrincipalUnitCode(emb?.capacity_unit ?? null, unitesMesure);
+  }, [selectedCommandeForForm, emballages, unitesMesure]);
+
+  const principalUnitLabel = useMemo(() => {
+    if (!principalUnitCode) return "";
+    const urow = unitesMesure.find((u) => normalizeUnitCode(u.code) === normalizeUnitCode(principalUnitCode));
+    return urow ? `${urow.label} (${urow.code})` : principalUnitCode;
+  }, [unitesMesure, principalUnitCode]);
+
+  const unitesQuantiteCompat = useMemo(
+    () => (principalUnitCode ? unitesCompatibleQuantiteCommande(principalUnitCode, unitesMesure) : []),
+    [principalUnitCode, unitesMesure]
+  );
+
+  const quantiteEnPrincipal = useMemo(() => {
+    const raw = String(form.quantite_recue).trim();
+    if (!selectedCommandeForForm || raw === "") {
+      return null;
+    }
+    const q = Number(raw.replace(",", "."));
+    if (!Number.isFinite(q)) {
+      return null;
+    }
+    if (!principalUnitCode) {
+      return null;
+    }
+    const fromU = normalizeUnitCode(quantiteUniteSaisie) || principalUnitCode;
+    if (normalizeUnitCode(fromU) === normalizeUnitCode(principalUnitCode)) {
+      return q;
+    }
+    return convertQuantityBetweenUnites(q, fromU, principalUnitCode, unitesMesure);
+  }, [selectedCommandeForForm, form.quantite_recue, quantiteUniteSaisie, principalUnitCode, unitesMesure]);
+
+  useEffect(() => {
+    if (!selectedCommandeForForm || !unitesQuantiteCompat.length) {
+      return;
+    }
+    const ok = unitesQuantiteCompat.some(
+      (u) => normalizeUnitCode(u.code) === normalizeUnitCode(quantiteUniteSaisie)
+    );
+    if (!ok) {
+      setQuantiteUniteSaisie(principalUnitCode);
+    }
+  }, [selectedCommandeForForm, principalUnitCode, unitesQuantiteCompat, quantiteUniteSaisie]);
+
   const handleSelectCommande = (c: CommandeOption) => {
+    const emb = emballages.find((e) => String(e.id) === String(c.emballage_id));
+    const principal = resolvePrincipalUnitCode(emb?.capacity_unit ?? null, unitesMesure);
+    setQuantiteUniteSaisie(principal);
     setForm((prev) => ({
       ...prev,
       numero_commande: c.numero_commande,
       emballage_id: c.emballage_id ? String(c.emballage_id) : "",
       entrepot_id: c.entrepot_id ? String(c.entrepot_id) : "",
-      quantite_recue: "" 
+      quantite_recue: "",
     }));
-    setIsCmdOpen(false);
     setErrorMessage("");
   };
 
@@ -306,14 +389,27 @@ export default function BonLivraisonsTable({
     e.preventDefault();
     if (!editing && !file) { setErrorMessage("Le document BL est obligatoire"); return; }
     const maxAllowed = selectedCommandeForForm ? remainingQuantity : Number.POSITIVE_INFINITY;
-    if (!editing && Number(form.quantite_recue) > maxAllowed) {
-        setErrorMessage(`Quantité dépasse le reste à livrer (${remainingQuantity})`);
+    const qPrincipal = quantiteEnPrincipal;
+    if (!editing) {
+      if (qPrincipal == null || !Number.isFinite(qPrincipal) || qPrincipal < 0) {
+        setErrorMessage("Indiquez une quantité reçue valide et une unité compatible avec l'emballage.");
         return;
+      }
+      if (qPrincipal > maxAllowed) {
+        setErrorMessage(
+          `La quantité convertie (${formatQuantitePrincipale(qPrincipal)} ${principalUnitCode}) dépasse le reste à livrer (${formatQuantitePrincipale(maxAllowed)} ${principalUnitCode}).`
+        );
+        return;
+      }
     }
 
     setSubmitLoading(true);
     try {
-      const payload = { ...form, quantite_recue: Number(form.quantite_recue) };
+      const qSave =
+        quantiteEnPrincipal != null && Number.isFinite(quantiteEnPrincipal)
+          ? quantiteEnPrincipal
+          : Number(String(form.quantite_recue).replace(",", "."));
+      const payload = { ...form, quantite_recue: qSave };
       if (editing) {
         const res = await updateBonLivraison(editing.id, payload);
         setRows(prev => prev.map(r => String(r.id) === String(editing.id) ? normalizeBonLivraison(res.updateBonLivraison) : r));
@@ -330,6 +426,7 @@ export default function BonLivraisonsTable({
       }
       setIsDrawerOpen(false);
       setForm(emptyForm);
+      setQuantiteUniteSaisie("");
       setFile(null);
     } catch (err: any) {
       setErrorMessage(getFriendlyErrorMessage(err));
@@ -371,7 +468,12 @@ export default function BonLivraisonsTable({
           />
         </div>
         <button
-          onClick={() => { setEditing(null); setForm(emptyForm); setIsDrawerOpen(true); }}
+          onClick={() => {
+            setEditing(null);
+            setForm(emptyForm);
+            setQuantiteUniteSaisie("");
+            setIsDrawerOpen(true);
+          }}
           className="bg-white text-gray-900 border-2 border-gray-900 px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all shadow-[8px_8px_0px_rgba(0,160,157,0.2)]"
         >
           NOUVEAU
@@ -490,8 +592,12 @@ export default function BonLivraisonsTable({
                   </span>
                 </td>
                 <td className="px-6 py-5 text-center">
-                  <span className="text-sm font-black text-gray-700">{bl.quantite_recue}</span>
-                  <span className="text-[10px] ml-1.5 text-gray-300 font-bold uppercase">Unités</span>
+                  <span className="text-sm font-black text-gray-700">
+                    {formatQuantitePrincipale(Number(bl.quantite_recue || 0))}
+                  </span>
+                  <span className="text-[10px] ml-1 font-black text-[#00A09D] uppercase">
+                    {commandeUnitByNumero.get(bl.numero_commande) ?? ""}
+                  </span>
                   <div className="mt-1">
                     <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-wider ${
                       bl.statut === "VALIDE"
@@ -506,6 +612,11 @@ export default function BonLivraisonsTable({
                   <div className="flex justify-end gap-1">
                     <button onClick={() => {
                         setEditing(bl);
+                        const cmd = commandes.find((c) => c.numero_commande === bl.numero_commande);
+                        const emb = cmd
+                          ? emballages.find((e) => String(e.id) === String(cmd.emballage_id))
+                          : null;
+                        setQuantiteUniteSaisie(resolvePrincipalUnitCode(emb?.capacity_unit ?? null, unitesMesure));
                         setForm({
                             date_reception: bl.date_reception?.split("T")[0] || "",
                             emballage_id: String(bl.emballage_id),
@@ -559,44 +670,32 @@ export default function BonLivraisonsTable({
               )}
 
               {/* STEP 1: COMMANDE SELECTION */}
-              <div className="space-y-4" ref={dropdownRef}>
+              <div className="space-y-4">
                 <label className="text-[10px] font-black uppercase text-gray-400 tracking-[0.2em] ml-1">Référence Commande</label>
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => !isEditMode && setIsCmdOpen(!isCmdOpen)}
-                    disabled={isEditMode}
-                    className={`w-full flex items-center justify-between rounded-2xl border-2 p-4 text-sm font-black transition-all ${
-                      form.numero_commande ? "border-indigo-600 bg-indigo-50/20 text-indigo-900" : "border-gray-100 text-gray-300"
-                    } ${isEditMode ? "opacity-80 cursor-not-allowed" : ""}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Hash className={`h-4 w-4 ${form.numero_commande ? "text-indigo-600" : "text-gray-200"}`} />
-                      {form.numero_commande || "Choisir Commande"}
-                    </div>
-                    <ChevronDown className={`h-4 w-4 transition-transform ${isCmdOpen ? "rotate-180" : ""}`} />
-                  </button>
-                  {isCmdOpen && !isEditMode && (
-                    <div className="absolute z-[110] mt-3 w-full bg-white border border-gray-100 rounded-[2rem] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                      <div className="max-h-64 overflow-y-auto p-3 space-y-1">
-                        {commandesEnAttente.map((c) => (
-                          <button key={c.id} type="button" onClick={() => handleSelectCommande(c)} className="w-full text-left p-4 hover:bg-indigo-600 hover:text-white rounded-[1.2rem] transition-all group">
-                            <div className="font-black text-sm">#{c.numero_commande}</div>
-                            <div className="text-[10px] opacity-60 font-bold uppercase mt-1">Total: {c.quantite} Unités</div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <CommandeSearchablePicker
+                  value={form.numero_commande}
+                  onSelect={handleSelectCommande}
+                  commandes={commandesPourPicker}
+                  disabled={isEditMode}
+                  placeholder="Rechercher ou choisir une commande…"
+                  listMaxHeightClassName="max-h-[min(10.5rem,34vh)] sm:max-h-40"
+                  dropdownZClassName="z-[250]"
+                />
               </div>
 
               {/* VISUELLE PAR COMMANDE (TIMELINE) */}
               {selectedCommandeForForm && (
-                <CommandeTimeline 
-                  total={selectedCommandeForForm.quantite} 
-                  dejaRecu={dejaRecu} 
-                  actuel={Number(form.quantite_recue) || 0} 
+                <CommandeTimeline
+                  total={selectedCommandeForForm.quantite}
+                  dejaRecu={dejaRecu}
+                  actuel={
+                    isEditMode
+                      ? Number(form.quantite_recue) || 0
+                      : quantiteEnPrincipal != null && Number.isFinite(quantiteEnPrincipal)
+                        ? quantiteEnPrincipal
+                        : 0
+                  }
+                  uniteCode={principalUnitCode}
                 />
               )}
 
@@ -619,14 +718,61 @@ export default function BonLivraisonsTable({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase text-gray-400 tracking-[0.2em] ml-1">Date d'Arrivée</label>
                     <input type="date" value={form.date_reception} onChange={(e) => setForm({...form, date_reception: e.target.value})} readOnly={isEditMode} className="w-full rounded-2xl border-2 border-gray-50 bg-gray-50 p-4 text-xs font-black outline-none focus:border-indigo-200 focus:bg-white transition-all read-only:opacity-70 read-only:cursor-not-allowed" required />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-[0.2em] ml-1">Quantité (Max: {remainingQuantity})</label>
-                    <input type="number" value={form.quantite_recue} onChange={(e) => setForm({...form, quantite_recue: e.target.value})} readOnly={isEditMode} className="w-full rounded-2xl border-2 border-gray-100 p-4 text-xs font-black outline-none focus:border-indigo-600 transition-all placeholder:text-gray-200 read-only:opacity-70 read-only:cursor-not-allowed" placeholder="00" required />
+                  <div className="space-y-2 sm:col-span-2">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-[0.2em] ml-1">
+                      Quantité reçue (max : {formatQuantitePrincipale(remainingQuantity)} {principalUnitCode})
+                    </label>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={form.quantite_recue}
+                        onChange={(e) => setForm({ ...form, quantite_recue: e.target.value })}
+                        readOnly={isEditMode}
+                        className="w-full rounded-2xl border-2 border-gray-100 p-4 text-xs font-black outline-none focus:border-indigo-600 transition-all placeholder:text-gray-200 read-only:opacity-70 read-only:cursor-not-allowed font-mono"
+                        placeholder="Ex. 10000"
+                        required
+                      />
+                      {selectedCommandeForForm && unitesQuantiteCompat.length > 0 && !isEditMode ? (
+                        <UniteMesureSearchablePicker
+                          value={quantiteUniteSaisie}
+                          onChange={(code) => setQuantiteUniteSaisie(code)}
+                          unites={unitesQuantiteCompat}
+                          placeholder="Unité de saisie…"
+                          allowEmpty={false}
+                          listMaxHeightClassName="max-h-[min(9rem,28vh)] sm:max-h-32"
+                          dropdownZClassName="z-[250]"
+                        />
+                      ) : (
+                        <div className="flex items-center rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50/80 px-4 py-3 text-xs font-bold text-gray-400">
+                          {isEditMode
+                            ? `Unité : ${principalUnitLabel}`
+                            : principalUnitLabel
+                              ? `Réf. : ${principalUnitLabel}`
+                              : "—"}
+                        </div>
+                      )}
+                    </div>
+                    {!isEditMode && selectedCommandeForForm ? (
+                      <p className="text-[10px] font-bold text-gray-500">
+                        Enregistrement en{" "}
+                        <span className="font-black text-[#00A09D]">{principalUnitLabel}</span>
+                        {quantiteEnPrincipal != null && Number.isFinite(quantiteEnPrincipal) ? (
+                          <>
+                            {" "}
+                            →{" "}
+                            <span className="font-mono font-black text-gray-900">
+                              {formatQuantitePrincipale(quantiteEnPrincipal)} {principalUnitCode}
+                            </span>
+                          </>
+                        ) : null}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -688,7 +834,14 @@ export default function BonLivraisonsTable({
               <button onClick={() => setIsDrawerOpen(false)} className="flex-1 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest hover:text-gray-900 transition-colors">Fermer</button>
               <button 
                 onClick={(e) => handleSubmit(e as any)}
-                disabled={submitLoading || !selectedCommandeForForm}
+                disabled={
+                  submitLoading ||
+                  !selectedCommandeForForm ||
+                  (!editing &&
+                    (quantiteEnPrincipal == null ||
+                      !Number.isFinite(quantiteEnPrincipal) ||
+                      quantiteEnPrincipal < 0))
+                }
                 className="flex-[2] bg-gray-900 text-white py-5 rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] shadow-2xl shadow-gray-200 hover:bg-indigo-600 disabled:bg-gray-100 disabled:text-gray-300 transition-all active:scale-95"
               >
                 {submitLoading ? "En cours..." : editing ? "Modifier le BL" : "Confirmer l'Entrée"}

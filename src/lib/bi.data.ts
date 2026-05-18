@@ -431,6 +431,144 @@ export function topBusyDays(points: BiActivityDay[], limit = 5): BiActivityDay[]
     .slice(0, limit);
 }
 
+/** CA TTC facturé par jour civil (date_facture), hors factures annulées. */
+export type BiFactureDailyPoint = {
+  day: string;
+  label: string;
+  ttc: number;
+  count: number;
+};
+
+export function buildFacturesDailyTtcSeries(
+  factures: Facture[],
+  start: Date,
+  end: Date
+): BiFactureDailyPoint[] {
+  const bucket: Record<string, { ttc: number; count: number }> = {};
+  for (const f of factures) {
+    if (f.statut === "ANNULE") continue;
+    const t = new Date(f.date_facture).getTime();
+    if (!inRange(t, start, end)) continue;
+    const key = toLocalYmd(new Date(f.date_facture));
+    if (!bucket[key]) bucket[key] = { ttc: 0, count: 0 };
+    bucket[key].ttc += Number(f.montant_ttc) || 0;
+    bucket[key].count += 1;
+  }
+
+  const days: BiFactureDailyPoint[] = [];
+  const cur = atDayStart(start);
+  const endT = end.getTime();
+  while (cur.getTime() <= endT) {
+    const key = toLocalYmd(cur);
+    const label = cur.toLocaleDateString("fr-FR", {
+      weekday: "short",
+      day: "2-digit",
+      month: "short",
+    });
+    const b = bucket[key] || { ttc: 0, count: 0 };
+    days.push({ day: key, label, ttc: b.ttc, count: b.count });
+    cur.setDate(cur.getDate() + 1);
+  }
+  return days;
+}
+
+export type BiFournisseurFactureAgg = {
+  name: string;
+  montantTtc: number;
+  count: number;
+};
+
+/** Montants TTC par fournisseur (sur factures non annulées dans la période). */
+export function aggregateFacturesByFournisseur(
+  factures: Facture[],
+  start: Date,
+  end: Date,
+  limit = 10
+): BiFournisseurFactureAgg[] {
+  const m: Record<string, { montantTtc: number; count: number }> = {};
+  for (const f of factures) {
+    if (f.statut === "ANNULE") continue;
+    const t = new Date(f.date_facture).getTime();
+    if (!inRange(t, start, end)) continue;
+    const name = (f.fournisseur?.raison_sociale || "").trim() || "—";
+    if (!m[name]) m[name] = { montantTtc: 0, count: 0 };
+    m[name].montantTtc += Number(f.montant_ttc) || 0;
+    m[name].count += 1;
+  }
+  return Object.entries(m)
+    .map(([name, v]) => ({ name, montantTtc: v.montantTtc, count: v.count }))
+    .sort((a, b) => b.montantTtc - a.montantTtc)
+    .slice(0, limit);
+}
+
+/** Factures non payées et non annulées émises dans la période (encours). */
+export function facturesEncoursSurPeriode(
+  factures: Facture[],
+  start: Date,
+  end: Date
+): { encoursTtc: number; encoursCount: number } {
+  let encoursTtc = 0;
+  let encoursCount = 0;
+  for (const f of factures) {
+    if (f.statut === "ANNULE" || f.statut === "PAYE") continue;
+    const t = new Date(f.date_facture).getTime();
+    if (!inRange(t, start, end)) continue;
+    encoursTtc += Number(f.montant_ttc) || 0;
+    encoursCount += 1;
+  }
+  return { encoursTtc, encoursCount };
+}
+
+export function facturesPenalitesSurPeriode(
+  factures: Facture[],
+  start: Date,
+  end: Date
+): number {
+  let s = 0;
+  for (const f of factures) {
+    if (f.statut === "ANNULE") continue;
+    const t = new Date(f.date_facture).getTime();
+    if (!inRange(t, start, end)) continue;
+    s += Number(f.montant_penalites) || 0;
+  }
+  return s;
+}
+
+export function facturesMontantHtSurPeriode(
+  factures: Facture[],
+  start: Date,
+  end: Date
+): number {
+  let s = 0;
+  for (const f of factures) {
+    if (f.statut === "ANNULE") continue;
+    const t = new Date(f.date_facture).getTime();
+    if (!inRange(t, start, end)) continue;
+    s += Number(f.montant_ht) || 0;
+  }
+  return s;
+}
+
+/** Factures avec jours de retard > 0 (pénalités / retard livraison côté métier). */
+export function facturesAvecRetardSurPeriode(
+  factures: Facture[],
+  start: Date,
+  end: Date
+): { count: number; ttc: number } {
+  let count = 0;
+  let ttc = 0;
+  for (const f of factures) {
+    if (f.statut === "ANNULE") continue;
+    const jr = Number(f.jours_retard_total) || 0;
+    if (jr <= 0) continue;
+    const t = new Date(f.date_facture).getTime();
+    if (!inRange(t, start, end)) continue;
+    count++;
+    ttc += Number(f.montant_ttc) || 0;
+  }
+  return { count, ttc };
+}
+
 export type BiComputed = {
   range: { start: Date; end: Date };
   prevRange: { start: Date; end: Date };

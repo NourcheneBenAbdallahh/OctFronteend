@@ -3,10 +3,14 @@
 import { useState, useMemo, useEffect } from "react";
 import { EmballagesHeader } from "./EmballagesHeader";
 import { EmballagesListView } from "./EmballagesListView";
+import { EmballagesGridView } from "./EmballagesGridView";
 import EmballagesFormModal from "./EmballagesFormModal";
+import EmballagesDetailsDrawer from "./EmballagesDetailsDrawer";
 import { TableEmballages } from "@/types/emballage";
 import { deleteEmballages } from "@/lib/emballages.api";
 import { BoxSelect } from "lucide-react";
+import { useAuthStore } from "@/store/useAuthStore";
+import { canManageEmballagesCatalog } from "@/lib/access";
 
 interface Props {
   data: TableEmballages[];
@@ -59,6 +63,10 @@ export default function EmballagesTable({
   const [isOpen, setIsOpen] = useState(false);
   const [editing, setEditing] = useState<TableEmballages | null>(null);
   const [query, setQuery] = useState("");
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  const [detailItem, setDetailItem] = useState<TableEmballages | null>(null);
+  const userRole = useAuthStore((s) => s.user?.role);
+  const canManage = canManageEmballagesCatalog(userRole);
 
   useEffect(() => {
     setRows(data);
@@ -82,6 +90,9 @@ export default function EmballagesTable({
     try {
       await deleteEmballages(id);
       setRows((prev) => prev.filter((r) => r.id !== id));
+      if (detailItem != null && String(detailItem.id) === String(id)) {
+        setDetailItem(null);
+      }
     } catch {
       alert(
         "Erreur lors de la suppression. L'emballage est peut-être lié à un contrat."
@@ -95,7 +106,11 @@ export default function EmballagesTable({
         query={query}
         setQuery={setQuery}
         total={total}
+        canManage={canManage}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
         onOpenNew={() => {
+          setDetailItem(null);
           setEditing(null);
           setIsOpen(true);
         }}
@@ -104,14 +119,31 @@ export default function EmballagesTable({
       <div className="flex-1">
         {filteredRows.length > 0 ? (
           <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-            <EmballagesListView
-              rows={filteredRows}
-              onEdit={(item: TableEmballages) => {
-                setEditing(item);
-                setIsOpen(true);
-              }}
-              onDelete={handleDelete}
-            />
+            {viewMode === "list" ? (
+              <EmballagesListView
+                rows={filteredRows}
+                canManage={canManage}
+                onOpenDetail={setDetailItem}
+                onEdit={(item: TableEmballages) => {
+                  setDetailItem(null);
+                  setEditing(item);
+                  setIsOpen(true);
+                }}
+                onDelete={handleDelete}
+              />
+            ) : (
+              <EmballagesGridView
+                rows={filteredRows}
+                canManage={canManage}
+                onOpenDetail={setDetailItem}
+                onEdit={(item: TableEmballages) => {
+                  setDetailItem(null);
+                  setEditing(item);
+                  setIsOpen(true);
+                }}
+                onDelete={handleDelete}
+              />
+            )}
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-24 bg-white rounded-[2.5rem] border border-dashed border-gray-200">
@@ -122,7 +154,9 @@ export default function EmballagesTable({
               Aucun emballage trouvé
             </h3>
             <p className="text-sm text-gray-400 font-medium">
-              Essayez de modifier votre recherche ou créez un nouveau modèle.
+              {canManage
+                ? "Essayez de modifier votre recherche ou créez un nouveau modèle."
+                : "Essayez de modifier votre recherche."}
             </p>
           </div>
         )}
@@ -138,7 +172,22 @@ export default function EmballagesTable({
         </div>
       )}
 
-      {isOpen && (
+      <EmballagesDetailsDrawer
+        emballage={detailItem}
+        open={detailItem != null}
+        onClose={() => setDetailItem(null)}
+        canManage={canManage}
+        onRequestEdit={
+          canManage
+            ? (item) => {
+                setEditing(item);
+                setIsOpen(true);
+              }
+            : undefined
+        }
+      />
+
+      {canManage && isOpen && (
         <EmballagesFormModal
           editing={editing}
           setRows={setRows}

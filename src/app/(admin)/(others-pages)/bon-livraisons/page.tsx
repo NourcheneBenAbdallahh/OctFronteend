@@ -8,7 +8,9 @@ import {
 import { listEmballages } from "@/lib/emballages.api";
 import { listCommandes } from "@/lib/commandes.api";
 import { fetchEntrepots } from "@/lib/entrepot.api";
+import { listUnitesMesure } from "@/lib/unites-mesure.api";
 import { requireServerAccessToken } from "@/lib/requireServerAccessToken";
+import type { UniteMesure } from "@/types/unite-mesure";
 import {
   CommandeOption,
   EmballageOption,
@@ -35,11 +37,13 @@ export default async function BonLivraisonsPage({
     emballagesResult,
     commandesResult,
     entrepotsResult,
+    unitesMesureResult,
   ] = await Promise.all([
     listBonLivraisons(1, 1000, auth),
     listEmballages(1, 100, auth),
     listCommandes(1, 100, auth),
     fetchEntrepots(auth),
+    listUnitesMesure(auth),
   ]);
 
   const rows: TableBonLivraison[] =
@@ -49,7 +53,10 @@ export default async function BonLivraisonsPage({
     emballagesResult.emballages.data.map((item: any) => ({
       id: item.id,
       label: `${item.code} - ${item.name}`,
+      capacity_unit: item.capacity_unit ?? null,
     }));
+
+  const unitesMesure: UniteMesure[] = unitesMesureResult.unitesMesure ?? [];
   const commandes: CommandeOption[] =
     commandesResult.commandes.data.map((item: any) => ({
       id: item.id,
@@ -75,6 +82,7 @@ export default async function BonLivraisonsPage({
             emballages={emballages}
             commandes={commandes}
             entrepots={entrepots}
+            unitesMesure={unitesMesure}
           />
       </div>
     </div>

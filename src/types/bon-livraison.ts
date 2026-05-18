@@ -52,6 +52,7 @@ export type BonLivraisonsPaginatorInfo = {
 export type EmballageOption = {
   id: string | number;
   label: string;
+  capacity_unit: string | null;
 };
 
 export interface BonLivraisonOption {

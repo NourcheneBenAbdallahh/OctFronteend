@@ -2,7 +2,96 @@ import { AUTH_ACCESS_TOKEN_COOKIE } from "@/lib/authCookie";
 
 const STORAGE_KEY = "auth-storage";
 
-type GraphQLErrorItem = { message: string };
+type GraphQLErrorItem = {
+  message: string;
+  extensions?: {
+    validation?: Record<string, string[] | string>;
+    category?: string;
+    [key: string]: unknown;
+  };
+};
+
+/** Erreur GraphQL avec détail de validation (Lighthouse / Laravel), pour affichage utilisateur. */
+export class GraphqlRequestError extends Error {
+  override readonly name = "GraphqlRequestError";
+
+  constructor(
+    message: string,
+    public readonly graphqlErrors: GraphQLErrorItem[],
+    public readonly validationByField: Record<string, string>
+  ) {
+    super(message);
+  }
+}
+
+function normalizeValidationKey(key: string): string {
+  return key.replace(/^input\./, "").replace(/^variables\./, "");
+}
+
+function mergeGraphqlValidation(errors: GraphQLErrorItem[]): Record<string, string> {
+  const out: Record<string, string[]> = {};
+  for (const e of errors) {
+    const raw = e.extensions?.validation;
+    if (!raw || typeof raw !== "object") continue;
+    for (const [k, val] of Object.entries(raw)) {
+      const key = normalizeValidationKey(k);
+      const arr = Array.isArray(val) ? val : [String(val)];
+      out[key] = [...(out[key] ?? []), ...arr.map(String)];
+    }
+  }
+  const single: Record<string, string> = {};
+  for (const [k, arr] of Object.entries(out)) {
+    if (arr.length) single[k] = arr[0] ?? "";
+  }
+  return single;
+}
+
+/** Transforme un message serveur (anglais / technique) en phrase compréhensible pour l’utilisateur final. */
+export function friendlyGraphqlMessage(raw: string): string {
+  const m = (raw ?? "").trim();
+  if (!m) return "Une erreur est survenue. Réessayez dans un instant.";
+  if (/unauthenticated|not authenticated/i.test(m)) {
+    return "Votre session a expiré. Reconnectez-vous.";
+  }
+  if (/internal server error|500/i.test(m)) {
+    return "Le service est momentanément indisponible. Réessayez plus tard.";
+  }
+  if (/network|failed to fetch|load failed/i.test(m)) {
+    return "Connexion impossible. Vérifiez votre réseau.";
+  }
+  if (/capacity_unit|selected capacity unit/i.test(m)) {
+    return "L’unité de capacité choisie n’est pas valide. Sélectionnez une unité dans la liste.";
+  }
+  if (/already been taken|unique|duplicate/i.test(m)) {
+    return "Cette valeur existe déjà (doublon). Modifiez le code ou le nom.";
+  }
+  if (/must be (at least|greater|numeric|a number)/i.test(m)) {
+    return "Certaines valeurs numériques ne sont pas valides.";
+  }
+  if (/required/i.test(m)) {
+    return "Un ou plusieurs champs obligatoires sont manquants.";
+  }
+  if (/Validation failed|validation/i.test(m) && m.length < 120) {
+    return "Certaines informations ne sont pas acceptées. Vérifiez le formulaire.";
+  }
+  if (m.length > 200 || /exception|stack|SQLSTATE|vendor\\/i.test(m)) {
+    return "L’enregistrement n’a pas pu aboutir. Vérifiez les champs ou contactez l’administrateur.";
+  }
+  return m;
+}
+
+function buildGraphqlUserError(errors: GraphQLErrorItem[]): GraphqlRequestError {
+  const validationByField = mergeGraphqlValidation(errors);
+  const firstTechnical = errors[0]?.message ?? "Erreur GraphQL.";
+  const fromFields = Object.values(validationByField)
+    .map((s) => friendlyGraphqlMessage(s))
+    .filter(Boolean);
+  const summary =
+    fromFields.length > 0
+      ? fromFields[0] ?? friendlyGraphqlMessage(firstTechnical)
+      : friendlyGraphqlMessage(firstTechnical);
+  return new GraphqlRequestError(summary, errors, validationByField);
+}
 
 export type GraphqlRequestOptions = {
   /** Si fourni, ce jeton Prime sur le jeton lu depuis le persist Zustand. */
@@ -93,15 +182,15 @@ export async function graphqlRequest<T>(
     if (isUnauthenticatedMessage(json?.message)) {
       clearClientSessionAndRedirect();
     }
-    throw new Error(json?.message || `HTTP ${res.status}`);
+    throw new Error(friendlyGraphqlMessage(json?.message || `HTTP ${res.status}`));
   }
 
   if (json?.errors?.length) {
-    const first = (json.errors as GraphQLErrorItem[])[0];
-    if (isUnauthenticatedMessage(first?.message)) {
+    const errs = json.errors as GraphQLErrorItem[];
+    if (isUnauthenticatedMessage(errs[0]?.message)) {
       clearClientSessionAndRedirect();
     }
-    throw new Error(first?.message || "Erreur GraphQL.");
+    throw buildGraphqlUserError(errs);
   }
 
   if (json.data === undefined) {
@@ -158,15 +247,15 @@ export async function graphqlMultipartRequest<T>(
     if (isUnauthenticatedMessage(json?.message)) {
       clearClientSessionAndRedirect();
     }
-    throw new Error(json?.message || `HTTP ${res.status}`);
+    throw new Error(friendlyGraphqlMessage(json?.message || `HTTP ${res.status}`));
   }
 
   if (json?.errors?.length) {
-    const first = (json.errors as GraphQLErrorItem[])[0];
-    if (isUnauthenticatedMessage(first?.message)) {
+    const errs = json.errors as GraphQLErrorItem[];
+    if (isUnauthenticatedMessage(errs[0]?.message)) {
       clearClientSessionAndRedirect();
     }
-    throw new Error(first?.message || "Erreur GraphQL.");
+    throw buildGraphqlUserError(errs);
   }
 
   if (json.data === undefined) {

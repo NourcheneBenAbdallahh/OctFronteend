@@ -8,9 +8,11 @@ import { graphqlRequest } from "@/lib/graphqlClient";
 import { useAuthStore } from "@/store/useAuthStore";
 import { listFournisseurs } from "@/lib/fournisseurs.api";
 import { listEmballages } from "@/lib/emballages.api";
+import { listUnitesMesure } from "@/lib/unites-mesure.api";
 import { listCommandes, normalizeCommande } from "@/lib/commandes.api";
 import { normalizeContrat, TableContrat } from "@/types/contrat";
 import { TableEmballages } from "@/types/emballage";
+import type { UniteMesure } from "@/types/unite-mesure";
 import { TableFournisseur } from "@/types/fournisseur";
 import { useSearchParams } from "next/navigation";
 import { Calendar, RotateCcw, Filter, ChevronDown, ChevronUp, Download, FileSpreadsheet } from "lucide-react";
@@ -101,6 +103,7 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
 
   const [fournisseurs, setFournisseurs] = useState<TableFournisseur[]>([]);
   const [emballages, setEmballages] = useState<TableEmballages[]>([]);
+  const [unitesMesure, setUnitesMesure] = useState<UniteMesure[]>([]);
   const [userNamesById, setUserNamesById] = useState<Record<string, string>>({});
 
   const emptyForm: Partial<TableContrat> = {
@@ -118,16 +121,26 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
   };
   const [form, setForm] = useState<Partial<TableContrat>>(emptyForm);
 
+  const uniteLabelByCode = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const u of unitesMesure) {
+      m[u.code] = u.label;
+    }
+    return m;
+  }, [unitesMesure]);
+
   useEffect(() => {
     const loadRefs = async () => {
       if (!token) return;
       try {
-        const [resF, resE] = await Promise.all([
+        const [resF, resE, resU] = await Promise.all([
           listFournisseurs({ token }),
-          listEmballages(1, 100, { token })
+          listEmballages(1, 100, { token }),
+          listUnitesMesure({ token }),
         ]);
         setFournisseurs(resF.fournisseurs || []);
         setEmballages(resE.emballages.data || []);
+        setUnitesMesure(resU.unitesMesure || []);
       } catch (err) {
         console.error("Erreur de chargement des références", err);
       }
@@ -1394,6 +1407,7 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
           rows={paginatedRows}
           focusedId={focusId}
           userNamesById={userNamesById}
+          uniteLabelByCode={uniteLabelByCode}
           onEdit={(c) => { setEditing(c); setForm(c); setIsOpen(true); }}
           onDelete={async (id) => {
             if (confirm("Voulez-vous vraiment supprimer ce contrat ?")) {
@@ -1427,6 +1441,7 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
         onExtractFromFile={handleExtractFromFile}
         fournisseurs={fournisseurs}
         emballages={emballages}
+        unitesMesure={unitesMesure}
       />
     </div>
   );

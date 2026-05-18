@@ -96,6 +96,10 @@ export function canAccessPath(
     return false;
   }
 
+  if (path.startsWith("/unites-mesure")) {
+    return isAdminUser(role);
+  }
+
   if (path.startsWith("/emballages")) {
     return r === "STOCK" || r === "LOGISTIQUE";
   }
@@ -144,6 +148,12 @@ export function isAdminUser(role: string | undefined | null): boolean {
   return (role ?? "").trim().toUpperCase() === "ADMIN";
 }
 
+/** Catalogue emballages : lecture STOCK + LOGISTIQUE ; création / édition réservées à la logistique (et ADMIN côté API). */
+export function canManageEmballagesCatalog(role: string | undefined | null): boolean {
+  if (isAdminUser(role)) return true;
+  return toAccessRole(role) === "LOGISTIQUE";
+}
+
 function isStockSectionUser(role: string | undefined | null): boolean {
   return toAccessRole(role) === "STOCK";
 }
@@ -168,6 +178,15 @@ export function filterCommandesForCalendarUser<
   if (isAdminUser(role) || isLogistiqueSectionUser(role)) return commandes;
   if (!userId) return [];
   return commandes.filter((c) => String(c.created_by ?? "") === String(userId));
+}
+
+/**
+ * Aligné sur `commandes` GraphQL (@requiresRole LOGISTIQUE) : ADMIN court-circuité côté API,
+ * CONTRAT traité comme LOGISTIQUE. FINANCE / STOCK n’ont pas accès à la liste commandes.
+ */
+export function canQueryCommandesList(role: string | undefined | null): boolean {
+  if (isAdminUser(role)) return true;
+  return toAccessRole(role) === "LOGISTIQUE";
 }
 
 /** Domaine de données du tableau BI : chaque rôle a sa vue métier. */

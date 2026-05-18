@@ -52,7 +52,7 @@ export default function EmballagesClient() {
   return (
     <div className='space-y-6'>
       <div className='mt-8'>
-        <div className={`transition-opacity duration-300 ${loading ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
+        <div className={`transition-opacity duration-300 ${loading ? "opacity-50" : "opacity-100"}`}>
           <EmballagesTable
             data={emballages}
             total={total}

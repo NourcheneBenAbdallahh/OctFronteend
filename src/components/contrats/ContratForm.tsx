@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from "react";
 import { X, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Check, AlertCircle } from "lucide-react";
+import { UniteMesureSearchablePicker } from "@/components/unites-mesure/UniteMesureSearchablePicker";
 
-export const ContratForm = ({ isOpen, editing, form, setForm, onClose, onSubmit, loading, fournisseurs, emballages, onExtractFromFile, extracting }: any) => {
+export const ContratForm = ({ isOpen, editing, form, setForm, onClose, onSubmit, loading, fournisseurs, emballages, unitesMesure = [], onExtractFromFile, extracting }: any) => {
   const [step, setStep] = useState(1);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -195,8 +196,21 @@ export const ContratForm = ({ isOpen, editing, form, setForm, onClose, onSubmit,
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="bg-[#1C2434] p-8 rounded-[2.5rem] text-white space-y-8 shadow-xl">
                  <div className="grid grid-cols-2 gap-6">
-                   <InputFieldDark label="Quantité Contractuelle" type="number" value={form.quantite_contractuelle} error={errors.quantite_contractuelle} onChange={(v:any) => setForm({...form, quantite_contractuelle: Number(v)})} disabled={isLocked} />
-                   <InputFieldDark label="Unité (Tonnes, kg, m²...)" type="text" value={form.unite_quantite} onChange={(v:any) => setForm({...form, unite_quantite: v})} disabled={isLocked} />
+                   <InputFieldDark label="Quantité contractuelle" type="number" value={form.quantite_contractuelle} error={errors.quantite_contractuelle} onChange={(v:any) => setForm({...form, quantite_contractuelle: Number(v)})} disabled={isLocked} />
+                   <div className="space-y-2 min-w-0">
+                     <label className="text-[9px] font-black uppercase text-gray-500 tracking-widest ml-1">Unité de quantité</label>
+                     <UniteMesureSearchablePicker
+                       value={form.unite_quantite ?? ""}
+                       onChange={(code) => setForm({ ...form, unite_quantite: code })}
+                       unites={unitesMesure}
+                       placeholder="Choisir une unité…"
+                       disabled={isLocked}
+                       variant="dark"
+                       allowEmpty
+                       emptyLabel="— Non renseigné —"
+                       listMaxHeightClassName="max-h-52"
+                     />
+                   </div>
                  </div>
                  <div className="grid grid-cols-2 gap-6">
                    <InputFieldDark label="Cautionnement (%)" type="number" value={form.taux_cautionnement} onChange={(v:any) => setForm({...form, taux_cautionnement: Number(v)})} />

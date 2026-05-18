@@ -22,7 +22,7 @@ import { Receipt } from "lucide-react";
 import { Truck } from "lucide-react";
 import { Boxes } from "lucide-react";
 import { ShoppingCart } from "lucide-react";
-import { ArrowLeftRight, BarChart3, Users } from "lucide-react";
+import { ArrowLeftRight, BarChart3, Ruler, Users } from "lucide-react";
 import { canAccessPath, sidebarBiNavLabel } from "@/lib/access";
 import { useAuthStore } from "@/store/useAuthStore";
 type NavItem = {
@@ -47,6 +47,11 @@ const navItems: NavItem[] = [
     icon: <Users className="w-5 h-5" />,
     name: "Utilisateurs",
     path: "/users",
+  },
+  {
+    icon: <Ruler className="w-5 h-5" />,
+    name: "Unités de mesure",
+    path: "/unites-mesure",
   },
     {
   icon: <BoxCubeIcon />,
