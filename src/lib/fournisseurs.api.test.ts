@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { Fournisseur } from "@/types/fournisseur";
 import { sanitizeFournisseurInput } from "./fournisseurs.api";
 
 describe("sanitizeFournisseurInput", () => {
@@ -19,7 +20,8 @@ describe("sanitizeFournisseurInput", () => {
   });
 
   it("convertit latitude en nombre", () => {
-    expect(sanitizeFournisseurInput({ latitude: "36.8" }).latitude).toBe(36.8);
+    const formValue = { latitude: "36.8" } as unknown as Partial<Fournisseur>;
+    expect(sanitizeFournisseurInput(formValue).latitude).toBe(36.8);
     expect(sanitizeFournisseurInput({ latitude: null }).latitude).toBeNull();
   });
 
