@@ -7,7 +7,8 @@ import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import Button from "@/components/ui/button/Button";
 import Checkbox from "@/components/form/input/Checkbox";
-import { login } from "@/lib/auth.api"; 
+import { login } from "@/lib/auth.api";
+import { isValidEmailFormat } from "@/lib/email-validation"; 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/store/useAuthStore"; // Import du store
 
@@ -27,7 +28,7 @@ export default function SignInForm() {
   const validate = () => {
     const newErrors: typeof errors = {};
     if (!email) newErrors.email = "L'email est requis";
-    else if (!/\S+@\S+\.\S+/.test(email)) newErrors.email = "Format d'email invalide";
+    else if (!isValidEmailFormat(email)) newErrors.email = "Format d'email invalide";
     if (!password) newErrors.password = "Le mot de passe est requis";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;

@@ -108,7 +108,7 @@ jobs:
           context: .
           push: true
           build-args: |
-            NEXT_PUBLIC_GRAPHQL_ENDPOINT=${{ vars.NEXT_PUBLIC_GRAPHQL_ENDPOINT || 'http://localhost:8000/graphql' }}
+            NEXT_PUBLIC_GRAPHQL_ENDPOINT=${{ vars.NEXT_PUBLIC_GRAPHQL_ENDPOINT || 'http://192.168.125.1:8000/graphql' }}
             NEXT_PUBLIC_MERCURE_HUB_URL=${{ vars.NEXT_PUBLIC_MERCURE_HUB_URL || '' }}
           tags: |
             ghcr.io/${{ steps.image_vars.outputs.owner_lc }}/oct-frontend:${{ github.sha }}
