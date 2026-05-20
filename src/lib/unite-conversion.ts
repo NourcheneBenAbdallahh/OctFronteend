@@ -6,6 +6,12 @@ export function normalizeUnitCode(code: string | null | undefined): string {
     .toUpperCase();
 }
 
+/** Libellé court pour affichage (code normalisé, ex. KG, L, UNITE). */
+export function formatUnitCodeShort(code: string | null | undefined): string {
+  const c = normalizeUnitCode(code);
+  return c || "—";
+}
+
 /**
  * Unité de référence pour la quantité commandée : celle définie sur l'emballage (`capacity_unit`).
  * Si absente ou inconnue du référentiel, défaut historique logistique : KG.

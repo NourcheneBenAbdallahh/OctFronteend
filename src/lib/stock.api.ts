@@ -52,6 +52,7 @@ export async function getStocks(
             name
             code
             min_stock
+            capacity_unit
           }
           lot {
             id
@@ -105,6 +106,7 @@ const STOCKS_PAGE_QUERY = `
           name
           code
           min_stock
+          capacity_unit
         }
         lot {
           id
@@ -185,7 +187,8 @@ export async function updateStock(
           id
           name
           code
-          
+          min_stock
+          capacity_unit
         }
         lot {
           id

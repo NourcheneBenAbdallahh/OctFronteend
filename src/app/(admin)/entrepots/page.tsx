@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { Suspense, useEffect, useState, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   fetchEntrepots,
@@ -48,6 +48,14 @@ const LocalPagination = ({
 );
 
 export default function EntrepotsPage() {
+  return (
+    <Suspense fallback={<EntrepotSkeleton />}>
+      <EntrepotsPageContent />
+    </Suspense>
+  );
+}
+
+function EntrepotsPageContent() {
   const searchParams = useSearchParams();
   const focusId = searchParams.get("focus");
   const [items, setItems] = useState<Entrepot[]>([]);

@@ -201,6 +201,28 @@ export function biDataScopeForRole(role: string | undefined | null): BiDataScope
   return "full";
 }
 
+/** Alertes prédictives (consommation par emballage) : dashboard et BI stock. */
+export function canViewPredictiveStockAlerts(
+  role: string | undefined | null
+): boolean {
+  const scope = biDataScopeForRole(role);
+  return scope === "full" || scope === "stock";
+}
+
+/** Liste fournisseurs (page `/fournisseurs`) : ADMIN + LOGISTIQUE (+ CONTRAT). */
+export function canViewFournisseursList(
+  role: string | undefined | null
+): boolean {
+  return canAccessPath("/fournisseurs", role);
+}
+
+/** Carte géolocalisée : même périmètre que la liste fournisseurs. */
+export function canViewFournisseursMap(
+  role: string | undefined | null
+): boolean {
+  return canViewFournisseursList(role);
+}
+
 /** Libellé menu latéral pour la route `/bi`. */
 export function sidebarBiNavLabel(role: string | undefined | null): string {
   switch (biDataScopeForRole(role)) {
