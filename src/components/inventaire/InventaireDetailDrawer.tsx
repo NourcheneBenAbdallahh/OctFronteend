@@ -7,9 +7,10 @@ interface Props {
   item: TableInventaire | null;
   open: boolean;
   onClose: () => void;
+  onRegulariser?: () => void;
 }
 
-export default function InventaireDetailDrawer({ item, open, onClose }: Props) {
+export default function InventaireDetailDrawer({ item, open, onClose, onRegulariser }: Props) {
   if (!open || !item) return null;
 
   const isLoss = item.ecart < 0;
@@ -55,7 +56,8 @@ export default function InventaireDetailDrawer({ item, open, onClose }: Props) {
           <div className="grid grid-cols-2 gap-4">
             <div className="p-6 rounded-[24px] bg-gray-50 border border-gray-100">
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Théorique</p>
-              <p className="text-3xl font-[1000] text-gray-400">{item.stock_theorique}</p>
+              <p className="text-3xl font-[1000] text-gray-400">{item.stock_theorique_fige ?? item.stock_theorique}</p>
+              <p className="text-[10px] text-gray-300 mt-1">Actuel système : {item.stock_theorique}</p>
             </div>
             <div className="p-6 rounded-[24px] bg-white border-2 border-[#1C2434] shadow-lg shadow-gray-100">
               <p className="text-[10px] font-black text-[#00A09D] uppercase tracking-widest mb-1">Physique</p>
@@ -107,13 +109,39 @@ export default function InventaireDetailDrawer({ item, open, onClose }: Props) {
                 label="Localisation" 
                 value={item.entrepot_name} 
               />
+              <InfoRow
+                icon={<Info size={18} />}
+                label="Statut"
+                value={item.statut}
+              />
+              {item.code_session && (
+                <InfoRow icon={<Info size={18} />} label="Session" value={item.code_session} />
+              )}
+              {item.motif_ecart && (
+                <InfoRow icon={<Info size={18} />} label="Motif écart" value={item.motif_ecart} />
+              )}
+              {item.regularise_at && (
+                <InfoRow
+                  icon={<Info size={18} />}
+                  label="Régularisé"
+                  value={`${new Date(item.regularise_at).toLocaleString("fr-FR")}${item.regularisePar?.name ? ` par ${item.regularisePar.name}` : ""}`}
+                />
+              )}
             </div>
           </section>
 
         </div>
 
         {/* FOOTER ACTION */}
-        <div className="px-10 py-8 border-t border-gray-50 bg-white">
+        <div className="px-10 py-8 border-t border-gray-50 bg-white flex flex-col gap-3">
+          {item.statut !== "REGULARISEE" && onRegulariser && Math.abs(item.ecart) >= 0.0001 && (
+            <button
+              onClick={onRegulariser}
+              className="w-full h-14 rounded-[20px] bg-emerald-600 text-white font-black text-[11px] uppercase tracking-widest hover:bg-emerald-700 transition-all"
+            >
+              Régulariser le stock
+            </button>
+          )}
           <button
             onClick={onClose}
             className="w-full h-14 rounded-[20px] bg-gray-50 text-[#1C2434] font-black text-[11px] uppercase tracking-widest hover:bg-gray-100 transition-all"

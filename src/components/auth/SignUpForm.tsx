@@ -138,7 +138,7 @@ export default function SignUpForm() {
                   onChange={(val) => handleInputChange('terms', val, setIsChecked)} 
                 />
                 <p className={`text-[10px] font-[1000] uppercase leading-relaxed select-none cursor-pointer ${errors.terms ? 'text-red-500' : 'text-gray-400'}`} onClick={() => handleInputChange('terms', !isChecked, setIsChecked)}>
-                  J'accepte les conditions de StockMaster.
+                  J&apos;accepte les conditions de StockMaster.
                 </p>
               </div>
               {errors.terms && <p className="text-[9px] font-black text-red-500 uppercase ml-4">{errors.terms}</p>}
@@ -194,7 +194,7 @@ export default function SignUpForm() {
             </div>
           </div>
           <h2 className="text-7xl font-[1000] leading-[0.95] text-white tracking-tighter mb-8 uppercase">
-            L'excellence <br />
+            L&apos;excellence <br />
             <span className="text-emerald-300 italic text-6xl lowercase">à chaque flux.</span>
           </h2>
         </div>

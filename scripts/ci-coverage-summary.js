@@ -26,6 +26,11 @@ if (fs.existsSync(lcovPath)) {
   if (totalLines > 0) {
     const pct = ((100 * coveredLines) / totalLines).toFixed(2);
     line = `**Lines: ${pct}%** (${coveredLines} / ${totalLines} lines)`;
+    if (process.env.GITHUB_ACTIONS === "true") {
+      process.stderr.write(
+        `::notice title=Frontend Coverage (pipeline)::${pct}% — ${coveredLines}/${totalLines} lines in src/\n`
+      );
+    }
   } else {
     line = "**Coverage:** 0 line mesurée dans lcov.info.";
   }

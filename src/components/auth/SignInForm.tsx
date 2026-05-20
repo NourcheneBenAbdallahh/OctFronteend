@@ -91,7 +91,7 @@ export default function SignInForm() {
           <form className="space-y-6" onSubmit={handleSubmit} noValidate>
             {pendingActivation && (
               <div className="rounded-xl border-l-4 border-amber-500 bg-amber-50 p-4 text-[10px] font-black uppercase tracking-widest text-amber-700">
-                Votre compte a été créé. Un administrateur doit l'activer avant la première connexion.
+                Votre compte a été créé. Un administrateur doit l&apos;activer avant la première connexion.
               </div>
             )}
             <div className="space-y-2">
@@ -135,15 +135,15 @@ export default function SignInForm() {
             )}
 
             <Button className="w-full py-7 bg-[#00A09D] hover:bg-[#008784] text-white font-[1000] text-[12px] uppercase tracking-[0.3em] rounded-[22px] shadow-[0_15px_30px_rgba(0,160,157,0.3)] transition-all hover:-translate-y-1 active:scale-95 disabled:opacity-50" disabled={loading}>
-              {loading ? "Vérification..." : "Entrer dans l'entrepôt"}
+              {loading ? "Vérification..." : "Entrer dans l\u2019entrepôt"}
             </Button>
           </form>
 
           <div className="mt-10 text-center">
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.15em]">
-              Vous n'avez pas de compte ? 
+              Vous n&apos;avez pas de compte ? 
               <Link href="/signup" className="text-[#00A09D] ml-2 border-b-2 border-[#00A09D]/20 hover:border-[#00A09D] transition-all font-black">
-                S'inscrire
+                S&apos;inscrire
               </Link>
             </p>
           </div>

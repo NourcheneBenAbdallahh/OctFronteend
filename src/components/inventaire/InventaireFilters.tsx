@@ -52,7 +52,7 @@ export default function InventaireFilters({ data, filters, onChange }: Props) {
 
         {/* Bouton Reset */}
         <button
-          onClick={() => onChange({ search: "", status: "all", entrepot: "" })}
+          onClick={() => onChange({ search: "", status: "all", entrepot: "", code_session: "" })}
           className="h-[56px] w-[56px] flex items-center justify-center rounded-full bg-white border border-gray-100 text-gray-400 hover:text-red-500 hover:shadow-md transition-all shadow-sm group"
           title="Réinitialiser"
         >
@@ -76,6 +76,7 @@ export default function InventaireFilters({ data, filters, onChange }: Props) {
               <option value="perfect">Conformes (0)</option>
               <option value="negative">Écarts négatifs (-)</option>
               <option value="positive">Écarts positifs (+)</option>
+              <option value="non_regularise">Non régularisés</option>
             </select>
             <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none" />
           </div>

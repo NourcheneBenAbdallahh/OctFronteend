@@ -10,18 +10,30 @@ import {
   Pencil,
   Trash2,
   Calendar,
+  CheckCheck,
 } from "lucide-react";
 import { TableInventaire } from "@/types/inventaire";
 
 interface Props {
   data: TableInventaire[];
   onAdjust: (id: string, newVal: number) => void;
+  onRegulariser: (id: string) => void;
   onView: (item: TableInventaire) => void;
   onEdit: (item: TableInventaire) => void;
   onDelete: (id: string) => void;
 }
 
-export default function InventaireAuditCards({ data, onAdjust, onView, onEdit, onDelete }: Props) {
+function theoriqueRef(row: TableInventaire): number {
+  return Number(row.stock_theorique_fige ?? row.stock_theorique);
+}
+
+function statutLabel(statut: string): string {
+  if (statut === "REGULARISEE") return "Régularisé";
+  if (statut === "COMPTEE") return "Compté";
+  return "Brouillon";
+}
+
+export default function InventaireAuditCards({ data, onAdjust, onRegulariser, onView, onEdit, onDelete }: Props) {
   if (!data.length) {
     return (
       <div className="bg-white border-2 border-dashed border-gray-100 rounded-[32px] p-20 text-center">
@@ -38,11 +50,11 @@ export default function InventaireAuditCards({ data, onAdjust, onView, onEdit, o
   return (
     <div className="grid grid-cols-1 gap-6 pb-20">
       {data.map((row) => {
+        const ref = theoriqueRef(row);
         const isLoss = row.ecart < 0;
-        const isPerfect = row.ecart === 0;
-        const progress = row.stock_theorique > 0 
-          ? Math.min((row.stock_physique / row.stock_theorique) * 100, 100) 
-          : 0;
+        const isPerfect = Math.abs(row.ecart) < 0.0001;
+        const isRegularise = row.statut === "REGULARISEE";
+        const progress = ref > 0 ? Math.min((row.stock_physique / ref) * 100, 100) : 0;
 
         return (
           <div
@@ -97,9 +109,9 @@ export default function InventaireAuditCards({ data, onAdjust, onView, onEdit, o
               <div className="p-8 border-r border-gray-50 bg-gray-50/30 flex flex-col justify-center text-center xl:text-left">
                 <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-2">Système</span>
                 <div className="text-[32px] font-[1000] text-gray-400 tracking-tighter">
-                  {row.stock_theorique}
+                  {ref}
                 </div>
-                <span className="text-[11px] font-bold text-gray-300">Unités théoriques</span>
+                <span className="text-[11px] font-bold text-gray-300">Système (figé)</span>
               </div>
 
               {/* SECTION 3 : PHYSIQUE (AJUSTABLE) */}
@@ -108,8 +120,9 @@ export default function InventaireAuditCards({ data, onAdjust, onView, onEdit, o
                 <input
                   type="number"
                   defaultValue={row.stock_physique}
+                  disabled={isRegularise}
                   onBlur={(e) => onAdjust(row.id, parseFloat(e.target.value))}
-                  className="w-full text-[42px] font-[1000] text-[#1C2434] tracking-tighter outline-none bg-transparent focus:text-[#00A09D] transition-colors"
+                  className="w-full text-[42px] font-[1000] text-[#1C2434] tracking-tighter outline-none bg-transparent focus:text-[#00A09D] transition-colors disabled:opacity-50"
                 />
                 <div className="h-1 w-12 bg-gray-100 group-focus-within/input:w-full group-focus-within/input:bg-[#00A09D] transition-all duration-500" />
               </div>
@@ -132,14 +145,32 @@ export default function InventaireAuditCards({ data, onAdjust, onView, onEdit, o
                     )}
                   </div>
                   
+                  <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-full ${
+                    isRegularise ? "bg-emerald-100 text-emerald-700" : row.statut === "COMPTEE" ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-500"
+                  }`}>
+                    {statutLabel(row.statut)}
+                  </span>
                   <div className="flex gap-2">
+                    {!isRegularise && Math.abs(row.ecart) >= 0.0001 && (
+                      <button
+                        onClick={() => onRegulariser(row.id)}
+                        className="p-3 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all"
+                        title="Régulariser le stock"
+                      >
+                        <CheckCheck size={18} />
+                      </button>
+                    )}
                     <button onClick={() => onView(row)} className="p-3 rounded-xl bg-gray-50 text-gray-400 hover:bg-[#1C2434] hover:text-white transition-all">
                       <Eye size={18} />
                     </button>
                     <button onClick={() => onEdit(row)} className="p-3 rounded-xl bg-gray-50 text-gray-400 hover:bg-[#00A09D] hover:text-white transition-all">
                       <Pencil size={18} />
                     </button>
-                    <button onClick={() => onDelete(row.id)} className="p-3 rounded-xl bg-gray-50 text-gray-400 hover:bg-red-500 hover:text-white transition-all">
+                    <button
+                      onClick={() => onDelete(row.id)}
+                      disabled={isRegularise}
+                      className="p-3 rounded-xl bg-gray-50 text-gray-400 hover:bg-red-500 hover:text-white transition-all disabled:opacity-30"
+                    >
                       <Trash2 size={18} />
                     </button>
                   </div>
