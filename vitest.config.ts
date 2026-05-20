@@ -17,10 +17,10 @@ export default defineConfig({
         "src/**/types/**",
       ],
     },
-    reporters: ["default", "junit"],
-    outputFile: {
-      junit: "./junit.xml",
-    },
+    reporters: [
+      "default",
+      ["vitest-sonar-reporter", { outputFile: "sonar-report.xml" }],
+    ],
   },
   resolve: {
     alias: {

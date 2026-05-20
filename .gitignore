@@ -33,6 +33,7 @@ yarn-error.log*
 # ci artifacts
 coverage/
 junit.xml
+sonar-report.xml
 coverage.txt
 .scannerwork/
 
