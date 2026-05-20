@@ -137,13 +137,29 @@ export function readPersistedAuthToken(): string | undefined {
   }
 }
 
-/** URL HTTP du point d’entrée GraphQL (multipart upload, chatbot custom fetch, etc.). */
-export function getGraphqlEndpoint(): string {
+const DEFAULT_GRAPHQL_ENDPOINT = "http://localhost:8000/graphql";
+
+function publicGraphqlEndpoint(): string {
   return (
     process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT ||
     process.env.NEXT_PUBLIC_GRAPHQL_URL ||
-    "http://localhost:8000/graphql"
+    DEFAULT_GRAPHQL_ENDPOINT
   );
+}
+
+/**
+ * URL GraphQL selon le contexte :
+ * - Serveur (SSR dans Docker) : GRAPHQL_ENDPOINT → ex. host.docker.internal
+ * - Navigateur : NEXT_PUBLIC_GRAPHQL_ENDPOINT → ex. localhost
+ */
+export function getGraphqlEndpoint(): string {
+  if (typeof window === "undefined") {
+    return (
+      process.env.GRAPHQL_ENDPOINT ||
+      publicGraphqlEndpoint()
+    );
+  }
+  return publicGraphqlEndpoint();
 }
 
 function resolveBearer(options?: GraphqlRequestOptions): string | undefined {

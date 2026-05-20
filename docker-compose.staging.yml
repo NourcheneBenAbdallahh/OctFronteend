@@ -9,6 +9,8 @@ services:
       - .env.staging
     environment:
       NODE_ENV: production
+      # SSR depuis le conteneur : le backend est sur la machine hôte (port 8000 publié)
+      GRAPHQL_ENDPOINT: ${GRAPHQL_ENDPOINT:-http://host.docker.internal:8000/graphql}
     healthcheck:
       test:
         [
