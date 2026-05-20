@@ -7,7 +7,8 @@ import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import Button from "@/components/ui/button/Button";
 import Checkbox from "@/components/form/input/Checkbox";
-import { register } from "@/lib/auth.api"; 
+import { register } from "@/lib/auth.api";
+import { isValidEmailFormat } from "@/lib/email-validation"; 
 import { useRouter } from "next/navigation";
 
 export default function SignUpForm() {
@@ -26,7 +27,7 @@ export default function SignUpForm() {
     const e: any = {};
     if (!firstName.trim()) e.firstName = "Prénom requis";
     if (!lastName.trim()) e.lastName = "Nom requis";
-    if (!/\S+@\S+\.\S+/.test(email)) e.email = "Email invalide";
+    if (!isValidEmailFormat(email)) e.email = "Email invalide";
     if (password.length < 8) e.password = "Min. 8 caractères";
     if (!isChecked) e.terms = "Acceptation requise";
     

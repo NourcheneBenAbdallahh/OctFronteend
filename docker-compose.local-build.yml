@@ -1,0 +1,10 @@
+# Build local sans pull GHCR : docker compose -f docker-compose.staging.yml -f docker-compose.local-build.yml up -d --build
+services:
+  frontend:
+    image: oct-frontend:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_GRAPHQL_ENDPOINT: ${NEXT_PUBLIC_GRAPHQL_ENDPOINT:-http://192.168.125.1:8000/graphql}
+        NEXT_PUBLIC_MERCURE_HUB_URL: ${NEXT_PUBLIC_MERCURE_HUB_URL:-}
