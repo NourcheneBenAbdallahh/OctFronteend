@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { filterStocksForDashboardUser } from "@/lib/access";
+import { canViewFournisseursMap, filterStocksForDashboardUser } from "@/lib/access";
 import { getStocks } from "@/lib/stock.api"; 
 import { Stock } from "@/types/stock";
 
@@ -81,8 +81,7 @@ export default function Ecommerce() {
         {/* Santé globale (Radial bar) */}
         <StockHealthScore stocks={dashboardStocks} />
         
-        {/* Carte des fournisseurs */}
-        <FournisseursMapCard />
+        {canViewFournisseursMap(user?.role) ? <FournisseursMapCard /> : null}
         
         {/* Petit rappel informatif ou autre widget si nécessaire */}
      <div className="p-8 bg-gradient-to-br from-[#00A09D] to-[#00817F] rounded-[40px] text-white shadow-lg shadow-[#00A09D]/10 relative overflow-hidden group">

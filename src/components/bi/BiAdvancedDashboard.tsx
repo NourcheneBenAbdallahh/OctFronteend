@@ -36,10 +36,14 @@ import {
 import { getAllStocks } from "@/lib/stock.api";
 import {
   biDataScopeForRole,
+  canViewFournisseursMap,
+  canViewPredictiveStockAlerts,
   filterCommandesForCalendarUser,
   filterStocksForDashboardUser,
   isAdminUser,
 } from "@/lib/access";
+import StockPredictionCard from "@/components/dashboard/StockPredictionCard";
+import FournisseursMapCard from "@/components/fournisseurs/FournisseursMapCard";
 import { useAuthStore } from "@/store/useAuthStore";
 import type { Stock } from "@/types/stock";
 import type { Commande } from "@/types/commandes";
@@ -128,6 +132,8 @@ export default function BiAdvancedDashboard() {
   const showStock = scope === "full" || scope === "stock";
   const showCmd = scope === "full" || scope === "logistique";
   const showFac = scope === "full" || scope === "finance";
+  const showPredictiveAlerts = canViewPredictiveStockAlerts(user?.role);
+  const showFournisseursMap = canViewFournisseursMap(user?.role);
 
   const [period, setPeriod] = useState<BiPeriodKey>("90d");
   const [entrepot, setEntrepot] = useState<string | "all">("all");
@@ -929,6 +935,42 @@ export default function BiAdvancedDashboard() {
             )}
           </div>
         </>
+      ) : null}
+
+      {showPredictiveAlerts ? (
+        <section className="w-full rounded-[40px] border border-[#DDF2F1] bg-[#F8FAFA] p-8 dark:border-teal-900/30 dark:bg-gray-900/40">
+          <div className="mb-8">
+            <h3 className="text-xl font-[1000] uppercase tracking-tighter text-[#1C2434] dark:text-white">
+              Alertes Prédictives
+            </h3>
+            <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-gray-400">
+              Basé sur la consommation réelle par produit
+              {entrepot !== "all" ? ` · ${entrepot}` : ""}
+            </p>
+          </div>
+          {loading ? (
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="min-h-[220px] animate-pulse rounded-[35px] border-2 border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-800"
+                />
+              ))}
+            </div>
+          ) : stocksScoped.length === 0 ? (
+            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+              Aucune donnée de stock sur ce périmètre pour calculer les alertes.
+            </p>
+          ) : (
+            <StockPredictionCard stocks={stocksScoped} />
+          )}
+        </section>
+      ) : null}
+
+      {showFournisseursMap ? (
+        <section className="w-full">
+          <FournisseursMapCard enabled={showFournisseursMap} />
+        </section>
       ) : null}
 
       {/* Charts row 1 */}

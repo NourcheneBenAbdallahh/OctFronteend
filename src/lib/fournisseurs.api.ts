@@ -38,6 +38,23 @@ export async function listFournisseurs(opts?: GraphqlRequestOptions) {
   );
 }
 
+const LIST_FOURNISSEURS_MAP = `
+  query {
+    fournisseursMap {
+      ${FOURNISSEUR_FIELDS}
+    }
+  }
+`;
+
+/** Fournisseurs géolocalisés pour la carte (dashboard / BI — rôles STOCK & ADMIN). */
+export async function listFournisseursForMap(opts?: GraphqlRequestOptions) {
+  return graphqlRequest<{ fournisseursMap: Fournisseur[] }>(
+    LIST_FOURNISSEURS_MAP,
+    {},
+    opts
+  );
+}
+
 const CREATE_FOURNISSEUR = `
   mutation CreateFournisseur($input: FournisseurCreateInput!) {
     createFournisseur(input: $input) {

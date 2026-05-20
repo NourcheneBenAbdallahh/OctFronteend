@@ -33,11 +33,7 @@ type NavItem = {
 };
 
 const navItems: NavItem[] = [
-  {
-    icon: <GridIcon />,
-    name: "Dashboard",
-    path: "/",
-  },
+ 
   {
     icon: <BarChart3 className="w-5 h-5" />,
     name: "Tableau BI",

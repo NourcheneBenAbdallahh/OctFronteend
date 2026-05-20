@@ -1,0 +1,288 @@
+name: Frontend CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      deploy_local:
+        description: "Déployer sur la machine locale (runner self-hosted Windows)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  quality:
+    name: quality
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: .
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run typecheck
+        run: npm run typecheck
+
+      - name: Run lint (ESLint on changed files)
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
+          fi
+
+          if [[ -z "$BASE_SHA" || "$BASE_SHA" == "0000000000000000000000000000000000000000" ]]; then
+            echo "No valid base SHA found, linting all source files."
+            npm run lint
+            exit 0
+          fi
+
+          CHANGED=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.mjs' | tr '\n' ' ' | xargs)
+
+          if [[ -z "$CHANGED" ]]; then
+            echo "No changed source files. Skipping ESLint."
+            exit 0
+          fi
+
+          echo "Linting changed files:"
+          echo "$CHANGED"
+          npx eslint $CHANGED
+
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    needs: [quality]
+    outputs:
+      image_ref: ${{ steps.image_ref.outputs.value }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare Docker tags
+        id: image_vars
+        shell: bash
+        run: |
+          OWNER_LC=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          REF_SAFE=$(echo "${{ github.ref_name }}" | tr '[:upper:]' '[:lower:]' | tr '/' '-')
+          echo "owner_lc=$OWNER_LC" >> "$GITHUB_OUTPUT"
+          echo "ref_safe=$REF_SAFE" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push frontend image
+        id: docker_build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          build-args: |
+            NEXT_PUBLIC_GRAPHQL_ENDPOINT=${{ vars.NEXT_PUBLIC_GRAPHQL_ENDPOINT || 'http://localhost:8000/graphql' }}
+            NEXT_PUBLIC_MERCURE_HUB_URL=${{ vars.NEXT_PUBLIC_MERCURE_HUB_URL || '' }}
+          tags: |
+            ghcr.io/${{ steps.image_vars.outputs.owner_lc }}/oct-frontend:${{ github.sha }}
+            ghcr.io/${{ steps.image_vars.outputs.owner_lc }}/oct-frontend:${{ steps.image_vars.outputs.ref_safe }}
+
+      - name: Export image ref
+        id: image_ref
+        run: echo "value=ghcr.io/${{ steps.image_vars.outputs.owner_lc }}/oct-frontend:${{ github.sha }}" >> "$GITHUB_OUTPUT"
+
+  unit_tests:
+    name: unit_tests
+    runs-on: ubuntu-latest
+    needs: [quality, build]
+
+    defaults:
+      run:
+        working-directory: .
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Vitest with coverage
+        run: npm run test:coverage 2>&1 | tee coverage.txt
+
+      - name: Publish coverage summary
+        run: node scripts/ci-coverage-summary.js
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: |
+            coverage/lcov.info
+            coverage/coverage-final.json
+            coverage.txt
+            junit.xml
+
+  sonar:
+    name: sonar
+    runs-on: ubuntu-latest
+    needs: [unit_tests]
+
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download coverage report
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-coverage
+
+      - name: Verify coverage reports for SonarCloud
+        shell: bash
+        run: |
+          test -f coverage/lcov.info || { echo "::error::coverage/lcov.info manquant"; exit 1; }
+          test -f junit.xml || { echo "::error::junit.xml manquant"; exit 1; }
+          echo "Rapports de couverture prêts pour SonarCloud."
+
+      - name: Validate SonarCloud token
+        shell: bash
+        run: |
+          if [[ -z "${{ secrets.SONAR_TOKEN }}" ]]; then
+            echo "::error::Secret SONAR_TOKEN manquant (SonarCloud → My Account → Security → Generate Token)."
+            exit 1
+          fi
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarqube-scan-action@v4.2.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  integration_tests:
+    name: integration_tests
+    runs-on: ubuntu-latest
+    needs: [unit_tests, build]
+
+    steps:
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull image and smoke test
+        run: |
+          docker pull "${{ needs.build.outputs.image_ref }}"
+          docker run --rm "${{ needs.build.outputs.image_ref }}" node -v
+
+  deploy_staging:
+    name: deploy_local_machine
+    runs-on: [self-hosted, Windows, X64]
+    needs: [integration_tests, build]
+    if: >
+      github.event_name != 'pull_request' &&
+      (github.event_name == 'push' ||
+       (github.event_name == 'workflow_dispatch' && inputs.deploy_local == true))
+    environment:
+      name: local
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare .env.staging
+        shell: powershell
+        env:
+          ENV_STAGING_SECRET: ${{ secrets.ENV_STAGING }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          if (Test-Path -LiteralPath ".env.staging") {
+            Write-Host ".env.staging already present in workspace."
+            exit 0
+          }
+          if (-not [string]::IsNullOrWhiteSpace($env:ENV_STAGING_SECRET)) {
+            $path = Join-Path (Get-Location) ".env.staging"
+            $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+            [System.IO.File]::WriteAllText($path, $env:ENV_STAGING_SECRET, $utf8NoBom)
+            Write-Host "Wrote .env.staging from GitHub Actions secret ENV_STAGING."
+            exit 0
+          }
+          $copyFrom = @(
+            (Join-Path (Join-Path $env:ProgramData "OctFrontend") ".env.staging")
+            (Join-Path (Join-Path $env:LOCALAPPDATA "OctFrontend") ".env.staging")
+            (Join-Path $env:USERPROFILE ".oct-frontend.env.staging")
+          )
+          foreach ($src in $copyFrom) {
+            if (Test-Path -LiteralPath $src) {
+              Copy-Item -LiteralPath $src -Destination ".env.staging"
+              Write-Host "Copied .env.staging from $src"
+              exit 0
+            }
+          }
+          Write-Host "Cannot deploy: missing .env.staging."
+          Write-Host 'Option A - GitHub secret ENV_STAGING with the full .env.staging file content.'
+          Write-Host 'Option B - On this runner, copy .env.staging once to one of these paths:'
+          Write-Host ('  - {0}' -f $copyFrom[0])
+          Write-Host ('  - {0}' -f $copyFrom[1])
+          Write-Host ('  - {0}' -f $copyFrom[2])
+          exit 1
+
+      - name: Deploy with Docker Compose on local machine
+        env:
+          IMAGE_REF: ${{ needs.build.outputs.image_ref }}
+        run: |
+          docker compose --env-file .env.staging -f docker-compose.staging.yml pull
+          docker compose --env-file .env.staging -f docker-compose.staging.yml up -d --remove-orphans
+          docker compose --env-file .env.staging -f docker-compose.staging.yml ps
