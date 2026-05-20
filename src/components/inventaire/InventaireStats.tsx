@@ -5,7 +5,8 @@ import { TableInventaire } from "@/types/inventaire";
 
 export default function InventaireStats({ data }: { data: TableInventaire[] }) {
   const total = data.length;
-  const exact = data.filter((i) => i.ecart === 0).length;
+  const regularise = data.filter((i) => i.statut === "REGULARISEE").length;
+  const exact = data.filter((i) => Math.abs(i.ecart) < 0.0001).length;
   const negative = data.filter((i) => i.ecart < 0);
   const positive = data.filter((i) => i.ecart > 0);
 
@@ -18,7 +19,7 @@ export default function InventaireStats({ data }: { data: TableInventaire[] }) {
     {
       title: "Fiabilité Stock",
       value: `${exactitude}%`,
-      sub: `${exact} lignes conformes`,
+      sub: `${regularise} régularisées · ${exact} conformes`,
       icon: <Activity size={22} />,
       bg: "bg-[#F2F7F7]",
       text: "text-[#00A09D]",

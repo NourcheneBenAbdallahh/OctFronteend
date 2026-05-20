@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { UniteMesure } from "@/types/unite-mesure";
 import {
   convertQuantityBetweenUnites,
+  formatQuantitePrincipale,
   formatUnitCodeShort,
   normalizeUnitCode,
   resolvePrincipalUnitCode,
@@ -78,5 +79,15 @@ describe("convertQuantityBetweenUnites", () => {
 
   it("retourne null si dimensions incompatibles", () => {
     expect(convertQuantityBetweenUnites(10, "KG", "UNITE", unites)).toBeNull();
+  });
+});
+
+describe("formatQuantitePrincipale", () => {
+  it("retourne un tiret si non fini", () => {
+    expect(formatQuantitePrincipale(Number.NaN)).toBe("—");
+  });
+
+  it("formate un nombre en fr-FR", () => {
+    expect(formatQuantitePrincipale(1234.5)).toMatch(/1/);
   });
 });
