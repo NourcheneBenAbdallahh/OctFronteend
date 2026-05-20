@@ -272,7 +272,7 @@ jobs:
             }
           }
           Write-Host "Cannot deploy: missing .env.staging."
-          Write-Host 'Option A - GitHub secret ENV_STAGING with the full .env.staging file content.'
+          Write-Host 'Option A - GitHub secret ENV_STAGING with the full .env.staging file content (include GRAPHQL_ENDPOINT=http://host.docker.internal:8000/graphql).'
           Write-Host 'Option B - On this runner, copy .env.staging once to one of these paths:'
           Write-Host ('  - {0}' -f $copyFrom[0])
           Write-Host ('  - {0}' -f $copyFrom[1])
