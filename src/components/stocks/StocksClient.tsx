@@ -16,6 +16,8 @@ import StocksTableView from "./StocksTableView";
 import StockDetailsDrawer from "./StockDetailsDrawer";
 import StockEditDrawer from "./StockEditDrawer";
 import { deleteStock, updateStock } from "@/lib/stock.api";
+import { AppConfirmModal, AppFeedbackBanner } from "@/components/ui/feedback";
+import { getActionErrorMessage, useAppFeedback } from "@/hooks/useAppFeedback";
 
 interface Props {
   initialStocks: Stock[];
@@ -62,6 +64,16 @@ export default function StocksClient({ initialStocks }: Props) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingStock, setEditingStock] = useState<Stock | null>(null);
   const [editOpen, setEditOpen] = useState(false);
+  const {
+    feedback,
+    confirm,
+    showSuccess,
+    showError,
+    clearFeedback,
+    openConfirm,
+    closeConfirm,
+    runConfirmedAction,
+  } = useAppFeedback();
 
   const [filters, setFilters] = useState<StockFiltersState>({
     search: "",
@@ -230,31 +242,41 @@ if (filters.sort === "quantite_asc") {
     setEditOpen(true);
   };
 
-  const handleDelete = async (stock: Stock) => {
-    if (!window.confirm(`Supprimer le mouvement #${stock.id} ?`)) return;
-    try {
-      await deleteStock(stock.id);
-      setRows((prev) => prev.filter((r) => r.id !== stock.id));
-    } catch (error) {
-      console.error(error);
-    }
+  const handleDelete = (stock: Stock) => {
+    clearFeedback();
+    openConfirm({
+      title: "Supprimer ce mouvement ?",
+      detail: `Mouvement #${stock.id}`,
+      description: "Cette action est définitive.",
+      variant: "danger",
+      onConfirm: () =>
+        void runConfirmedAction(async () => {
+          await deleteStock(stock.id);
+          setRows((prev) => prev.filter((r) => r.id !== stock.id));
+          showSuccess("Mouvement supprimé.");
+        }),
+    });
   };
 
   const handleSubmitEdit = async (payload: any) => {
     if (!editingStock) return;
+    clearFeedback();
     try {
       const updated = await updateStock(editingStock.id, payload);
       setRows((prev) =>
         prev.map((row) => (row.id === updated.id ? updated : row))
       );
       setEditOpen(false);
+      showSuccess("Mouvement modifié.");
     } catch (error) {
-      console.error(error);
+      showError(getActionErrorMessage(error));
     }
   };
 
   return (
     <div className="space-y-5 pb-20">
+      <AppFeedbackBanner feedback={feedback} onDismiss={clearFeedback} />
+      <AppConfirmModal confirm={confirm} onClose={closeConfirm} />
       <StocksHeader />
       <StocksStats stats={stats} />
 

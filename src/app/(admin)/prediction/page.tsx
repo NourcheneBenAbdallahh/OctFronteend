@@ -6,6 +6,8 @@ import StockForecastChart from "@/components/prediction/StockForecastChart";
 import { listEmballages } from "@/lib/emballages.api";
 import jsPDF from "jspdf";
 import { useAuthStore } from "@/store/useAuthStore";
+import { AppFeedbackBanner } from "@/components/ui/feedback";
+import { useAppFeedback } from "@/hooks/useAppFeedback";
 
 interface Emballage {
   id: string;
@@ -22,6 +24,7 @@ export default function ForecastingPage() {
   const [data, setData] = useState<PredictDemandResponse["predictDemand"] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { feedback, showError: showActionError, clearFeedback } = useAppFeedback();
 
   // ===== Unité affichable =====
   const displayUnit = useMemo(() => {
@@ -301,13 +304,14 @@ export default function ForecastingPage() {
       pdf.save(`Rapport_OCT_${data.name}.pdf`);
     } catch (err) {
       console.error("Erreur PDF:", err);
-      alert("Erreur lors de la génération du PDF.");
+      showActionError("Erreur lors de la génération du PDF.");
     }
   };
 
   return (
     <div className="p-6 bg-[#f8fafc] min-h-screen space-y-6">
       <div className="max-w-7xl mx-auto mt-8">
+        <AppFeedbackBanner feedback={feedback} onDismiss={clearFeedback} />
         {/* HEADER PAGE */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
           <div>

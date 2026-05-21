@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Plus, Search, UserCog, BoxSelect, Filter, UserPlus, UserPen, KeyRound, X } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Plus, Search, UserCog, BoxSelect, Filter, UserPlus, UserPen, KeyRound, Trash2, X } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useUsersAdmin } from "./useUsersAdmin";
@@ -10,6 +10,7 @@ import {
   UserRole, adminDeleteUser, adminUpdateUserRole, 
   adminSetUserActive, adminCreateUser, adminUpdateUser, adminResetUserPassword
 } from "@/lib/users.api";
+import { AppFeedbackBanner } from "@/components/ui/feedback";
 
 const ROLE_OPTIONS: UserRole[] = ["ADMIN", "STOCK", "LOGISTIQUE", "FINANCE"];
 const ROLE_LABEL: Record<string, string> = { 
@@ -22,8 +23,16 @@ export default function UsersAdminPage() {
   const me = useAuthStore((s) => s.user);
   const {
     users, paginatorInfo, page, setPage, searchInput, setSearchInput,
-    roleFilter, setRoleFilter, loading, savingId, error, success, handleAction
+    roleFilter, setRoleFilter, loading, savingId, error, success, handleAction,
+    setError, setSuccess,
   } = useUsersAdmin(perPage);
+
+  const pageFeedback =
+    error != null
+      ? { type: "error" as const, message: error }
+      : success != null
+        ? { type: "success" as const, message: success }
+        : null;
 
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -64,6 +73,7 @@ export default function UsersAdminPage() {
   const [createRoleSearch, setCreateRoleSearch] = useState("");
   const [roleFilterOpen, setRoleFilterOpen] = useState(false);
   const [roleFilterSearch, setRoleFilterSearch] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,10 +168,20 @@ export default function UsersAdminPage() {
     }
   };
 
-  // Exemple de handler pour la suppression
   const onDelete = (id: string, name: string) => {
-    if (window.confirm(`Supprimer l'utilisateur "${name}" ?`)) {
-      handleAction(`delete-${id}`, () => adminDeleteUser(id), "Utilisateur supprimé avec succès.");
+    setDeleteTarget({ id, name });
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!deleteTarget) return;
+    const { id } = deleteTarget;
+    const ok = await handleAction(
+      `delete-${id}`,
+      () => adminDeleteUser(id),
+      "Utilisateur supprimé."
+    );
+    if (ok) {
+      setDeleteTarget(null);
     }
   };
 
@@ -298,9 +318,13 @@ export default function UsersAdminPage() {
         </div>
       </section>
 
-      {/* FEEDBACK MESSAGES */}
-      {error && <div className="p-3 rounded-xl bg-red-50 text-red-600 text-sm font-bold">{error}</div>}
-      {success && <div className="p-3 rounded-xl bg-emerald-50 text-emerald-600 text-sm font-bold">{success}</div>}
+      <AppFeedbackBanner
+        feedback={pageFeedback}
+        onDismiss={() => {
+          setError(null);
+          setSuccess(null);
+        }}
+      />
 
       <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
       {users.length > 0 ? (
@@ -656,6 +680,51 @@ export default function UsersAdminPage() {
             </div>
           </form>
         </div>
+      </Modal>
+
+      <Modal
+        isOpen={!!deleteTarget}
+        onClose={() => {
+          if (savingId?.startsWith("delete-")) return;
+          setDeleteTarget(null);
+        }}
+        className="max-w-md rounded-[32px] p-8"
+        showCloseButton
+      >
+        {deleteTarget && (
+          <div className="text-center">
+            <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-red-50 text-red-600">
+              <Trash2 size={28} />
+            </div>
+            <h3 className="mb-2 text-xl font-black tracking-tight text-[#1C2434]">
+              Supprimer cet utilisateur ?
+            </h3>
+            <p className="text-sm font-medium text-gray-500">
+              <span className="font-black text-[#1C2434]">{deleteTarget.name}</span>
+            </p>
+            <p className="mt-4 text-sm text-gray-400">
+              Cette action est définitive. Le compte sera retiré de la liste des utilisateurs.
+            </p>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                disabled={!!savingId?.startsWith("delete-")}
+                className="h-12 rounded-full border border-gray-200 px-8 text-[11px] font-black uppercase tracking-widest text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmDeleteUser()}
+                disabled={!!savingId?.startsWith("delete-")}
+                className="h-12 rounded-full bg-red-600 px-8 text-[11px] font-black uppercase tracking-widest text-white transition-colors hover:bg-red-700 disabled:opacity-40"
+              >
+                {savingId?.startsWith("delete-") ? "Suppression…" : "Supprimer"}
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
 
       <Modal

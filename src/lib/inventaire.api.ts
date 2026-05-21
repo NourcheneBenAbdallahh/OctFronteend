@@ -18,12 +18,24 @@ export const INVENTAIRE_FIELDS = `
   periode_debut
   periode_fin
   regularisation_stock_id
+  mouvement_stock_id
+  lot_id
   regularise_par
   regularise_at
   entrepot { id nom }
   emballage { id name }
   user { id name }
   regularisePar { id name }
+  mouvementStock {
+    id
+    code_mouvement
+    type_mouvement
+    quantite
+    statut
+    date_mouvement
+    user { id name }
+  }
+  lot { id code_lot quantite }
 `;
 
 export function normalizeInventaire(inv: StockInventaire): TableInventaire {
@@ -42,9 +54,21 @@ const LIST_INVENTAIRES = `
   }
 `;
 
-const STOCK_THEORIQUE_AT = `
-  query($entrepot_id: ID!, $emballage_id: ID!, $at: DateTime!) {
-    stockTheoriqueAt(entrepot_id: $entrepot_id, emballage_id: $emballage_id, at: $at)
+const STOCK_THEORIQUE_INVENTAIRE = `
+  query(
+    $entrepot_id: ID!
+    $emballage_id: ID!
+    $date_inventaire: DateTime!
+    $periode_debut: DateTime
+    $periode_fin: DateTime
+  ) {
+    stockTheoriqueInventaire(
+      entrepot_id: $entrepot_id
+      emballage_id: $emballage_id
+      date_inventaire: $date_inventaire
+      periode_debut: $periode_debut
+      periode_fin: $periode_fin
+    )
   }
 `;
 
@@ -110,18 +134,28 @@ export async function listInventaires(
   }
 }
 
-export async function fetchStockTheoriqueAt(
-  entrepotId: string,
-  emballageId: string,
-  at: string,
+export async function fetchStockTheoriqueInventaire(
+  params: {
+    entrepot_id: string;
+    emballage_id: string;
+    date_inventaire: string;
+    periode_debut?: string;
+    periode_fin?: string;
+  },
   opts?: GraphqlRequestOptions
 ): Promise<number> {
-  const data = await graphqlRequest<{ stockTheoriqueAt: number }>(
-    STOCK_THEORIQUE_AT,
-    { entrepot_id: entrepotId, emballage_id: emballageId, at },
+  const data = await graphqlRequest<{ stockTheoriqueInventaire: number }>(
+    STOCK_THEORIQUE_INVENTAIRE,
+    {
+      entrepot_id: params.entrepot_id,
+      emballage_id: params.emballage_id,
+      date_inventaire: params.date_inventaire,
+      periode_debut: params.periode_debut || null,
+      periode_fin: params.periode_fin || null,
+    },
     opts
   );
-  return data.stockTheoriqueAt;
+  return data.stockTheoriqueInventaire;
 }
 
 export async function createInventaire(input: CreateInventaireInput): Promise<StockInventaire | null> {
@@ -150,16 +184,13 @@ export async function updateInventaire(id: string, input: Record<string, unknown
   }
 }
 
-export async function deleteInventaire(id: string): Promise<boolean> {
-  try {
-    const data = await graphqlRequest<{ deleteStockInventaire: { id: string } }>(
-      DELETE_INVENTAIRE,
-      { id }
-    );
-    return !!data.deleteStockInventaire;
-  } catch (error) {
-    console.error(`[API Inventaire] Erreur lors de la suppression (ID: ${id}) :`, error);
-    return false;
+export async function deleteInventaire(id: string): Promise<void> {
+  const data = await graphqlRequest<{ deleteStockInventaire: { id: string } }>(
+    DELETE_INVENTAIRE,
+    { id }
+  );
+  if (!data.deleteStockInventaire?.id) {
+    throw new Error("La suppression n'a pas abouti.");
   }
 }
 
@@ -171,14 +202,30 @@ export async function regulariserInventaire(id: string): Promise<StockInventaire
   return data.regulariserStockInventaire;
 }
 
+export type GenererInventaireEntrepotParams = {
+  entrepotId: string;
+  dateInventaire: string;
+  scope: "DAY" | "YEAR";
+  codeSession?: string;
+  periodeDebut?: string;
+  periodeFin?: string;
+};
+
 export async function genererInventaireEntrepot(
-  entrepotId: string,
-  dateInventaire: string,
-  codeSession?: string
+  params: GenererInventaireEntrepotParams
 ): Promise<StockInventaire[]> {
   const data = await graphqlRequest<{ genererInventaireEntrepot: StockInventaire[] }>(
     GENERER_ENTREPOT,
-    { input: { entrepot_id: entrepotId, date_inventaire: dateInventaire, code_session: codeSession } }
+    {
+      input: {
+        entrepot_id: params.entrepotId,
+        date_inventaire: params.dateInventaire,
+        scope: params.scope,
+        code_session: params.codeSession,
+        periode_debut: params.periodeDebut,
+        periode_fin: params.periodeFin,
+      },
+    }
   );
   return data.genererInventaireEntrepot;
 }

@@ -19,6 +19,8 @@ import { Calendar, RotateCcw, Filter, ChevronDown, ChevronUp, Download, FileSpre
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { exportContratsCsv, type ContratUsageHistoryCsvRow } from "@/lib/contrats.csv";
+import { AppConfirmModal, AppFeedbackBanner } from "@/components/ui/feedback";
+import { getActionErrorMessage, useAppFeedback } from "@/hooks/useAppFeedback";
 
 // Sous-composant interne pour la pagination en français
 const LocalPagination = ({ 
@@ -96,6 +98,17 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
   const [exportMonthSearch, setExportMonthSearch] = useState<string>("");
   const [exporting, setExporting] = useState(false);
   const [exportingCsv, setExportingCsv] = useState(false);
+  const {
+    feedback,
+    confirm,
+    showSuccess,
+    showError,
+    showInfo,
+    clearFeedback,
+    openConfirm,
+    closeConfirm,
+    runConfirmedAction,
+  } = useAppFeedback();
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -404,7 +417,7 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
 
   const handleExportPdf = async () => {
     if (!exportRows.length) {
-      alert("Aucune donnee a exporter avec ces parametres.");
+      showInfo("Aucune donnée à exporter avec ces paramètres.");
       return;
     }
 
@@ -521,7 +534,7 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
 
   const handleExportCsv = async () => {
     if (!exportRows.length) {
-      alert("Aucune donnee a exporter avec ces parametres.");
+      showInfo("Aucune donnée à exporter avec ces paramètres.");
       return;
     }
     if (exporting || exportingCsv) return;
@@ -549,7 +562,7 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
       exportContratsCsv(exportRows, exportStats, period, history);
     } catch (e) {
       console.error(e);
-      alert("Erreur lors de l'export CSV.");
+      showError("Erreur lors de l'export CSV.");
     } finally {
       setExportingCsv(false);
     }
@@ -697,9 +710,10 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
       setIsOpen(false);
       setEditing(null);
       setForm(emptyForm);
+      showSuccess(editing ? "Contrat modifié." : "Contrat créé.");
     } catch (err) {
       console.error(err);
-      alert("Erreur de sauvegarde : Vérifiez les champs obligatoires.");
+      showError(getActionErrorMessage(err, "Erreur de sauvegarde : vérifiez les champs obligatoires."));
     } finally {
       setLoading(false);
     }
@@ -758,17 +772,35 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
         fournisseur_id: extracted.fournisseur_id || prev.fournisseur_id || "",
         emballage_id: extracted.emballage_id || prev.emballage_id || "",
       }));
-      alert("Extraction OCR terminee et formulaire pre-rempli.");
+      showSuccess("Extraction OCR terminée et formulaire pré-rempli.");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Extraction OCR impossible.";
-      alert(message);
+      showError(getActionErrorMessage(error, "Extraction OCR impossible."));
     } finally {
       setExtracting(false);
     }
   };
 
+  const requestDeleteContrat = (id: string | number) => {
+    const item = rows.find((x) => String(x.id) === String(id));
+    clearFeedback();
+    openConfirm({
+      title: "Supprimer ce contrat ?",
+      detail: item?.numero_contrat ?? "",
+      description: "Cette action est définitive.",
+      variant: "danger",
+      onConfirm: () =>
+        void runConfirmedAction(async () => {
+          await deleteContrat(id);
+          setRows((r) => r.filter((x) => String(x.id) !== String(id)));
+          showSuccess("Contrat supprimé.");
+        }),
+    });
+  };
+
   return (
     <div className="flex flex-col gap-6 min-h-[700px]">
+      <AppFeedbackBanner feedback={feedback} onDismiss={clearFeedback} />
+      <AppConfirmModal confirm={confirm} onClose={closeConfirm} />
       <ContratHeader
         query={query}
         setQuery={setQuery}
@@ -1409,12 +1441,7 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
           userNamesById={userNamesById}
           uniteLabelByCode={uniteLabelByCode}
           onEdit={(c) => { setEditing(c); setForm(c); setIsOpen(true); }}
-          onDelete={async (id) => {
-            if (confirm("Voulez-vous vraiment supprimer ce contrat ?")) {
-              await deleteContrat(id);
-              setRows(r => r.filter(x => x.id !== id));
-            }
-          }}
+          onDelete={requestDeleteContrat}
         />
       </div>
 

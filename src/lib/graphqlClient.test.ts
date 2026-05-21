@@ -1,5 +1,12 @@
-import { describe, expect, it } from "vitest";
-import { friendlyGraphqlMessage } from "./graphqlClient";
+/**
+ * @vitest-environment jsdom
+ */
+import { afterEach, describe, expect, it } from "vitest";
+import {
+  friendlyGraphqlMessage,
+  getGraphqlEndpoint,
+  readPersistedAuthToken,
+} from "./graphqlClient";
 
 describe("friendlyGraphqlMessage", () => {
   it("retourne un message par défaut si vide", () => {
@@ -26,5 +33,40 @@ describe("friendlyGraphqlMessage", () => {
 
   it("conserve un message court lisible", () => {
     expect(friendlyGraphqlMessage("Email invalide")).toBe("Email invalide");
+  });
+
+  it("traduit capacity_unit et champs requis", () => {
+    expect(friendlyGraphqlMessage("The selected capacity unit is invalid")).toContain(
+      "unité"
+    );
+    expect(friendlyGraphqlMessage("The field is required")).toContain("obligatoires");
+  });
+});
+
+describe("getGraphqlEndpoint", () => {
+  const orig = process.env;
+
+  afterEach(() => {
+    process.env = { ...orig };
+  });
+
+  it("utilise NEXT_PUBLIC_GRAPHQL_ENDPOINT dans le navigateur", () => {
+    process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT = "http://browser.test/graphql";
+    expect(getGraphqlEndpoint()).toBe("http://browser.test/graphql");
+  });
+});
+
+describe("readPersistedAuthToken", () => {
+  it("lit le token depuis localStorage", () => {
+    localStorage.setItem(
+      "auth-storage",
+      JSON.stringify({ state: { token: "jwt-test" } })
+    );
+    expect(readPersistedAuthToken()).toBe("jwt-test");
+  });
+
+  it("retourne undefined si absent", () => {
+    localStorage.clear();
+    expect(readPersistedAuthToken()).toBeUndefined();
   });
 });

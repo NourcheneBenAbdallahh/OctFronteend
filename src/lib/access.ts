@@ -127,7 +127,7 @@ export function canAccessPath(
     return r === "STOCK";
   }
   if (path.startsWith("/prediction")) {
-    return r === "STOCK";
+    return canUseStockAi(role);
   }
 
   if (path.startsWith("/commandes")) {

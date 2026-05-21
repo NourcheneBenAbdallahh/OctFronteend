@@ -127,6 +127,16 @@ export default function InventaireDetailDrawer({ item, open, onClose, onRegulari
                   value={`${new Date(item.regularise_at).toLocaleString("fr-FR")}${item.regularisePar?.name ? ` par ${item.regularisePar.name}` : ""}`}
                 />
               )}
+              {item.mouvementStock && (
+                <InfoRow
+                  icon={<Info size={18} />}
+                  label="Mouvement stock"
+                  value={`${item.mouvementStock.type_mouvement} — ${item.mouvementStock.code_mouvement || item.mouvementStock.id} (${item.mouvementStock.quantite} u.)`}
+                />
+              )}
+              {item.lot?.code_lot && (
+                <InfoRow icon={<Package size={18} />} label="Lot" value={item.lot.code_lot} />
+              )}
             </div>
           </section>
 

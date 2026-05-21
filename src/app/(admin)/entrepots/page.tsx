@@ -13,6 +13,8 @@ import { EntrepotSkeleton } from "@/components/entrepot/EntrepotSkeleton";
 import EntrepotsFormModal from "@/components/entrepot/EntrepotsFormModal";
 import { EntrepotsHeader } from "@/components/entrepot/EntrepotsHeader";
 import { Search, Filter, AlertTriangle } from "lucide-react";
+import { AppFeedbackBanner } from "@/components/ui/feedback";
+import { getActionErrorMessage, useAppFeedback } from "@/hooks/useAppFeedback";
 
 // Pagination locale, même logique que ton template Contrat
 const LocalPagination = ({
@@ -69,6 +71,7 @@ function EntrepotsPageContent() {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
+  const { feedback, showSuccess, showError, clearFeedback } = useAppFeedback();
 
   async function loadData() {
     setLoading(true);
@@ -130,20 +133,25 @@ function EntrepotsPageContent() {
     try {
       if (editingItem) {
         await updateEntrepot({ id: editingItem.id, ...formData });
+        showSuccess("Entrepôt modifié.");
       } else {
         await createEntrepot(formData as any);
+        showSuccess("Entrepôt créé.");
       }
       setIsModalOpen(false);
       setEditingItem(null);
       loadData();
     } catch (error) {
       console.error(error);
-      alert("Erreur lors de l'enregistrement.");
+      showError(getActionErrorMessage(error, "Erreur lors de l'enregistrement."));
     }
   };
 
   return (
     <div className="flex flex-col h-screen bg-[#F0F4F4]">
+      <div className="px-8 pt-4">
+        <AppFeedbackBanner feedback={feedback} onDismiss={clearFeedback} />
+      </div>
       <EntrepotsHeader
         count={items.length}
         onAdd={() => {

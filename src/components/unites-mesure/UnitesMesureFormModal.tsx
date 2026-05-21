@@ -16,10 +16,14 @@ export default function UnitesMesureFormModal({
   editing,
   onClose,
   onSaved,
+  onSuccess,
+  onError,
 }: {
   editing: UniteMesure | null;
   onClose: () => void;
   onSaved: () => void | Promise<void>;
+  onSuccess?: (message: string) => void;
+  onError?: (message: string) => void;
 }) {
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState(() =>
@@ -75,10 +79,11 @@ export default function UnitesMesureFormModal({
         });
       }
       await onSaved();
+      onSuccess?.(editing ? "Unité de mesure modifiée." : "Unité de mesure créée.");
       onClose();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Erreur de sauvegarde";
-      alert(msg);
+      onError?.(msg);
     } finally {
       setLoading(false);
     }

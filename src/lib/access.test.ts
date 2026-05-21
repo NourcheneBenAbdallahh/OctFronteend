@@ -5,6 +5,8 @@ import {
   canManageEmballagesCatalog,
   canQueryCommandesList,
   canUseStockAi,
+  canViewFournisseursList,
+  canViewFournisseursMap,
   canViewPredictiveStockAlerts,
   defaultHomePath,
   filterCommandesForCalendarUser,
@@ -46,6 +48,12 @@ describe("canAccessPath", () => {
     expect(canAccessPath("/", "STOCK")).toBe(true);
     expect(canAccessPath("/stock-inventaire", "STOCK")).toBe(true);
     expect(canAccessPath("/commandes", "STOCK")).toBe(false);
+  });
+
+  it("autorise ADMIN et STOCK sur /prediction", () => {
+    expect(canAccessPath("/prediction", "ADMIN")).toBe(true);
+    expect(canAccessPath("/prediction", "STOCK")).toBe(true);
+    expect(canAccessPath("/prediction", "FINANCE")).toBe(false);
   });
 });
 
@@ -145,5 +153,25 @@ describe("filterCommandesForCalendarUser", () => {
     expect(filterCommandesForCalendarUser(commandes, "9", "FINANCE")).toEqual([
       { id: 2, created_by: 9 },
     ]);
+  });
+});
+
+describe("permissions BI et fournisseurs", () => {
+  it("canViewFournisseursList et map", () => {
+    expect(canViewFournisseursList("LOGISTIQUE")).toBe(true);
+    expect(canViewFournisseursMap("CONTRAT")).toBe(true);
+    expect(canViewFournisseursList("STOCK")).toBe(false);
+  });
+
+  it("canViewPredictiveStockAlerts selon le scope", () => {
+    expect(canViewPredictiveStockAlerts("ADMIN")).toBe(true);
+    expect(canViewPredictiveStockAlerts("FINANCE")).toBe(false);
+  });
+
+  it("sidebarBiNavLabel par scope", () => {
+    expect(sidebarBiNavLabel("STOCK")).toContain("Stock");
+    expect(sidebarBiNavLabel("FINANCE")).toContain("Finance");
+    expect(sidebarBiNavLabel("LOGISTIQUE")).toContain("Logistique");
+    expect(sidebarBiNavLabel("ADMIN")).toBe("Tableau BI");
   });
 });

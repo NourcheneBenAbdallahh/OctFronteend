@@ -133,10 +133,12 @@ export default function EmballagesFormModal({
   editing,
   setRows,
   onClose,
+  onSuccess,
 }: {
   editing: TableEmballages | null;
   setRows: React.Dispatch<React.SetStateAction<TableEmballages[]>>;
   onClose: () => void;
+  onSuccess?: (message: string) => void;
 }) {
   const [step, setStep] = useState<1 | 2>(1);
   const [loading, setLoading] = useState(false);
@@ -212,12 +214,14 @@ export default function EmballagesFormModal({
           (res as { updateEmballage: Emballages }).updateEmballage
         );
         setRows((prev) => prev.map((r) => (String(r.id) === String(updated.id) ? updated : r)));
+        onSuccess?.("Emballage modifié.");
       } else {
         const res = await createEmballages(payload as Parameters<typeof createEmballages>[0]);
         const created = normalizeEmballages(
           (res as { createEmballage: Emballages }).createEmballage
         );
         setRows((prev) => [created, ...prev]);
+        onSuccess?.("Emballage créé.");
       }
       onClose();
     } catch (err: unknown) {

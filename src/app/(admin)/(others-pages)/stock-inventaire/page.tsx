@@ -12,6 +12,11 @@ import {
   updateInventaire,
 } from "@/lib/inventaire.api";
 import { TableInventaire, InventaireFilters } from "@/types/inventaire";
+import {
+  applyInventaireFilters,
+  EMPTY_INVENTAIRE_FILTERS,
+} from "@/lib/inventaire.filters";
+import { exportInventaireCsv, exportInventairePdf } from "@/lib/inventaire.export";
 import InventaireHeader from "@/components/inventaire/InventaireHeader";
 import InventaireStats from "@/components/inventaire/InventaireStats";
 import InventaireFiltersBar from "@/components/inventaire/InventaireFilters";
@@ -19,16 +24,21 @@ import InventaireCriticalPanel from "@/components/inventaire/InventaireCriticalP
 import InventaireAuditCards from "@/components/inventaire/InventaireAuditCards";
 import InventaireDetailDrawer from "@/components/inventaire/InventaireDetailDrawer";
 import InventaireFormDrawer from "@/components/inventaire/InventaireFormDrawer";
+import InventaireContextBar from "@/components/inventaire/InventaireContextBar";
+import InventaireGenererEntrepotModal from "@/components/inventaire/InventaireGenererEntrepotModal";
+import {
+  InventaireConfirmDeleteModal,
+  InventaireConfirmRegulariserModal,
+  InventaireConfirmRegulariserSessionModal,
+  InventaireFeedbackBanner,
+  type InventaireFeedback,
+} from "@/components/inventaire/InventairePageAlerts";
+import { getInventaireErrorMessage } from "@/lib/inventaire.errors";
 
 import { listEmballages } from "@/lib/emballages.api";
 import { fetchEntrepots } from "@/lib/entrepot.api";
+import { currentYear, todayIsoDay } from "@/lib/inventaire.dates";
 import { useAuthStore } from "@/store/useAuthStore";
-
-function formatForBackend(dateStr: string): string {
-  let formatted = dateStr.replace("T", " ");
-  if (formatted.length === 16) formatted = `${formatted}:00`;
-  return formatted;
-}
 
 export default function InventairePage() {
   const token = useAuthStore((state) => state.token);
@@ -45,11 +55,27 @@ export default function InventairePage() {
   const [detailOpen, setDetailOpen] = useState(false);
 
   const [filters, setFilters] = useState<InventaireFilters>({
-    search: "",
-    status: "all",
-    entrepot: "",
-    code_session: "",
+    ...EMPTY_INVENTAIRE_FILTERS,
+    date_mode: "day",
+    pivot_day: todayIsoDay(),
+    pivot_year: currentYear(),
   });
+  const [exporting, setExporting] = useState(false);
+  const [feedback, setFeedback] = useState<InventaireFeedback>(null);
+  const [deleteTarget, setDeleteTarget] = useState<TableInventaire | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [regularizeTarget, setRegularizeTarget] = useState<TableInventaire | null>(null);
+  const [regularizeOpen, setRegularizeOpen] = useState(false);
+  const [regularizing, setRegularizing] = useState(false);
+  const [sessionRegularizeOpen, setSessionRegularizeOpen] = useState(false);
+  const [sessionRegularizing, setSessionRegularizing] = useState(false);
+  const [genererOpen, setGenererOpen] = useState(false);
+  const [generating, setGenerating] = useState(false);
+
+  const showFeedback = (type: "success" | "error", message: string) => {
+    setFeedback({ type, message });
+  };
 
   const load = async () => {
     if (!token) {
@@ -78,95 +104,180 @@ export default function InventairePage() {
     load();
   }, [token]);
 
-  const filtered = useMemo(() => {
-    let rows = [...data];
-    if (filters.search.trim()) {
-      const q = filters.search.toLowerCase();
-      rows = rows.filter(
-        (r) =>
-          r.emballage_name.toLowerCase().includes(q) ||
-          r.entrepot_name.toLowerCase().includes(q) ||
-          (r.code_session || "").toLowerCase().includes(q)
-      );
-    }
-    if (filters.entrepot) {
-      rows = rows.filter((r) => r.entrepot_id === filters.entrepot);
-    }
-    if (filters.code_session) {
-      rows = rows.filter((r) => r.code_session === filters.code_session);
-    }
-    if (filters.status === "perfect") {
-      rows = rows.filter((r) => Math.abs(r.ecart) < 0.0001);
-    } else if (filters.status === "negative") {
-      rows = rows.filter((r) => r.ecart < 0);
-    } else if (filters.status === "positive") {
-      rows = rows.filter((r) => r.ecart > 0);
-    } else if (filters.status === "non_regularise") {
-      rows = rows.filter((r) => r.statut !== "REGULARISEE");
-    }
-    return rows.sort((a, b) => Math.abs(b.ecart) - Math.abs(a.ecart));
-  }, [data, filters]);
-
-  const criticalCount = data.filter(
-    (i) => i.statut !== "REGULARISEE" && Math.abs(i.ecart) >= 0.0001
-  ).length;
-
-  const sessionCodes = useMemo(
-    () =>
-      Array.from(
-        new Set(data.map((d) => d.code_session).filter(Boolean) as string[])
-      ),
-    [data]
+  const filtered = useMemo(
+    () => applyInventaireFilters(data, filters),
+    [data, filters]
   );
 
-  const handleGenererEntrepot = async () => {
-    const entrepotId = filters.entrepot || allEntrepots[0]?.id;
-    if (!entrepotId) {
-      alert("Sélectionnez un entrepôt dans les filtres ou créez-en un.");
+  const handleExportPdf = () => {
+    if (!filtered.length) {
+      showFeedback("error", "Aucune ligne à exporter avec ces filtres.");
       return;
     }
-    const date = formatForBackend(new Date().toISOString().slice(0, 16));
-    if (!window.confirm(`Générer les lignes d'inventaire pour cet entrepôt à la date du jour ?`)) {
-      return;
-    }
+    setExporting(true);
     try {
-      const lignes = await genererInventaireEntrepot(entrepotId, date);
+      exportInventairePdf(filtered, filters);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExportCsv = () => {
+    if (!filtered.length) {
+      showFeedback("error", "Aucune ligne à exporter avec ces filtres.");
+      return;
+    }
+    setExporting(true);
+    try {
+      exportInventaireCsv(filtered, filters);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const criticalCount = useMemo(
+    () =>
+      filtered.filter(
+        (i) => i.statut !== "REGULARISEE" && Math.abs(i.ecart) >= 0.0001
+      ).length,
+    [filtered]
+  );
+
+  const sessionCodes = useMemo(() => {
+    const base = filters.entrepot
+      ? data.filter((d) => d.entrepot_id === filters.entrepot)
+      : data;
+    return Array.from(
+      new Set(base.map((d) => d.code_session).filter(Boolean) as string[])
+    );
+  }, [data, filters.entrepot]);
+
+  const openGenererModal = () => {
+    if (!filters.entrepot) {
+      showFeedback("error", "Choisissez d'abord un entrepôt dans le panneau ci-dessus.");
+      return;
+    }
+    setGenererOpen(true);
+  };
+
+  const handleGenererConfirm = async (payload: {
+    entrepotId: string;
+    scope: "DAY" | "YEAR";
+    dateInventaire: string;
+    periodeDebut?: string;
+    periodeFin?: string;
+  }) => {
+    setGenerating(true);
+    try {
+      const lignes = await genererInventaireEntrepot({
+        entrepotId: payload.entrepotId,
+        dateInventaire: payload.dateInventaire,
+        scope: payload.scope,
+        periodeDebut: payload.periodeDebut,
+        periodeFin: payload.periodeFin,
+      });
+      setGenererOpen(false);
       if (lignes.length > 0 && lignes[0].code_session) {
-        setActiveSession(lignes[0].code_session!);
-        setFilters((f) => ({ ...f, code_session: lignes[0].code_session! }));
+        const session = lignes[0].code_session!;
+        setActiveSession(session);
+        setFilters((f) => ({
+          ...f,
+          entrepot: payload.entrepotId,
+          code_session: session,
+          date_mode: payload.scope === "YEAR" ? "year" : "day",
+          pivot_day: payload.scope === "DAY" ? payload.dateInventaire.slice(0, 10) : f.pivot_day,
+          pivot_year:
+            payload.scope === "YEAR"
+              ? payload.dateInventaire.slice(0, 4)
+              : f.pivot_year,
+        }));
       }
       await load();
-      alert(`${lignes.length} ligne(s) créée(s).`);
-    } catch {
-      alert("Erreur lors de la génération.");
+      showFeedback(
+        "success",
+        lignes.length > 0
+          ? `${lignes.length} ligne(s) créée(s) — session ${lignes[0]?.code_session ?? ""}.`
+          : "Aucune nouvelle ligne (déjà générées pour cette date ou cet entrepôt sans stock)."
+      );
+    } catch (err) {
+      showFeedback(
+        "error",
+        getInventaireErrorMessage(err, "Erreur lors de la génération de l'inventaire.")
+      );
+    } finally {
+      setGenerating(false);
     }
   };
 
-  const handleRegulariserSession = async () => {
-    const code = activeSession || filters.code_session;
+  const activeSessionCode = activeSession || filters.code_session;
+
+  const sessionEligibleCount = useMemo(() => {
+    if (!activeSessionCode) return 0;
+    return data.filter(
+      (d) =>
+        d.code_session === activeSessionCode &&
+        d.statut !== "REGULARISEE" &&
+        !(d.statut === "BROUILLON" && d.stock_physique <= 0)
+    ).length;
+  }, [data, activeSessionCode]);
+
+  const openRegulariserSessionConfirm = () => {
+    setFeedback(null);
+    setSessionRegularizeOpen(true);
+  };
+
+  const handleRegulariserSessionConfirm = async () => {
+    const code = activeSessionCode;
     if (!code) {
-      alert("Aucune session active. Générez d'abord un inventaire entrepôt.");
+      showFeedback("error", "Aucune session active. Générez d'abord un inventaire entrepôt.");
+      setSessionRegularizeOpen(false);
       return;
     }
-    if (!window.confirm(`Régulariser toutes les lignes comptées de la session ${code} ?`)) {
-      return;
-    }
+
+    setSessionRegularizing(true);
     try {
       const n = await regulariserInventaireSession(code);
+      setSessionRegularizeOpen(false);
       await load();
-      alert(`${n} ligne(s) régularisée(s).`);
-    } catch {
-      alert("Erreur lors de la régularisation.");
+      showFeedback(
+        "success",
+        n > 0
+          ? `${n} ligne(s) régularisée(s) pour la session ${code}.`
+          : `Aucune ligne à régulariser pour la session ${code}.`
+      );
+    } catch (err) {
+      showFeedback(
+        "error",
+        getInventaireErrorMessage(err, "Erreur lors de la régularisation de la session.")
+      );
+    } finally {
+      setSessionRegularizing(false);
     }
   };
 
-  const handleRegulariser = async (id: string) => {
-    if (!window.confirm("Appliquer l'écart au stock système (mouvement tracé) ?")) return;
+  const openRegulariserConfirm = (item: TableInventaire) => {
+    setFeedback(null);
+    setRegularizeTarget(item);
+    setRegularizeOpen(true);
+  };
+
+  const handleRegulariserConfirm = async () => {
+    if (!regularizeTarget) return;
+
+    setRegularizing(true);
     try {
-      await regulariserInventaire(id);
+      await regulariserInventaire(regularizeTarget.id);
+      setRegularizeOpen(false);
+      setRegularizeTarget(null);
       await load();
-    } catch {
-      alert("Erreur lors de la régularisation.");
+      showFeedback("success", "Stock régularisé : mouvement créé et ligne mise à jour.");
+    } catch (err) {
+      showFeedback(
+        "error",
+        getInventaireErrorMessage(err, "Erreur lors de la régularisation.")
+      );
+    } finally {
+      setRegularizing(false);
     }
   };
 
@@ -174,6 +285,7 @@ export default function InventairePage() {
     await createInventaire(payload);
     setFormOpen(false);
     await load();
+    showFeedback("success", "Ligne d'inventaire créée.");
   };
 
   const handleEdit = async (payload: Parameters<typeof createInventaire>[0]) => {
@@ -183,20 +295,105 @@ export default function InventairePage() {
     setFormOpen(false);
     setEditing(null);
     await load();
+    showFeedback("success", "Ligne d'inventaire modifiée.");
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm("Supprimer cet inventaire ?")) return;
+  const openDeleteConfirm = (item: TableInventaire) => {
+    setFeedback(null);
+    setDeleteTarget(item);
+    setDeleteOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    if (deleteTarget.statut === "REGULARISEE") {
+      showFeedback(
+        "error",
+        "Impossible de supprimer une ligne déjà régularisée (mouvement stock déjà appliqué)."
+      );
+      setDeleteOpen(false);
+      return;
+    }
+
+    setDeleting(true);
     try {
-      await deleteInventaire(id);
+      await deleteInventaire(deleteTarget.id);
+      setDeleteOpen(false);
+      setDeleteTarget(null);
+      if (selected?.id === deleteTarget.id) {
+        setDetailOpen(false);
+        setSelected(null);
+      }
       await load();
-    } catch {
-      alert("Erreur lors de la suppression.");
+      showFeedback("success", "Ligne d'inventaire supprimée.");
+    } catch (err) {
+      showFeedback(
+        "error",
+        getInventaireErrorMessage(err, "Erreur lors de la suppression.")
+      );
+    } finally {
+      setDeleting(false);
     }
   };
 
   return (
     <div className="space-y-6">
+      <InventaireFeedbackBanner
+        feedback={feedback}
+        onDismiss={() => setFeedback(null)}
+      />
+
+      <InventaireConfirmDeleteModal
+        item={deleteTarget}
+        open={deleteOpen}
+        loading={deleting}
+        onClose={() => {
+          if (deleting) return;
+          setDeleteOpen(false);
+          setDeleteTarget(null);
+        }}
+        onConfirm={handleDeleteConfirm}
+      />
+
+      <InventaireConfirmRegulariserModal
+        item={regularizeTarget}
+        open={regularizeOpen}
+        loading={regularizing}
+        onClose={() => {
+          if (regularizing) return;
+          setRegularizeOpen(false);
+          setRegularizeTarget(null);
+        }}
+        onConfirm={handleRegulariserConfirm}
+      />
+
+      <InventaireConfirmRegulariserSessionModal
+        codeSession={activeSessionCode}
+        eligibleCount={sessionEligibleCount}
+        open={sessionRegularizeOpen}
+        loading={sessionRegularizing}
+        onClose={() => {
+          if (sessionRegularizing) return;
+          setSessionRegularizeOpen(false);
+        }}
+        onConfirm={handleRegulariserSessionConfirm}
+      />
+
+      <InventaireGenererEntrepotModal
+        open={genererOpen}
+        entrepots={allEntrepots}
+        initialEntrepotId={filters.entrepot}
+        initialMode={filters.date_mode === "year" ? "year" : "day"}
+        initialDay={filters.pivot_day}
+        initialYear={filters.pivot_year}
+        loading={generating}
+        onClose={() => {
+          if (generating) return;
+          setGenererOpen(false);
+        }}
+        onConfirm={handleGenererConfirm}
+      />
+
       <InventaireHeader
         loading={loading}
         onRefresh={load}
@@ -204,11 +401,21 @@ export default function InventairePage() {
           setEditing(null);
           setFormOpen(true);
         }}
-        onGenererEntrepot={handleGenererEntrepot}
-        onRegulariserSession={handleRegulariserSession}
+        onGenererEntrepot={openGenererModal}
+        onRegulariserSession={openRegulariserSessionConfirm}
         hasActiveSession={!!(activeSession || filters.code_session)}
-        total={data.length}
+        total={filtered.length}
         criticalCount={criticalCount}
+      />
+
+      <InventaireContextBar
+        entrepots={allEntrepots}
+        filters={filters}
+        onChange={setFilters}
+        scopedCount={filtered.length}
+        totalCount={data.length}
+        onGenerer={openGenererModal}
+        loading={loading}
       />
 
       {sessionCodes.length > 0 && (
@@ -233,9 +440,18 @@ export default function InventairePage() {
         </div>
       )}
 
-      <InventaireStats data={data} />
+      <InventaireStats data={filtered} />
 
-      <InventaireFiltersBar data={data} filters={filters} onChange={setFilters} />
+      <InventaireFiltersBar
+        data={data}
+        entrepots={allEntrepots}
+        filteredCount={filtered.length}
+        filters={filters}
+        onChange={setFilters}
+        onExportPdf={handleExportPdf}
+        onExportCsv={handleExportCsv}
+        exporting={exporting}
+      />
 
       <InventaireCriticalPanel
         data={filtered}
@@ -251,7 +467,7 @@ export default function InventairePage() {
           await updateInventaire(id, { stock_physique: val });
           await load();
         }}
-        onRegulariser={handleRegulariser}
+        onRegulariser={openRegulariserConfirm}
         onView={(item) => {
           setSelected(item);
           setDetailOpen(true);
@@ -260,7 +476,7 @@ export default function InventairePage() {
           setEditing(item);
           setFormOpen(true);
         }}
-        onDelete={handleDelete}
+        onDelete={openDeleteConfirm}
       />
 
       <InventaireDetailDrawer
@@ -270,7 +486,7 @@ export default function InventairePage() {
           setDetailOpen(false);
           setSelected(null);
         }}
-        onRegulariser={selected ? () => handleRegulariser(selected.id) : undefined}
+        onRegulariser={selected ? () => openRegulariserConfirm(selected) : undefined}
       />
 
       <InventaireFormDrawer
@@ -283,6 +499,7 @@ export default function InventairePage() {
           setEditing(null);
         }}
         onSubmit={editing ? handleEdit : handleCreate}
+        onValidationError={(message) => showFeedback("error", message)}
       />
     </div>
   );

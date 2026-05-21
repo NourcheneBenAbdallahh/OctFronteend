@@ -17,10 +17,10 @@ import { TableInventaire } from "@/types/inventaire";
 interface Props {
   data: TableInventaire[];
   onAdjust: (id: string, newVal: number) => void;
-  onRegulariser: (id: string) => void;
+  onRegulariser: (item: TableInventaire) => void;
   onView: (item: TableInventaire) => void;
   onEdit: (item: TableInventaire) => void;
-  onDelete: (id: string) => void;
+  onDelete: (item: TableInventaire) => void;
 }
 
 function theoriqueRef(row: TableInventaire): number {
@@ -85,6 +85,22 @@ export default function InventaireAuditCards({ data, onAdjust, onRegulariser, on
                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
                          {row.entrepot_name}
                        </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-1">
+                        <Calendar size={10} />
+                        {row.date_inventaire?.slice(0, 10)}
+                      </span>
+                      {row.code_session && (
+                        <span className="text-[9px] font-black uppercase tracking-widest text-[#00A09D] bg-[#00A09D]/10 px-2 py-0.5 rounded-full">
+                          {row.code_session}
+                        </span>
+                      )}
+                      {row.periode_debut && row.periode_fin && (
+                        <span className="text-[9px] font-bold text-gray-400">
+                          {row.periode_debut.slice(0, 4)} → {row.periode_fin.slice(0, 4)}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -153,9 +169,13 @@ export default function InventaireAuditCards({ data, onAdjust, onRegulariser, on
                   <div className="flex gap-2">
                     {!isRegularise && Math.abs(row.ecart) >= 0.0001 && (
                       <button
-                        onClick={() => onRegulariser(row.id)}
+                        onClick={() => onRegulariser(row)}
                         className="p-3 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all"
-                        title="Régulariser le stock"
+                        title={
+                          row.ecart > 0
+                            ? "Régulariser : mouvement Surplus (SPL) + lot"
+                            : "Régulariser : mouvement Perte (PTE)"
+                        }
                       >
                         <CheckCheck size={18} />
                       </button>
@@ -167,7 +187,7 @@ export default function InventaireAuditCards({ data, onAdjust, onRegulariser, on
                       <Pencil size={18} />
                     </button>
                     <button
-                      onClick={() => onDelete(row.id)}
+                      onClick={() => onDelete(row)}
                       disabled={isRegularise}
                       className="p-3 rounded-xl bg-gray-50 text-gray-400 hover:bg-red-500 hover:text-white transition-all disabled:opacity-30"
                     >

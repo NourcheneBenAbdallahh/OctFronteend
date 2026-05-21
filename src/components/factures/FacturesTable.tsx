@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import Pagination from "@/components/tables/Pagination";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { AppConfirmModal, AppFeedbackBanner } from "@/components/ui/feedback";
+import { getActionErrorMessage, useAppFeedback } from "@/hooks/useAppFeedback";
 
 // Helper functions
 const formatDate = (date: string | Date) => {
@@ -122,7 +124,17 @@ export default function FacturesTable({
   const router = useRouter();
   const pathname = usePathname();
   const dropdownRef = useRef<HTMLDivElement | null>(null);
-
+  const {
+    feedback,
+    confirm,
+    showSuccess,
+    showError,
+    showInfo,
+    clearFeedback,
+    openConfirm,
+    closeConfirm,
+    runConfirmedAction,
+  } = useAppFeedback();
 
 const handlePageChange = (page: number) => {
   if (page < 1 || page > pagination.lastPage) return;
@@ -234,28 +246,30 @@ const filteredRows = useMemo(() => {
   const handlePrintPdf = () => {
     const list = filteredRows.filter((r) => selectedIds.has(String(r.id)));
     if (!list.length) {
-      alert("Sélectionnez au moins une facture à imprimer.");
+      showInfo("Sélectionnez au moins une facture à imprimer.");
       return;
     }
     try {
       exportFacturesPdf(list);
+      showSuccess("PDF généré.");
     } catch (e) {
       console.error(e);
-      alert("Erreur lors de la génération du PDF.");
+      showError("Erreur lors de la génération du PDF.");
     }
   };
 
   const handleExportCsv = () => {
     const list = filteredRows.filter((r) => selectedIds.has(String(r.id)));
     if (!list.length) {
-      alert("Sélectionnez au moins une facture à exporter.");
+      showInfo("Sélectionnez au moins une facture à exporter.");
       return;
     }
     try {
       exportFacturesCsv(list);
+      showSuccess("Export CSV terminé.");
     } catch (e) {
       console.error(e);
-      alert("Erreur lors de l'export CSV.");
+      showError("Erreur lors de l'export CSV.");
     }
   };
 
@@ -407,6 +421,7 @@ const filteredRows = useMemo(() => {
         };
         const res = await updateFacture(editing.id, payload);
         setRows(prev => prev.map(r => String(r.id) === String(editing.id) ? normalizeFacture(res.updateFacture) : r));
+        showSuccess("Facture modifiée.");
       } else {
         const payload: CreateFactureInput = {
           numero_facture: form.numero_facture,
@@ -419,34 +434,34 @@ const filteredRows = useMemo(() => {
         };
         const res = await createFacture(payload);
         setRows(prev => [normalizeFacture(res.createFacture), ...prev]);
+        showSuccess("Facture créée.");
       }
       closeDrawer();
-    } catch (err: any) {
-      setErrorMessage(err.graphQLErrors?.[0]?.message || err.message);
+    } catch (err: unknown) {
+      setErrorMessage(getActionErrorMessage(err));
     } finally { setSubmitLoading(false); }
   }
-// --- SUPPRESSION D'UNE FACTURE ---
-  async function handleDelete(id: Id) {
-    // Utilisation d'une confirmation stylée ou standard
-    if (!confirm("Voulez-vous vraiment supprimer cette facture ? Cette action est irréversible.")) return;
-    
-    try {
-      // Appel à ton API lib/factures.api
-      await deleteFacture(id);
-      
-      // Mise à jour locale de l'état pour un feedback instantané (Optimistic UI)
-      setRows(prev => prev.filter(r => String(r.id) !== String(id)));
-      setSelectedIds((prev) => {
-        const next = new Set(prev);
-        next.delete(String(id));
-        return next;
-      });
-      
-      // Optionnel : Notifier l'utilisateur (si tu as une lib de toast)
-      console.log(`Facture ${id} supprimée avec succès`);
-    } catch (err: any) {
-      alert("Erreur lors de la suppression : " + (err.message || "Serveur injoignable"));
-    }
+
+  function handleDelete(id: Id) {
+    const row = rows.find((r) => String(r.id) === String(id));
+    clearFeedback();
+    openConfirm({
+      title: "Supprimer cette facture ?",
+      detail: row?.numero_facture ?? `#${id}`,
+      description: "Cette action est irréversible.",
+      variant: "danger",
+      onConfirm: () =>
+        void runConfirmedAction(async () => {
+          await deleteFacture(id);
+          setRows((prev) => prev.filter((r) => String(r.id) !== String(id)));
+          setSelectedIds((prev) => {
+            const next = new Set(prev);
+            next.delete(String(id));
+            return next;
+          });
+          showSuccess("Facture supprimée.");
+        }),
+    });
   }
 
   const handleStatusChange = async (id: string | number, newStatut: FactureStatut) => {
@@ -463,9 +478,10 @@ const filteredRows = useMemo(() => {
       setRows(rows.map(row => 
         row.id === id ? { ...row, statut: newStatut } : row
       ));
+      showSuccess("Statut de la facture mis à jour.");
     } catch (error) {
       console.error("Erreur lors de la mise à jour du statut:", error);
-      alert("Erreur lors de la mise à jour du statut");
+      showError(getActionErrorMessage(error, "Erreur lors de la mise à jour du statut."));
     } finally {
       setUpdatingStatus(null);
     }
@@ -473,6 +489,10 @@ const filteredRows = useMemo(() => {
 
   return (
     <>
+      <div className="bg-[#F0F4F4] px-8 pt-4">
+        <AppFeedbackBanner feedback={feedback} onDismiss={clearFeedback} />
+      </div>
+      <AppConfirmModal confirm={confirm} onClose={closeConfirm} />
       {/* HEADER */}
       <div className="bg-[#F0F4F4] px-8 py-8 flex flex-col md:flex-row justify-between items-end gap-6">
       <div>

@@ -10,6 +10,8 @@ import { FournisseurHeader } from "./FournisseurHeader";
 import { FournisseurListView } from "./FournisseurListView";
 import { FournisseurForm } from "./FournisseurForm";
 import { TableFournisseur, normalizeFournisseur } from "@/types/fournisseur";
+import { AppConfirmModal, AppFeedbackBanner } from "@/components/ui/feedback";
+import { getActionErrorMessage, useAppFeedback } from "@/hooks/useAppFeedback";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -75,6 +77,16 @@ export default function FournisseursTable({
   };
 
   const [form, setForm] = useState<Partial<TableFournisseur>>(emptyForm);
+  const {
+    feedback,
+    confirm,
+    showSuccess,
+    showError,
+    clearFeedback,
+    openConfirm,
+    closeConfirm,
+    runConfirmedAction,
+  } = useAppFeedback();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -106,7 +118,7 @@ export default function FournisseursTable({
       };
 
       if (!input.raison_sociale || !input.matricule_fiscale) {
-        alert("La raison sociale et le matricule fiscal sont obligatoires.");
+        showError("La raison sociale et le matricule fiscal sont obligatoires.");
         setLoading(false);
         return;
       }
@@ -117,38 +129,48 @@ export default function FournisseursTable({
         setRows((r) =>
           r.map((x) => (String(x.id) === String(updated.id) ? updated : x))
         );
+        showSuccess("Fournisseur modifié.");
       } else {
         const res = await createFournisseur(input as any);
         const created = normalizeFournisseur(res.createFournisseur);
         setRows((r) => [created, ...r]);
+        showSuccess("Fournisseur créé.");
       }
 
       setIsOpen(false);
       setForm(emptyForm);
       setEditing(null);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Erreur détaillée:", err);
-
-      const validationErrors = err?.response?.errors?.[0]?.extensions?.validation;
+      const validationErrors = (err as { response?: { errors?: { extensions?: { validation?: Record<string, string[]> } }[] } })
+        ?.response?.errors?.[0]?.extensions?.validation;
       if (validationErrors) {
-        const messages = Object.values(validationErrors).flat().join("\n");
-        alert(`Erreur de validation :\n${messages}`);
+        const messages = Object.values(validationErrors).flat().join(" ");
+        showError(messages || "Erreur de validation.");
       } else {
-        alert("Une erreur est survenue lors de l'enregistrement.");
+        showError(getActionErrorMessage(err, "Une erreur est survenue lors de l'enregistrement."));
       }
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleDelete(id: string | number) {
-    if (!confirm("Voulez-vous supprimer ce fournisseur ?")) return;
-    try {
-      await deleteFournisseur(id);
-      setRows((r) => r.filter((x) => x.id !== id));
-    } catch (err) {
-      alert("Erreur lors de la suppression");
-    }
+  function requestDelete(id: string | number) {
+    const item = rows.find((x) => String(x.id) === String(id));
+    if (!item) return;
+    clearFeedback();
+    openConfirm({
+      title: "Supprimer ce fournisseur ?",
+      detail: item.raison_sociale ?? "",
+      description: "Cette action est définitive.",
+      variant: "danger",
+      onConfirm: () =>
+        void runConfirmedAction(async () => {
+          await deleteFournisseur(id);
+          setRows((r) => r.filter((x) => String(x.id) !== String(id)));
+          showSuccess("Fournisseur supprimé.");
+        }),
+    });
   }
 
   const filteredRows = useMemo(() => {
@@ -183,6 +205,8 @@ export default function FournisseursTable({
         }}
       />
 
+      <AppFeedbackBanner feedback={feedback} onDismiss={clearFeedback} />
+
       <div className="flex-1">
         <FournisseurListView
           rows={paginatedRows}
@@ -191,7 +215,7 @@ export default function FournisseursTable({
             setForm(f);
             setIsOpen(true);
           }}
-          onDelete={handleDelete}
+          onDelete={requestDelete}
         />
       </div>
 
@@ -204,6 +228,8 @@ export default function FournisseursTable({
           />
         </div>
       )}
+
+      <AppConfirmModal confirm={confirm} onClose={closeConfirm} />
 
       <FournisseurForm
         isOpen={isOpen}
