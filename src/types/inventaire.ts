@@ -21,8 +21,26 @@ export type StockInventaire = {
   periode_fin?: string | null;
 
   regularisation_stock_id?: string | null;
+  mouvement_stock_id?: string | null;
+  lot_id?: string | null;
   regularise_par?: string | null;
   regularise_at?: string | null;
+
+  mouvementStock?: {
+    id: string;
+    code_mouvement?: string | null;
+    type_mouvement: "PTE" | "SPL" | "PRD" | "CDD" | "EMC";
+    quantite: number;
+    statut: string;
+    date_mouvement?: string | null;
+    user?: { id: string; name: string } | null;
+  } | null;
+
+  lot?: {
+    id: string;
+    code_lot?: string | null;
+    quantite?: number;
+  } | null;
 
   entrepot?: {
     id: string;
@@ -55,11 +73,21 @@ export type TableInventaire = Omit<StockInventaire, "entrepot" | "emballage"> & 
   emballage_name: string;
 };
 
+export type InventaireDateMode = "all" | "day" | "year";
+
 export type InventaireFilters = {
   search: string;
   status: "all" | "perfect" | "negative" | "positive" | "non_regularise";
   entrepot: string;
   code_session: string;
+  /** Vue principale : par jour, par année ou tout */
+  date_mode: InventaireDateMode;
+  pivot_day: string;
+  pivot_year: string;
+  date_inventaire_from: string;
+  date_inventaire_to: string;
+  periode_debut_from: string;
+  periode_fin_to: string;
 };
 
 export type InventaireViewMode = "audit" | "critical";

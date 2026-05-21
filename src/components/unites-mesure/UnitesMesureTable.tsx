@@ -4,6 +4,8 @@ import { useState, useMemo, useEffect } from "react";
 import { Ruler } from "lucide-react";
 import type { UniteMesure } from "@/types/unite-mesure";
 import { deleteUniteMesure } from "@/lib/unites-mesure.api";
+import { AppConfirmModal, AppFeedbackBanner } from "@/components/ui/feedback";
+import { getActionErrorMessage, useAppFeedback } from "@/hooks/useAppFeedback";
 import { UnitesMesureHeader } from "./UnitesMesureHeader";
 import { UnitesMesureListView } from "./UnitesMesureListView";
 import UnitesMesureFormModal from "./UnitesMesureFormModal";
@@ -18,6 +20,16 @@ export default function UnitesMesureTable({ data, onRefresh }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [editing, setEditing] = useState<UniteMesure | null>(null);
   const [query, setQuery] = useState("");
+  const {
+    feedback,
+    confirm,
+    showSuccess,
+    showError,
+    clearFeedback,
+    openConfirm,
+    closeConfirm,
+    runConfirmedAction,
+  } = useAppFeedback();
 
   useEffect(() => {
     setRows(data);
@@ -34,16 +46,24 @@ export default function UnitesMesureTable({ data, onRefresh }: Props) {
     );
   }, [rows, query]);
 
-  async function handleDelete(id: string | number) {
-    if (!confirm("Supprimer cette unité de mesure ?")) return;
-    try {
-      await deleteUniteMesure(id);
-      await onRefresh();
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Suppression impossible";
-      alert(msg);
+  const requestDelete = (id: string | number) => {
+    const item = rows.find((r) => String(r.id) === String(id));
+    if (item) {
+      clearFeedback();
+      openConfirm({
+        title: "Supprimer cette unité ?",
+        detail: `${item.code} — ${item.label}`,
+        description: "Cette action est définitive.",
+        variant: "danger",
+        onConfirm: () =>
+          void runConfirmedAction(async () => {
+            await deleteUniteMesure(id);
+            await onRefresh();
+            showSuccess("Unité de mesure supprimée.");
+          }),
+      });
     }
-  }
+  };
 
   return (
     <div className="flex flex-col min-h-[600px]">
@@ -57,6 +77,8 @@ export default function UnitesMesureTable({ data, onRefresh }: Props) {
         }}
       />
 
+      <AppFeedbackBanner feedback={feedback} onDismiss={clearFeedback} />
+
       <div className="flex-1">
         {filteredRows.length > 0 ? (
           <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -66,7 +88,7 @@ export default function UnitesMesureTable({ data, onRefresh }: Props) {
                 setEditing(item);
                 setIsOpen(true);
               }}
-              onDelete={handleDelete}
+              onDelete={requestDelete}
             />
           </div>
         ) : (
@@ -82,6 +104,8 @@ export default function UnitesMesureTable({ data, onRefresh }: Props) {
         )}
       </div>
 
+      <AppConfirmModal confirm={confirm} onClose={closeConfirm} />
+
       {isOpen && (
         <UnitesMesureFormModal
           editing={editing}
@@ -89,6 +113,8 @@ export default function UnitesMesureTable({ data, onRefresh }: Props) {
           onSaved={async () => {
             await onRefresh();
           }}
+          onSuccess={(message) => showSuccess(message)}
+          onError={(message) => showError(message)}
         />
       )}
     </div>

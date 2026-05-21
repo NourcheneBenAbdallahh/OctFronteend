@@ -11,6 +11,9 @@ import { deleteEmballages } from "@/lib/emballages.api";
 import { BoxSelect } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
 import { canManageEmballagesCatalog } from "@/lib/access";
+import { EmballageConfirmDeleteModal } from "./EmballagesPageAlerts";
+import { AppFeedbackBanner } from "@/components/ui/feedback";
+import { useAppFeedback } from "@/hooks/useAppFeedback";
 
 interface Props {
   data: TableEmballages[];
@@ -65,8 +68,11 @@ export default function EmballagesTable({
   const [query, setQuery] = useState("");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [detailItem, setDetailItem] = useState<TableEmballages | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<TableEmballages | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const userRole = useAuthStore((s) => s.user?.role);
   const canManage = canManageEmballagesCatalog(userRole);
+  const { feedback, showSuccess, showError, clearFeedback } = useAppFeedback();
 
   useEffect(() => {
     setRows(data);
@@ -83,22 +89,34 @@ export default function EmballagesTable({
 
   const totalPages = Math.ceil(total / limit);
 
-  async function handleDelete(id: string | number) {
-    if (!confirm("Voulez-vous vraiment supprimer ce modèle d'emballage ?"))
-      return;
+  const requestDelete = (id: string | number) => {
+    const item = rows.find((r) => String(r.id) === String(id));
+    if (item) setDeleteTarget(item);
+  };
 
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    const id = deleteTarget.id;
+    setDeleteLoading(true);
+    clearFeedback();
     try {
       await deleteEmballages(id);
-      setRows((prev) => prev.filter((r) => r.id !== id));
+      setRows((prev) => prev.filter((r) => String(r.id) !== String(id)));
       if (detailItem != null && String(detailItem.id) === String(id)) {
         setDetailItem(null);
       }
-    } catch {
-      alert(
-        "Erreur lors de la suppression. L'emballage est peut-être lié à un contrat."
+      setDeleteTarget(null);
+      showSuccess("Emballage supprimé.");
+    } catch (err: unknown) {
+      showError(
+        err instanceof Error
+          ? err.message
+          : "Erreur lors de la suppression. L'emballage est peut-être lié à un contrat."
       );
+    } finally {
+      setDeleteLoading(false);
     }
-  }
+  };
 
   return (
     <div className="flex flex-col min-h-[600px]">
@@ -112,9 +130,12 @@ export default function EmballagesTable({
         onOpenNew={() => {
           setDetailItem(null);
           setEditing(null);
+          clearFeedback();
           setIsOpen(true);
         }}
       />
+
+      <AppFeedbackBanner feedback={feedback} onDismiss={clearFeedback} />
 
       <div className="flex-1">
         {filteredRows.length > 0 ? (
@@ -127,9 +148,10 @@ export default function EmballagesTable({
                 onEdit={(item: TableEmballages) => {
                   setDetailItem(null);
                   setEditing(item);
+                  clearFeedback();
                   setIsOpen(true);
                 }}
-                onDelete={handleDelete}
+                onDelete={requestDelete}
               />
             ) : (
               <EmballagesGridView
@@ -139,9 +161,10 @@ export default function EmballagesTable({
                 onEdit={(item: TableEmballages) => {
                   setDetailItem(null);
                   setEditing(item);
+                  clearFeedback();
                   setIsOpen(true);
                 }}
-                onDelete={handleDelete}
+                onDelete={requestDelete}
               />
             )}
           </div>
@@ -187,11 +210,22 @@ export default function EmballagesTable({
         }
       />
 
+      <EmballageConfirmDeleteModal
+        item={deleteTarget}
+        open={deleteTarget != null}
+        loading={deleteLoading}
+        onClose={() => {
+          if (!deleteLoading) setDeleteTarget(null);
+        }}
+        onConfirm={() => void confirmDelete()}
+      />
+
       {canManage && isOpen && (
         <EmballagesFormModal
           editing={editing}
           setRows={setRows}
           onClose={() => setIsOpen(false)}
+          onSuccess={(message) => showSuccess(message)}
         />
       )}
     </div>

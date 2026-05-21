@@ -34,6 +34,8 @@ import {
 } from "@/lib/unite-conversion";
 import type { UniteMesure } from "@/types/unite-mesure";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { AppConfirmModal, AppFeedbackBanner } from "@/components/ui/feedback";
+import { getActionErrorMessage, useAppFeedback } from "@/hooks/useAppFeedback";
 import {
   X,
   Plus,
@@ -227,6 +229,16 @@ export default function CommandesTable({
   const [drawerStep, setDrawerStep] = useState<1 | 2 | 3>(1);
   /** Unité dans laquelle l'utilisateur saisit la quantité (convertie vers l'unité emballage à l'enregistrement). */
   const [quantiteUniteSaisie, setQuantiteUniteSaisie] = useState("");
+  const {
+    feedback,
+    confirm,
+    showSuccess,
+    showError,
+    clearFeedback,
+    openConfirm,
+    closeConfirm,
+    runConfirmedAction,
+  } = useAppFeedback();
 
     const router = useRouter();
 const searchParams = useSearchParams();
@@ -471,21 +483,40 @@ const goToPage = (page: number) => {
     }
   };
 
-  async function handleCancel(id: Id) {
-    if (!confirm("Annuler cette commande ?")) return;
-    try {
-      const res = await cancelCommande(id);
-      const updated = normalizeCommande(res.cancelCommande);
-      setRows(prev => prev.map(r => String(r.id) === String(updated.id) ? updated : r));
-    } catch (err: any) { alert(err.message); }
+  function handleCancel(id: Id) {
+    const row = rows.find((r) => String(r.id) === String(id));
+    clearFeedback();
+    openConfirm({
+      title: "Annuler cette commande ?",
+      detail: row?.numero_commande ?? `#${id}`,
+      description: "La commande passera au statut annulé.",
+      variant: "warning",
+      confirmLabel: "Annuler la commande",
+      onConfirm: () =>
+        void runConfirmedAction(async () => {
+          const res = await cancelCommande(id);
+          const updated = normalizeCommande(res.cancelCommande);
+          setRows((prev) => prev.map((r) => (String(r.id) === String(updated.id) ? updated : r)));
+          showSuccess("Commande annulée.");
+        }),
+    });
   }
 
-  async function handleDrop(id: Id) {
-    if (!confirm("Supprimer cette commande ?")) return;
-    try {
-      await dropCommande(id);
-      setRows(prev => prev.filter(r => String(r.id) !== String(id)));
-    } catch (err: any) { alert(err.message); }
+  function handleDrop(id: Id) {
+    const row = rows.find((r) => String(r.id) === String(id));
+    clearFeedback();
+    openConfirm({
+      title: "Supprimer cette commande ?",
+      detail: row?.numero_commande ?? `#${id}`,
+      description: "Cette action est définitive.",
+      variant: "danger",
+      onConfirm: () =>
+        void runConfirmedAction(async () => {
+          await dropCommande(id);
+          setRows((prev) => prev.filter((r) => String(r.id) !== String(id)));
+          showSuccess("Commande supprimée.");
+        }),
+    });
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -529,13 +560,17 @@ const goToPage = (page: number) => {
         const res = await updateCommande(editing.id, updatePayload);
         const updated = normalizeCommande(res.updateCommande);
         setRows((prev) => prev.map((r) => String(r.id) === String(updated.id) ? updated : r));
+        showSuccess("Commande modifiée.");
       } else {
         const res = await createCommande(payloadBase as any);
         const created = normalizeCommande(res.createCommande);
         setRows((prev) => [created, ...prev]);
+        showSuccess("Commande créée.");
       }
       closeDrawer();
-    } catch (err: any) { setErrorMessage(err.message || "Erreur lors de l'enregistrement"); } finally { setSubmitLoading(false); }
+    } catch (err: unknown) {
+      setErrorMessage(getActionErrorMessage(err, "Erreur lors de l'enregistrement"));
+    } finally { setSubmitLoading(false); }
   }
 
 // 1. Calculer le nombre d'éléments par statut pour les badges
@@ -578,6 +613,8 @@ const filteredRows = useMemo(() => {
 }, [rows, query, fournisseursMap]);
   return (
     <div className="min-h-screen bg-gray-50/50 p-4 lg:p-8 font-sans">
+      <AppFeedbackBanner feedback={feedback} onDismiss={clearFeedback} />
+      <AppConfirmModal confirm={confirm} onClose={closeConfirm} />
       {/* HEADER SECTION */}
       <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>

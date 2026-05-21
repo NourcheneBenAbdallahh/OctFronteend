@@ -29,6 +29,8 @@ import {
   unitesCompatibleQuantiteCommande,
 } from "@/lib/unite-conversion";
 import type { UniteMesure } from "@/types/unite-mesure";
+import { AppConfirmModal, AppFeedbackBanner } from "@/components/ui/feedback";
+import { useAppFeedback } from "@/hooks/useAppFeedback";
 const PER_PAGE = 10;
 const LocalPagination = ({
   currentPage,
@@ -174,6 +176,15 @@ export default function BonLivraisonsTable({
   const lockLogisticsFields = isEditMode || Boolean(form.numero_commande);
   const isCancelledBL = isEditMode && editing?.statut === "ANNULE";
   const [userNamesById, setUserNamesById] = useState<Record<string, string>>({});
+  const {
+    feedback,
+    confirm,
+    showSuccess,
+    clearFeedback,
+    openConfirm,
+    closeConfirm,
+    runConfirmedAction,
+  } = useAppFeedback();
 
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -413,6 +424,7 @@ export default function BonLivraisonsTable({
       if (editing) {
         const res = await updateBonLivraison(editing.id, payload);
         setRows(prev => prev.map(r => String(r.id) === String(editing.id) ? normalizeBonLivraison(res.updateBonLivraison) : r));
+        showSuccess("Bon de livraison modifié.");
       } else {
         const createPayload = {
           date_reception: payload.date_reception,
@@ -423,6 +435,7 @@ export default function BonLivraisonsTable({
         };
         const created = await createBonLivraisonWithFile(createPayload as any, file!);
         setRows(prev => [normalizeBonLivraison(created), ...prev]);
+        showSuccess("Bon de livraison créé.");
       }
       setIsDrawerOpen(false);
       setForm(emptyForm);
@@ -435,16 +448,27 @@ export default function BonLivraisonsTable({
     }
   }
 
-  async function handleDelete(id: Id) {
-    if (!confirm("Supprimer définitivement ce BL ?")) return;
-    try {
-      await deleteBonLivraison(id);
-      setRows(prev => prev.filter(r => String(r.id) !== String(id)));
-    } catch (err: any) { alert(err.message); }
+  function handleDelete(id: Id) {
+    const row = rows.find((r) => String(r.id) === String(id));
+    clearFeedback();
+    openConfirm({
+      title: "Supprimer ce bon de livraison ?",
+      detail: row?.numero_bl ?? `#${id}`,
+      description: "Cette action est définitive.",
+      variant: "danger",
+      onConfirm: () =>
+        void runConfirmedAction(async () => {
+          await deleteBonLivraison(id);
+          setRows((prev) => prev.filter((r) => String(r.id) !== String(id)));
+          showSuccess("Bon de livraison supprimé.");
+        }),
+    });
   }
 
   return (
     <div className="min-h-screen bg-gray-50/50 p-4 lg:p-8 font-sans">
+    <AppFeedbackBanner feedback={feedback} onDismiss={clearFeedback} />
+    <AppConfirmModal confirm={confirm} onClose={closeConfirm} />
     {/* HEADER SECTION */}
     <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
       <div>

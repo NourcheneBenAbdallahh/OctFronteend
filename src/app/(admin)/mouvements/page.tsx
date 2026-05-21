@@ -25,13 +25,24 @@ import MouvementsHeader from "@/components/mouvements/MouvementsHeader";
 import MouvementsStats from "@/components/mouvements/MouvementsStats";
 import MouvementsTable from "@/components/mouvements/MouvementsTable";
 import MouvementDrawer from "@/components/mouvements/MouvementDrawer";
+import { AppConfirmModal, AppFeedbackBanner } from "@/components/ui/feedback";
+import { getActionErrorMessage, useAppFeedback } from "@/hooks/useAppFeedback";
 
 export default function MouvementsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    feedback,
+    confirm,
+    showSuccess,
+    showError,
+    clearFeedback,
+    openConfirm,
+    closeConfirm,
+    runConfirmedAction,
+  } = useAppFeedback();
 
   const [items, setItems] = useState<MouvementStock[]>([]);
   const [realStats, setRealStats] = useState<MouvementsPageStats | null>(null);
@@ -51,7 +62,7 @@ export default function MouvementsPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    setError(null);
+    clearFeedback();
 
     try {
       const [mouvementsResult, embs, ents, statsData] = await Promise.all([
@@ -73,7 +84,7 @@ setPagination(mouvementsResult.paginatorInfo);
       setEntrepots(ents);
       setRealStats(statsData);
     } catch (e: any) {
-      setError(e?.message || "Erreur de chargement.");
+      showError(getActionErrorMessage(e, "Erreur de chargement."));
     } finally {
       setLoading(false);
     }
@@ -95,12 +106,12 @@ setPagination(mouvementsResult.paginatorInfo);
   async function handleCreateDraft() {
     const validationMsg = validateForm(form);
     if (validationMsg) {
-      setError(validationMsg);
+      showError(validationMsg);
       return;
     }
 
     setSaving(true);
-    setError(null);
+    clearFeedback();
     try {
       await createMouvementDraft({
         type_mouvement: form.type,
@@ -114,41 +125,61 @@ setPagination(mouvementsResult.paginatorInfo);
       setDrawerOpen(false);
       setForm(emptyForm());
       await load();
-    } catch (e: any) {
-      setError(e?.message || "Erreur lors de la création.");
+      showSuccess("Mouvement créé en brouillon.");
+    } catch (e: unknown) {
+      showError(getActionErrorMessage(e, "Erreur lors de la création."));
     } finally {
       setSaving(false);
     }
   }
 
-  async function handleValidate(id: string) {
-    setBusyActionId(id);
-    try {
-      setError(null);
-      await validateMouvement(id);
-      await load();
-    } catch (e: any) {
-      setError(e?.message || "Erreur lors de la validation.");
-    } finally {
-      setBusyActionId(null);
-    }
+  function handleValidate(id: string) {
+    clearFeedback();
+    openConfirm({
+      title: "Valider ce mouvement ?",
+      detail: `#${id}`,
+      description: "Le mouvement sera appliqué au stock.",
+      variant: "primary",
+      confirmLabel: "Valider",
+      onConfirm: () =>
+        void runConfirmedAction(async () => {
+          setBusyActionId(id);
+          try {
+            await validateMouvement(id);
+            await load();
+            showSuccess("Mouvement validé.");
+          } finally {
+            setBusyActionId(null);
+          }
+        }, { closeOnSuccess: true }),
+    });
   }
 
-  async function handleDelete(id: string) {
-    setBusyActionId(id);
-    try {
-      setError(null);
-      await deleteMouvementDraft(id);
-      await load();
-    } catch (e: any) {
-      setError(e?.message || "Erreur lors de la suppression.");
-    } finally {
-      setBusyActionId(null);
-    }
+  function handleDelete(id: string) {
+    clearFeedback();
+    openConfirm({
+      title: "Supprimer ce brouillon ?",
+      detail: `Mouvement #${id}`,
+      description: "Cette action est définitive.",
+      variant: "danger",
+      onConfirm: () =>
+        void runConfirmedAction(async () => {
+          setBusyActionId(id);
+          try {
+            await deleteMouvementDraft(id);
+            await load();
+            showSuccess("Mouvement supprimé.");
+          } finally {
+            setBusyActionId(null);
+          }
+        }, { closeOnSuccess: true }),
+    });
   }
 
   return (
     <div className="p-4 mx-auto max-w-[1600px] lg:p-10 space-y-8">
+      <AppFeedbackBanner feedback={feedback} onDismiss={clearFeedback} />
+      <AppConfirmModal confirm={confirm} onClose={closeConfirm} />
       <MouvementsHeader
         onCreate={() => {
           setForm(emptyForm());
@@ -243,12 +274,6 @@ setPagination(mouvementsResult.paginatorInfo);
           </div>
         )}
       </div>
-
-      {error && (
-        <div className="p-4 bg-red-50 text-red-700 rounded-2xl font-bold border-l-4 border-red-500">
-          Attention : {error}
-        </div>
-      )}
 
       <div className="rounded-[35px] overflow-hidden border border-gray-100 bg-white shadow-sm transition-all hover:shadow-md">
        <MouvementsTable

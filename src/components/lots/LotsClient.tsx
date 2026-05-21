@@ -15,6 +15,8 @@ import LotsCardsView from "./LotsCardsView";
 import LotDetailsDrawer from "./LotDetailsDrawer";
 import LotEditDrawer from "./LotEditDrawer";
 import { deleteLot, updateLot, getLots } from "@/lib/lot.api";
+import { AppConfirmModal, AppFeedbackBanner } from "@/components/ui/feedback";
+import { getActionErrorMessage, useAppFeedback } from "@/hooks/useAppFeedback";
 
 interface Props {
   initialLots: Lot[];
@@ -60,6 +62,17 @@ export default function LotsClient({ initialLots, initialPagination }: Props) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingLot, setEditingLot] = useState<Lot | null>(null);
   const [editOpen, setEditOpen] = useState(false);
+
+  const {
+    feedback,
+    confirm,
+    showSuccess,
+    showError,
+    clearFeedback,
+    openConfirm,
+    closeConfirm,
+    runConfirmedAction,
+  } = useAppFeedback();
 
   const [filters, setFilters] = useState<LotFiltersState>({
     search: "",
@@ -132,30 +145,41 @@ const grouped: LotsGroupedByDate[] = useMemo(() => {
     setEditOpen(true);
   }, []);
 
-  const handleDelete = async (lot: Lot) => {
-    if (!window.confirm(`Voulez-vous vraiment supprimer le lot ${lot.code_lot} ?`)) return;
-    try {
-      await deleteLot(lot.id);
-      setRows(prev => prev.filter(r => r.id !== lot.id));
-    } catch (error) {
-      console.error(error);
-    }
+  const handleDelete = (lot: Lot) => {
+    clearFeedback();
+    openConfirm({
+      title: "Supprimer ce lot ?",
+      detail: lot.code_lot,
+      description: "Cette action est définitive.",
+      variant: "danger",
+      onConfirm: () =>
+        void runConfirmedAction(async () => {
+          await deleteLot(lot.id);
+          setRows((prev) => prev.filter((r) => r.id !== lot.id));
+          showSuccess("Lot supprimé.");
+        }),
+    });
   };
 
   const handleSubmitEdit = async (payload: any) => {
     if (!editingLot) return;
+    clearFeedback();
     try {
       const updated = await updateLot(editingLot.id, payload);
-      setRows(prev => prev.map(row => (row.id === updated.id ? updated : row)));
+      setRows((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
       setEditOpen(false);
+      showSuccess("Lot modifié.");
     } catch (error) {
-      console.error(error);
+      showError(getActionErrorMessage(error));
     }
   };
 
   return (
     <div className={`max-w-[1600px] mx-auto space-y-8 pb-20 transition-opacity duration-300 ${loading ? 'opacity-50' : 'opacity-100'}`}>
       
+      <AppFeedbackBanner feedback={feedback} onDismiss={clearFeedback} />
+      <AppConfirmModal confirm={confirm} onClose={closeConfirm} />
+
       {/* 1. TON HEADER ORIGINAL */}
       <LotsHeader viewMode={viewMode} onChangeView={setViewMode} count={rows.length} />
 
