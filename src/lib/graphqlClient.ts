@@ -53,6 +53,21 @@ export function friendlyGraphqlMessage(raw: string): string {
   if (/unauthenticated|not authenticated/i.test(m)) {
     return "Votre session a expiré. Reconnectez-vous.";
   }
+  if (
+    /aucun mouvement de stock validé|mouvements de stock validé|mouvements validés/i.test(
+      m
+    )
+  ) {
+    return m;
+  }
+  if (/historique insuffisant|pas assez de données/i.test(m)) {
+    return m.length > 200
+      ? "Historique de mouvements insuffisant. Créez et validez des mouvements dans « Mouvements de stock »."
+      : m;
+  }
+  if (/analyse prédictive|service d'analyse/i.test(m)) {
+    return m;
+  }
   if (/internal server error|500/i.test(m)) {
     return "Le service est momentanément indisponible. Réessayez plus tard.";
   }

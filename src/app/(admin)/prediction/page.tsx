@@ -66,13 +66,21 @@ export default function ForecastingPage() {
       try {
         const response = await fetchStockForecast(selectedId);
         setData(response.predictDemand);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error(err);
 
-        if (err.message?.includes("Pas assez de données")) {
-          setError("Historique insuffisant pour ce produit. L'IA a besoin de plus de mouvements.");
-        } else {
+        const msg =
+          err instanceof Error ? err.message : "Erreur lors du chargement de la prévision.";
+        if (
+          /mouvement de stock|mouvements validés|historique insuffisant|pas assez de données/i.test(
+            msg
+          )
+        ) {
+          setError(msg);
+        } else if (/indisponible|500|internal server/i.test(msg)) {
           setError("Le service d'analyse est temporairement indisponible.");
+        } else {
+          setError(msg);
         }
 
         setData(null);

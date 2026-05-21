@@ -15,9 +15,16 @@ export default defineConfig({
         "src/**/*.test.{ts,tsx}",
         "src/**/*.d.ts",
         "src/**/types/**",
+        // Export / intégrations lourdes (peu de valeur en unitaire)
         "src/lib/**/*.csv.ts",
         "src/lib/**/*.pdf.ts",
         "src/lib/prediction.tsx",
+        "src/lib/inventaire.export.ts",
+        // Clients GraphQL / fetch (testés via *.api.test ou E2E, pas dans le % lignes)
+        "src/lib/**/*.api.ts",
+        // Glue Next.js server-only
+        "src/lib/getServerAccessToken.ts",
+        "src/lib/requireServerAccessToken.ts",
       ],
       thresholds: {
         lines: 45,
