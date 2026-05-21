@@ -88,7 +88,26 @@ export default function StocksClient({ initialStocks }: Props) {
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = viewMode === "grid" ? 6 : 8;
+  const [focusPinned, setFocusPinned] = useState(Boolean(focusId));
+  const [prevFocusId, setPrevFocusId] = useState(focusId);
+
+  if (focusId !== prevFocusId) {
+    setPrevFocusId(focusId);
+    setFocusPinned(Boolean(focusId));
+  }
+
+  const displayViewMode = focusId ? "table" : viewMode;
+  const itemsPerPage = displayViewMode === "grid" ? 6 : 8;
+
+  const handleFiltersChange = (next: StockFiltersState) => {
+    setFilters(next);
+    setCurrentPage(1);
+  };
+
+  const handleViewModeChange = (mode: "grid" | "table") => {
+    setViewMode(mode);
+    setCurrentPage(1);
+  };
 
   const filteredRows = useMemo(() => {
     let data = [...rows];
@@ -180,39 +199,33 @@ if (filters.sort === "quantite_asc") {
     return data;
   }, [rows, filters]);
 
+  const focusTargetPage = useMemo(() => {
+    if (!focusId || displayViewMode !== "table") return null;
+    const targetIndex = filteredRows.findIndex(
+      (row) => String(row.id) === String(focusId)
+    );
+    if (targetIndex === -1) return null;
+    return Math.floor(targetIndex / itemsPerPage) + 1;
+  }, [focusId, filteredRows, itemsPerPage, displayViewMode]);
+
+  const activePage =
+    focusPinned && focusTargetPage !== null ? focusTargetPage : currentPage;
   const totalPages = Math.ceil(filteredRows.length / itemsPerPage);
 
   const paginatedRows = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
+    const start = (activePage - 1) * itemsPerPage;
     return filteredRows.slice(start, start + itemsPerPage);
-  }, [filteredRows, currentPage, itemsPerPage]);
+  }, [filteredRows, activePage, itemsPerPage]);
 
   useEffect(() => {
-    if (!focusId) return;
-    setViewMode("table");
-  }, [focusId]);
-
-  useEffect(() => {
-    if (!focusId || viewMode !== "table") return;
-    const targetIndex = filteredRows.findIndex((row) => String(row.id) === String(focusId));
-    if (targetIndex === -1) return;
-
-    const targetPage = Math.floor(targetIndex / itemsPerPage) + 1;
-    if (targetPage !== currentPage) {
-      setCurrentPage(targetPage);
-      return;
-    }
+    if (!focusId || focusTargetPage === null) return;
 
     const timer = window.setTimeout(() => {
       const el = document.getElementById(`stock-row-${focusId}`);
       el?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 180);
     return () => window.clearTimeout(timer);
-  }, [focusId, filteredRows, currentPage, itemsPerPage, viewMode]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filters, viewMode]);
+  }, [focusId, focusTargetPage, filteredRows]);
 
   const stats: StocksStatsType = useMemo(() => {
     return {
@@ -282,14 +295,14 @@ if (filters.sort === "quantite_asc") {
 
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
         <div className="flex-1">
-          <StocksFilters rows={rows} filters={filters} onChange={setFilters} />
+          <StocksFilters rows={rows} filters={filters} onChange={handleFiltersChange} />
         </div>
 
         <div className="flex bg-white border-2 border-gray-100 p-1.5 rounded-[20px] shadow-[8px_8px_0px_rgba(0,160,157,0.2)] self-start gap-1">
           <button
-            onClick={() => setViewMode("grid")}
+            onClick={() => handleViewModeChange("grid")}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-[14px] transition-all duration-300 font-bold text-[11px] uppercase tracking-wider ${
-              viewMode === "grid"
+              displayViewMode === "grid"
                 ? "bg-[#1C2434] text-white shadow-lg"
                 : "text-gray-400 hover:bg-gray-50"
             }`}
@@ -299,9 +312,9 @@ if (filters.sort === "quantite_asc") {
           </button>
 
           <button
-            onClick={() => setViewMode("table")}
+            onClick={() => handleViewModeChange("table")}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-[14px] transition-all duration-300 font-bold text-[11px] uppercase tracking-wider ${
-              viewMode === "table"
+              displayViewMode === "table"
                 ? "bg-[#1C2434] text-white shadow-lg"
                 : "text-gray-400 hover:bg-gray-50"
             }`}
@@ -313,7 +326,7 @@ if (filters.sort === "quantite_asc") {
       </div>
 
       <div className="mt-6">
-        {viewMode === "grid" ? (
+        {displayViewMode === "grid" ? (
           <StocksCardsView
             rows={paginatedRows}
             onView={handleView}
@@ -333,9 +346,12 @@ if (filters.sort === "quantite_asc") {
       {totalPages > 1 && (
         <div className="mt-4 flex justify-center items-center py-6 bg-white rounded-[2rem] border border-gray-50 shadow-sm">
           <LocalPagination
-            currentPage={currentPage}
+            currentPage={activePage}
             totalPages={totalPages}
-            onPageChange={setCurrentPage}
+            onPageChange={(page) => {
+              setFocusPinned(false);
+              setCurrentPage(page);
+            }}
           />
         </div>
       )}

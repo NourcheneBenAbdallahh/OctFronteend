@@ -744,7 +744,7 @@ export default function BonLivraisonsTable({
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-[0.2em] ml-1">Date d'Arrivée</label>
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-[0.2em] ml-1">Date d&apos;Arrivée</label>
                     <input type="date" value={form.date_reception} onChange={(e) => setForm({...form, date_reception: e.target.value})} readOnly={isEditMode} className="w-full rounded-2xl border-2 border-gray-50 bg-gray-50 p-4 text-xs font-black outline-none focus:border-indigo-200 focus:bg-white transition-all read-only:opacity-70 read-only:cursor-not-allowed" required />
                   </div>
                   <div className="space-y-2 sm:col-span-2">

@@ -1108,7 +1108,7 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
                       onClick={() => { setExportPeriodType("month"); setShowExportPeriodDropdown(false); }}
                       className={`w-full rounded-xl px-3 py-2 text-left text-xs font-semibold ${exportPeriodType === "month" ? "bg-indigo-50 text-indigo-700" : "text-gray-700 hover:bg-gray-50"}`}
                     >
-                      Mois d'une annee
+                      Mois d&apos;une annee
                     </button>
                   </div>
                 </div>

@@ -316,7 +316,7 @@ export default function ForecastingPage() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Analyse Prédictive IA</h1>
-            <p className="text-gray-500 text-sm italic">Système d'aide à la décision stratégique</p>
+            <p className="text-gray-500 text-sm italic">Système d&apos;aide à la décision stratégique</p>
           </div>
 
           <div className="flex items-center gap-4">

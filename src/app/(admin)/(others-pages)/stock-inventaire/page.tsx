@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   createInventaire,
   deleteInventaire,
@@ -77,7 +77,7 @@ export default function InventairePage() {
     setFeedback({ type, message });
   };
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!token) {
       setLoading(false);
       return;
@@ -98,11 +98,11 @@ export default function InventairePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
   useEffect(() => {
     load();
-  }, [token]);
+  }, [load]);
 
   const filtered = useMemo(
     () => applyInventaireFilters(data, filters),
