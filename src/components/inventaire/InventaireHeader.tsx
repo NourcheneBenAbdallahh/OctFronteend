@@ -65,16 +65,7 @@ export default function InventaireHeader({
             <RefreshCw size={20} className={`${loading ? "animate-spin" : ""} text-[#00A09D]`} />
           </button>
 
-          {onGenererEntrepot && (
-            <button
-              onClick={onGenererEntrepot}
-              disabled={loading}
-              className="h-14 px-5 inline-flex items-center gap-2 rounded-full bg-[#00A09D]/10 text-[#00A09D] border border-[#00A09D]/20 text-[10px] font-black uppercase tracking-widest hover:bg-[#00A09D]/20 transition-all disabled:opacity-50"
-            >
-              <Layers size={16} />
-              Inventaire entrepôt
-            </button>
-          )}
+       
 
           {hasActiveSession && onRegulariserSession && (
             <button
