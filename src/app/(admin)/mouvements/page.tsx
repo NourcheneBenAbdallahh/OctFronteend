@@ -88,7 +88,7 @@ setPagination(mouvementsResult.paginatorInfo);
     } finally {
       setLoading(false);
     }
-  }, [search, typeFilter, statutFilter, dateFrom, dateTo, page]);
+  }, [search, typeFilter, statutFilter, page, clearFeedback, showError]);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {

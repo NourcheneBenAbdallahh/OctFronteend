@@ -5,6 +5,8 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main, develop]
+    # Exclure "closed" : au merge, GitHub envoie aussi un push sur main → évite 2 exécutions
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
     inputs:
       deploy_local:

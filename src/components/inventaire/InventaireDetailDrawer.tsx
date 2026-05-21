@@ -65,7 +65,7 @@ export default function InventaireDetailDrawer({ item, open, onClose, onRegulari
             </div>
             <div className="col-span-2 p-8 rounded-[32px] bg-[#1C2434] text-white flex items-center justify-between overflow-hidden relative">
                <div className="relative z-10">
-                  <p className="text-[10px] font-black opacity-60 uppercase tracking-[0.2em] mb-1">Écart d'Audit</p>
+                  <p className="text-[10px] font-black opacity-60 uppercase tracking-[0.2em] mb-1">Écart d&apos;Audit</p>
                   <p className="text-5xl font-[1000] tracking-tighter">
                     {item.ecart > 0 ? `+${item.ecart}` : item.ecart}
                   </p>

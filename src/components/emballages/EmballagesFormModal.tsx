@@ -152,7 +152,7 @@ export default function EmballagesFormModal({
     setStep(1);
     setFieldErrors({});
     setSubmitError(null);
-  }, [editing?.id]);
+  }, [editing]);
 
   useEffect(() => {
     let cancelled = false;
