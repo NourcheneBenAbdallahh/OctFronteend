@@ -36,7 +36,14 @@ export default function UserInfoCard() {
             <InfoDisplay label="Prénom" value={firstName} />
             <InfoDisplay label="Nom" value={lastName} />
             <InfoDisplay label="Adresse Email" value={user?.email || "Non renseigné"} />
-            <InfoDisplay label="Téléphone" value="+216 -- --- ---" />
+            <InfoDisplay
+              label="Téléphone"
+              value={
+                user?.telephone
+                  ? `${user.telephone}${user?.phoneVerifiedAt ? " (vérifié)" : " (non vérifié)"}`
+                  : "Non renseigné"
+              }
+            />
             <div className="md:col-span-2">
               <InfoDisplay label="Bio / Rôle" value={user?.role || "Utilisateur"} />
             </div>

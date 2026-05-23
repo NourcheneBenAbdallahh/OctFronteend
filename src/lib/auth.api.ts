@@ -6,6 +6,7 @@ const LOGIN_MUTATION = `
 mutation Login($email: String!, $password: String!) {
   login(email: $email, password: $password) {
     token
+    isFirstLogin
     user {
       id
       name
@@ -13,6 +14,8 @@ mutation Login($email: String!, $password: String!) {
       role
       isActive
       emailVerifiedAt
+      telephone
+      phoneVerifiedAt
     }
   }
 }`;
@@ -28,6 +31,8 @@ mutation Register($name: String!, $email: String!, $password: String!, $role: St
       role
       isActive
       emailVerifiedAt
+      telephone
+      phoneVerifiedAt
     }
   }
 }`;
@@ -40,6 +45,16 @@ mutation VerifyEmail($token: String!) {
 const RESEND_VERIFICATION_MUTATION = `
 mutation ResendVerificationEmail {
   resendVerificationEmail
+}`;
+
+const SEND_PHONE_VERIFICATION_MUTATION = `
+mutation SendPhoneVerificationCode($telephone: String!) {
+  sendPhoneVerificationCode(telephone: $telephone)
+}`;
+
+const VERIFY_PHONE_MUTATION = `
+mutation VerifyPhone($code: String!) {
+  verifyPhone(code: $code)
 }`;
 
 
@@ -73,6 +88,8 @@ query Me {
     role
     isActive
     emailVerifiedAt
+    telephone
+    phoneVerifiedAt
   }
 }`;
 
@@ -107,6 +124,25 @@ export async function resendVerificationEmail(token?: string): Promise<string> {
     {},
     { token }
   ).then((d) => d.resendVerificationEmail);
+}
+
+export async function sendPhoneVerificationCode(
+  telephone: string,
+  token?: string
+): Promise<string> {
+  return graphqlRequest<{ sendPhoneVerificationCode: string }>(
+    SEND_PHONE_VERIFICATION_MUTATION,
+    { telephone },
+    { token }
+  ).then((d) => d.sendPhoneVerificationCode);
+}
+
+export async function verifyPhone(code: string, token?: string): Promise<string> {
+  return graphqlRequest<{ verifyPhone: string }>(
+    VERIFY_PHONE_MUTATION,
+    { code },
+    { token }
+  ).then((d) => d.verifyPhone);
 }
 
 export async function forgotPassword(email: string): Promise<string> {

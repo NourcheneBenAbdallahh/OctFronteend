@@ -1,6 +1,9 @@
 "use client";
 
 import { ClipboardCheck, RefreshCw, ShieldAlert, CheckCircle2, Plus, Layers, CheckCheck } from "lucide-react";
+import { tourPageAttrs } from "@/lib/tourPageAttrs";
+
+const tour = tourPageAttrs("/stock-inventaire");
 
 interface Props {
   loading: boolean;
@@ -79,6 +82,8 @@ export default function InventaireHeader({
           )}
 
           <button
+            type="button"
+            {...tour.actions}
             onClick={onNew}
             className="h-14 px-6 inline-flex items-center gap-2 bg-white text-gray-900 border-2 border-gray-900 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all shadow-[8px_8px_0px_rgba(0,160,157,0.2)]"
           >

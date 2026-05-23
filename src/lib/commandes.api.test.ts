@@ -18,4 +18,15 @@ describe("normalizeCommande", () => {
     } as Commande;
     expect(normalizeCommande(item).statut).toBe("EN_ATTENTE");
   });
+
+  it("normalise quantite_recue_total à 0 pour une nouvelle commande", () => {
+    const item = {
+      id: "3",
+      statut: "EN_ATTENTE",
+      quantite_recue_total: 0,
+    } as Commande;
+    const out = normalizeCommande(item);
+    expect(out.statut).toBe("EN_ATTENTE");
+    expect(out.quantite_recue_total).toBe(0);
+  });
 });

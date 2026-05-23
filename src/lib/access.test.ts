@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   biDataScopeForRole,
   canAccessPath,
+  canManageBonLivraisons,
+  canManageCommandes,
   canManageEmballagesCatalog,
+  canQueryBonLivraisonsList,
   canQueryCommandesList,
   canUseStockAi,
   canViewFournisseursList,
@@ -39,8 +42,9 @@ describe("canAccessPath", () => {
     expect(canAccessPath("/stock", "ADMIN")).toBe(true);
   });
 
-  it("restreint FINANCE aux factures", () => {
+  it("restreint FINANCE aux factures et consultation BL", () => {
     expect(canAccessPath("/factures", "FINANCE")).toBe(true);
+    expect(canAccessPath("/bon-livraisons", "FINANCE")).toBe(true);
     expect(canAccessPath("/commandes", "FINANCE")).toBe(false);
   });
 
@@ -66,6 +70,36 @@ describe("canQueryCommandesList", () => {
   });
 });
 
+describe("canManageCommandes", () => {
+  it("autorise LOGISTIQUE et refuse FINANCE / STOCK", () => {
+    expect(canManageCommandes("ADMIN")).toBe(true);
+    expect(canManageCommandes("LOGISTIQUE")).toBe(true);
+    expect(canManageCommandes("CONTRAT")).toBe(true);
+    expect(canManageCommandes("FINANCE")).toBe(false);
+    expect(canManageCommandes("STOCK")).toBe(false);
+  });
+});
+
+describe("canQueryBonLivraisonsList", () => {
+  it("autorise LOGISTIQUE et FINANCE", () => {
+    expect(canQueryBonLivraisonsList("ADMIN")).toBe(true);
+    expect(canQueryBonLivraisonsList("LOGISTIQUE")).toBe(true);
+    expect(canQueryBonLivraisonsList("CONTRAT")).toBe(true);
+    expect(canQueryBonLivraisonsList("FINANCE")).toBe(true);
+    expect(canQueryBonLivraisonsList("STOCK")).toBe(false);
+  });
+});
+
+describe("canManageBonLivraisons", () => {
+  it("réserve les mutations BL à la logistique", () => {
+    expect(canManageBonLivraisons("ADMIN")).toBe(true);
+    expect(canManageBonLivraisons("LOGISTIQUE")).toBe(true);
+    expect(canManageBonLivraisons("CONTRAT")).toBe(true);
+    expect(canManageBonLivraisons("FINANCE")).toBe(false);
+    expect(canManageBonLivraisons("STOCK")).toBe(false);
+  });
+});
+
 describe("biDataScopeForRole", () => {
   it("mappe chaque rôle à son périmètre BI", () => {
     expect(biDataScopeForRole("ADMIN")).toBe("full");
@@ -83,9 +117,9 @@ describe("sidebarBiNavLabel", () => {
 });
 
 describe("shouldBypassRouteAccess", () => {
-  it("bypass verify-email et reset-password", () => {
+  it("bypass verify-email uniquement", () => {
     expect(shouldBypassRouteAccess("/verify-email")).toBe(true);
-    expect(shouldBypassRouteAccess("/reset-password/confirm")).toBe(true);
+    expect(shouldBypassRouteAccess("/reset-password")).toBe(false);
     expect(shouldBypassRouteAccess("/stock")).toBe(false);
   });
 });

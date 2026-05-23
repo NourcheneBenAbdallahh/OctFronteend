@@ -1,4 +1,7 @@
 import { Search, Filter, LayoutGrid, ChevronRight, Plus, Download } from "lucide-react";
+import { tourPageAttrs } from "@/lib/tourPageAttrs";
+
+const tour = tourPageAttrs("/fournisseurs");
 
 interface Props {
   query: string;
@@ -20,7 +23,8 @@ export const FournisseurHeader = ({ query, setQuery, onOpenNew }: Props) => (
     <div className="flex items-center gap-3">
       <div className="relative group">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-[#00A09D] transition-colors" size={16} />
-        <input 
+        <input
+          {...tour.search}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="RECHERCHER UN PARTENAIRE..."
@@ -28,7 +32,10 @@ export const FournisseurHeader = ({ query, setQuery, onOpenNew }: Props) => (
         />
       </div>
       
-              <button onClick={onOpenNew}
+              <button
+        type="button"
+        {...tour.actions}
+        onClick={onOpenNew}
         className="bg-white text-gray-900 border-2 border-gray-900 px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all shadow-[8px_8px_0px_rgba(0,160,157,0.2)]"
       > 
         <Plus size={18} strokeWidth={3} />

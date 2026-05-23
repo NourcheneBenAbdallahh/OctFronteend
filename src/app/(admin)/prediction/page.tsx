@@ -1,13 +1,19 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { fetchStockForecast, PredictDemandResponse } from "@/lib/prediction";
+import {
+  fetchStockForecast,
+  PredictDemandResponse,
+  alertLevelLabel,
+} from "@/lib/prediction";
 import StockForecastChart from "@/components/prediction/StockForecastChart";
+import PredictionInsightPanel from "@/components/prediction/PredictionInsightPanel";
 import { listEmballages } from "@/lib/emballages.api";
 import jsPDF from "jspdf";
 import { useAuthStore } from "@/store/useAuthStore";
 import { AppFeedbackBanner } from "@/components/ui/feedback";
 import { useAppFeedback } from "@/hooks/useAppFeedback";
+import { HelpCircle, FileDown } from "lucide-react";
 
 interface Emballage {
   id: string;
@@ -26,12 +32,10 @@ export default function ForecastingPage() {
   const [error, setError] = useState<string | null>(null);
   const { feedback, showError: showActionError, clearFeedback } = useAppFeedback();
 
-  // ===== Unité affichable =====
   const displayUnit = useMemo(() => {
     return selectedEmballage?.capacity_unit?.trim() || "unités";
   }, [selectedEmballage]);
 
-  // ===== Chargement des emballages =====
   useEffect(() => {
     if (!token) return;
 
@@ -39,14 +43,12 @@ export default function ForecastingPage() {
       try {
         const response = await listEmballages(1, 100, { token });
         const listeBrute = response.emballages.data as Emballage[];
-
         setEmballages(listeBrute);
-
         if (listeBrute.length > 0) {
           setSelectedId(listeBrute[0].id);
           setSelectedEmballage(listeBrute[0]);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error(err);
         setError("Impossible de charger la liste des produits.");
       }
@@ -55,7 +57,6 @@ export default function ForecastingPage() {
     init();
   }, [token]);
 
-  // ===== Chargement des prédictions =====
   useEffect(() => {
     if (!selectedId) return;
 
@@ -68,13 +69,10 @@ export default function ForecastingPage() {
         setData(response.predictDemand);
       } catch (err: unknown) {
         console.error(err);
-
         const msg =
           err instanceof Error ? err.message : "Erreur lors du chargement de la prévision.";
         if (
-          /mouvement de stock|mouvements validés|historique insuffisant|pas assez de données/i.test(
-            msg
-          )
+          /mouvement|mouvements|sorties|historique|pas assez/i.test(msg)
         ) {
           setError(msg);
         } else if (/indisponible|500|internal server/i.test(msg)) {
@@ -82,7 +80,6 @@ export default function ForecastingPage() {
         } else {
           setError(msg);
         }
-
         setData(null);
       } finally {
         setLoading(false);
@@ -92,358 +89,204 @@ export default function ForecastingPage() {
     loadData();
   }, [selectedId]);
 
-  // ===== Export PDF =====
   const exportToPDF = async () => {
-    if (!data) return;
+    if (!data?.insight) return;
 
     try {
       const pdf = new jsPDF("p", "mm", "a4");
       const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
+      const ins = data.insight;
 
-      // ===== Charger logo =====
-      const loadImageAsBase64 = (url: string): Promise<string> => {
-        return new Promise((resolve, reject) => {
-          const img = new Image();
-          img.src = url;
-          img.crossOrigin = "anonymous";
-
-          img.onload = () => {
-            const canvas = document.createElement("canvas");
-            canvas.width = img.width;
-            canvas.height = img.height;
-
-            const ctx = canvas.getContext("2d");
-            if (!ctx) return reject("Canvas introuvable");
-
-            ctx.drawImage(img, 0, 0);
-            resolve(canvas.toDataURL("image/png"));
-          };
-
-          img.onerror = reject;
-        });
-      };
-
-      let logoBase64 = "";
-      try {
-        logoBase64 = await loadImageAsBase64("/images/logo/logoOCT.png");
-      } catch (e) {
-        console.warn("Logo non chargé");
-      }
-
-      // ===== HEADER PREMIUM =====
-      pdf.setFillColor(255, 255, 255);
-      pdf.rect(0, 0, pageWidth, 34, "F");
-
-      // Accent bleu vertical à gauche
-      pdf.setFillColor(30, 64, 175);
-      pdf.rect(0, 0, 6, 34, "F");
-
-      // Ligne fine
-      pdf.setDrawColor(203, 213, 225);
-      pdf.setLineWidth(0.5);
-      pdf.line(10, 31, pageWidth - 10, 31);
-
-      // Logo
-      if (logoBase64) {
-        pdf.addImage(logoBase64, "PNG", 12, 7, 18, 18);
-      }
-
-      // Titre header
-      pdf.setTextColor(15, 23, 42);
       pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(15);
-      pdf.text("OFFICE DU COMMERCE DE LA TUNISIE", 35, 14);
-
+      pdf.setFontSize(14);
+      pdf.text("OCT — Aide à la décision stock", 14, 20);
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(11);
-      pdf.setTextColor(71, 85, 105);
-      pdf.text("Rapport d’Analyse Prédictive des Stocks", 35, 21);
+      pdf.text(`Produit : ${data.name}`, 14, 30);
+      pdf.text(`Date : ${new Date().toLocaleDateString("fr-FR")}`, 14, 37);
+      pdf.text(`État : ${alertLevelLabel(ins.niveau_alerte)}`, 14, 44);
 
-      pdf.setFontSize(9);
-      pdf.setTextColor(148, 163, 184);
-      pdf.text("Système d’aide à la décision stratégique", 35, 27);
+      let y = 54;
+      const lines = pdf.splitTextToSize(ins.message_agent, 180);
+      pdf.text(lines, 14, y);
+      y += lines.length * 6 + 8;
 
-      // ===== INFOS GÉNÉRALES =====
-      let y = 42;
-
-      pdf.setTextColor(0, 0, 0);
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(13);
-      pdf.text("Informations générales", 14, y);
-
-      y += 8;
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(11);
-      pdf.text(`Produit analysé : ${data.name}`, 14, y);
-
+      pdf.text(`Stock actuel : ${ins.stock_actuel} ${displayUnit}`, 14, y);
       y += 7;
-      pdf.text(`Date d'extraction : ${new Date().toLocaleDateString("fr-FR")}`, 14, y);
-
+      pdf.text(`Autonomie estimée : ${ins.jours_avant_rupture} jours`, 14, y);
       y += 7;
-      pdf.text(`Niveau de confiance : ${data.metrics.confidence_level}`, 14, y);
-
+      pdf.text(`Quantité suggérée à commander : ${ins.quantite_a_commander} ${displayUnit}`, 14, y);
       y += 7;
-      pdf.text(`Unité de mesure : ${displayUnit}`, 14, y);
-
-      // ===== KPI BOXES =====
+      pdf.text(`Marge de sécurité recommandée : ${data.metrics.safety_stock} ${displayUnit}`, 14, y);
       y += 12;
 
-      const drawBox = (x: number, title: string, value: string) => {
-        pdf.setDrawColor(220, 220, 220);
-        pdf.setFillColor(248, 250, 252);
-        pdf.roundedRect(x, y, 55, 22, 3, 3, "FD");
-
-        pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(10);
-        pdf.setTextColor(100, 116, 139);
-        pdf.text(title, x + 4, y + 7);
-
-        pdf.setFontSize(14);
-        pdf.setTextColor(15, 23, 42);
-        pdf.text(value, x + 4, y + 16);
-      };
-
-      drawBox(14, "Stock de sécurité", `${data.metrics.safety_stock} ${displayUnit}`);
-      drawBox(77, "Fiabilité (Sigma)", `${data.metrics.volatility_sigma}`);
-      drawBox(140, "Confiance modèle", `${data.metrics.confidence_level}`);
-
-      y += 32;
-
-      // ===== TITRE TABLEAU =====
       pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(13);
-      pdf.setTextColor(0, 0, 0);
-      pdf.text("Prévisions de demande", 14, y);
-
+      pdf.text("Prévisions des sorties (7 jours)", 14, y);
       y += 8;
-
-      // ===== TABLE HEADER =====
-      pdf.setFillColor(241, 245, 249);
-      pdf.rect(14, y, 182, 10, "F");
-
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(10);
-      pdf.setTextColor(15, 23, 42);
-      pdf.text("Date", 18, y + 6.5);
-      pdf.text("Quantité prévue", 70, y + 6.5);
-      pdf.text("Intervalle de risque", 135, y + 6.5);
-
-      y += 12;
-
-      // ===== TABLE ROWS =====
       pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(10);
-
-      data.predictions.forEach((p, index) => {
-        if (y > pageHeight - 30) {
-          pdf.addPage();
-          y = 20;
-
-          pdf.setFont("helvetica", "bold");
-          pdf.setFontSize(12);
-          pdf.setTextColor(15, 23, 42);
-          pdf.text("Prévisions de demande (suite)", 14, y);
-
-          y += 8;
-          pdf.setFillColor(241, 245, 249);
-          pdf.rect(14, y, 182, 10, "F");
-
-          pdf.setFont("helvetica", "bold");
-          pdf.setFontSize(10);
-          pdf.text("Date", 18, y + 6.5);
-          pdf.text("Quantité prévue", 70, y + 6.5);
-          pdf.text("Intervalle de risque", 135, y + 6.5);
-
-          y += 12;
-        }
-
-        if (index % 2 === 0) {
-          pdf.setFillColor(250, 250, 250);
-          pdf.rect(14, y - 5, 182, 9, "F");
-        }
-
-        pdf.setTextColor(31, 41, 55);
-        pdf.text(String(p.date), 18, y);
-        pdf.text(`${p.quantite_predite} ${displayUnit}`, 70, y);
-        pdf.text(`[${p.borne_basse} - ${p.borne_haute}] ${displayUnit}`, 135, y);
-
-        y += 9;
+      data.predictions.forEach((p) => {
+        pdf.text(`${p.date} : environ ${p.quantite_predite} ${displayUnit}`, 14, y);
+        y += 6;
       });
 
-      // ===== CONCLUSION =====
-      y += 10;
-
-      if (y > pageHeight - 45) {
-        pdf.addPage();
-        y = 20;
-      }
-
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(12);
-      pdf.setTextColor(15, 23, 42);
-      pdf.text("Interprétation analytique", 14, y);
-
-      y += 8;
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(10);
-      pdf.setTextColor(31, 41, 55);
-
-      const commentaire = `Ce rapport présente une estimation prévisionnelle de la demande future pour le produit "${data.name}". Le stock de sécurité recommandé est de ${data.metrics.safety_stock} ${displayUnit}, avec un niveau de confiance de ${data.metrics.confidence_level}. Cette analyse permet d’anticiper les besoins, de mieux planifier l’approvisionnement et de réduire les risques de rupture ou de surstockage.`;
-
-      const lines = pdf.splitTextToSize(commentaire, 180);
-      pdf.text(lines, 14, y);
-
-      // ===== FOOTER =====
-      const totalPages = (pdf as any).internal.getNumberOfPages?.() || 1;
-
-      for (let i = 1; i <= totalPages; i++) {
-        pdf.setPage(i);
-        pdf.setFontSize(9);
-        pdf.setTextColor(120, 120, 120);
-        pdf.text(
-          "Rapport généré automatiquement par le système intelligent d’aide à la décision - OCT",
-          14,
-          287
-        );
-        pdf.text(`Page ${i}/${totalPages}`, pageWidth - 30, 287);
-      }
-
-      pdf.save(`Rapport_OCT_${data.name}.pdf`);
+      pdf.save(`Prevision_${data.name.replace(/\s+/g, "_")}.pdf`);
     } catch (err) {
-      console.error("Erreur PDF:", err);
+      console.error(err);
       showActionError("Erreur lors de la génération du PDF.");
     }
   };
 
   return (
-    <div className="p-6 bg-[#f8fafc] min-h-screen space-y-6">
-      <div className="max-w-7xl mx-auto mt-8">
+    <div className="min-h-screen bg-[#f8fafc] p-6">
+      <div className="mx-auto mt-8 max-w-7xl space-y-6">
         <AppFeedbackBanner feedback={feedback} onDismiss={clearFeedback} />
-        {/* HEADER PAGE */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Analyse Prédictive IA</h1>
-            <p className="text-gray-500 text-sm italic">Système d&apos;aide à la décision stratégique</p>
-          </div>
 
-          <div className="flex items-center gap-4">
-            <select
-              value={selectedId}
-              onChange={(e) => {
-                const id = e.target.value;
-                setSelectedId(id);
+        <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+          <div className="flex flex-col justify-between gap-6 md:flex-row md:items-center">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">
+                Prévisions de consommation
+              </h1>
+              <p className="mt-1 text-sm text-gray-600">
+                Estimez combien de temps votre stock tiendra et combien commander.
+              </p>
+            </div>
 
-                const emb = emballages.find((item) => item.id === id) || null;
-                setSelectedEmballage(emb);
-              }}
-              className="min-w-[220px] p-2.5 bg-gray-50 border border-gray-200 text-sm rounded-xl font-semibold outline-none transition-all focus:ring-2 focus:ring-indigo-500"
-            >
-              {emballages.map((emb) => (
-                <option key={emb.id} value={emb.id}>
-                  {emb.name}
-                </option>
-              ))}
-            </select>
-
-            {data && (
-              <button
-                onClick={exportToPDF}
-                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition-all shadow-lg active:scale-95"
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="sr-only" htmlFor="product-select">
+                Choisir un produit
+              </label>
+              <select
+                id="product-select"
+                value={selectedId}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  setSelectedId(id);
+                  setSelectedEmballage(emballages.find((item) => item.id === id) ?? null);
+                }}
+                className="min-w-[240px] rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-[#00A09D]"
               >
-                📥 Télécharger Rapport
-              </button>
-            )}
+                {emballages.map((emb) => (
+                  <option key={emb.id} value={emb.id}>
+                    {emb.name}
+                  </option>
+                ))}
+              </select>
+
+              {data && (
+                <button
+                  type="button"
+                  onClick={exportToPDF}
+                  className="inline-flex items-center gap-2 rounded-xl bg-[#1C2434] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#00A09D]"
+                >
+                  <FileDown size={16} />
+                  Télécharger le résumé
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Loading */}
+        <div className="flex gap-3 rounded-xl border border-blue-100 bg-blue-50/80 p-4 text-sm text-blue-900">
+          <HelpCircle className="shrink-0" size={20} />
+          <div>
+            <p className="font-semibold">Comment lire cette page ?</p>
+            <p className="mt-1 text-blue-800/90">
+              Nous analysons uniquement les <strong>sorties validées</strong> (production,
+              pertes) enregistrées dans « Mouvements de stock ». Le bandeau coloré vous dit
+              quoi faire. Le graphique montre le passé (bleu) et les 7 prochains jours
+              (orange).
+            </p>
+          </div>
+        </div>
+
         {loading && (
-          <div className="flex flex-col items-center justify-center p-20 space-y-4">
-            <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
-            <p className="text-indigo-600 font-bold">Calcul des modèles mathématiques...</p>
+          <div className="flex flex-col items-center justify-center rounded-2xl bg-white p-20 shadow-sm">
+            <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#00A09D]/30 border-t-[#00A09D]" />
+            <p className="mt-4 font-semibold text-gray-700">
+              Calcul de la prévision en cours…
+            </p>
+            <p className="text-sm text-gray-500">Cela peut prendre jusqu’à une minute.</p>
           </div>
         )}
 
-        {/* Error */}
         {error && (
-          <div className="p-8 bg-white border-2 border-red-100 rounded-3xl text-center shadow-xl">
-            <span className="text-4xl mb-4 block text-red-400">📊</span>
-            <h3 className="text-red-700 font-bold text-lg mb-2">Analyse impossible</h3>
-            <p className="text-gray-500 max-w-md mx-auto">{error}</p>
+          <div className="rounded-2xl border-2 border-red-100 bg-white p-8 text-center shadow-sm">
+            <span className="mb-3 block text-4xl">📋</span>
+            <h3 className="text-lg font-bold text-red-700">Analyse non disponible</h3>
+            <p className="mx-auto mt-2 max-w-lg text-gray-600">{error}</p>
           </div>
         )}
 
-        {/* Data */}
-        {!loading && data && (
+        {!loading && data?.insight && (
           <div id="report-content" className="space-y-6">
-            {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-white p-6 rounded-2xl border-b-4 border-red-500 shadow-sm">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-                  Stock de Sécurité IA
-                </p>
-                <p className="text-3xl font-black text-gray-900 mt-2">
-                  {data.metrics.safety_stock}{" "}
-                  <small className="text-sm font-normal text-gray-400">{displayUnit}</small>
-                </p>
-              </div>
+            <PredictionInsightPanel
+              insight={data.insight}
+              productName={data.name}
+              unitLabel={displayUnit}
+            />
 
-              <div className="bg-white p-6 rounded-2xl border-b-4 border-indigo-500 shadow-sm">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-                  Fiabilité (Sigma)
-                </p>
-                <p className="text-3xl font-black text-gray-900 mt-2">
-                  {data.metrics.volatility_sigma}
-                </p>
-              </div>
-
-              <div className="bg-white p-6 rounded-2xl border-b-4 border-green-500 shadow-sm">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-                  Confiance Modèle
-                </p>
-                <p className="text-3xl font-black text-gray-900 mt-2">
-                  {data.metrics.confidence_level}
-                </p>
-              </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <MetricHelp
+                title="Marge de sécurité"
+                value={`${data.metrics.safety_stock} ${displayUnit}`}
+                explanation="Quantité supplémentaire à garder pour absorber les imprévus."
+              />
+              <MetricHelp
+                title="Variabilité des sorties"
+                value={String(data.metrics.volatility_sigma)}
+                explanation="Plus le chiffre est élevé, plus les sorties varient d’un jour à l’autre."
+              />
+              <MetricHelp
+                title="Fiabilité du calcul"
+                value={data.metrics.confidence_level}
+                explanation={`Basé sur ${data.insight.history_days} jours de sorties enregistrées.`}
+              />
             </div>
 
-            {/* Graphique */}
-            <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
-              <div className="flex items-center justify-between mb-8">
-                <h3 className="font-bold text-gray-800 text-lg flex items-center gap-3">
-                  <span className="w-2 h-8 bg-indigo-600 rounded-full"></span>
-                  Prévisions de demande : {data.name}
+            <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm md:p-8">
+              <h3 className="mb-4 text-lg font-bold text-gray-900">
+                Évolution des sorties — {data.name}
+              </h3>
+              <StockForecastChart
+                history={data.history ?? []}
+                predictions={data.predictions}
+                unitLabel={displayUnit}
+              />
+            </div>
+
+            <div className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
+              <div className="border-b border-gray-100 bg-gray-50/80 px-6 py-4">
+                <h3 className="font-bold text-gray-800">
+                  Détail jour par jour (7 prochains jours)
                 </h3>
+                <p className="text-xs text-gray-500 mt-1">
+                  Fourchette = scénario prudent (bas) et optimiste (haut).
+                </p>
               </div>
-              <StockForecastChart data={data} />
-            </div>
-
-            {/* Tableau */}
-            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-gray-50/50 border-b border-gray-100">
-                  <tr>
-                    <th className="px-8 py-5 text-left text-xs font-bold text-gray-400 uppercase">
-                      Date
-                    </th>
-                    <th className="px-8 py-5 text-left text-xs font-bold text-indigo-600 uppercase">
-                      Prévision
-                    </th>
-                    <th className="px-8 py-5 text-center text-xs font-bold text-gray-400 uppercase">
-                      Plage de Risque
-                    </th>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 text-left text-xs font-bold uppercase text-gray-400">
+                    <th className="px-6 py-4">Date</th>
+                    <th className="px-6 py-4">Sorties prévues</th>
+                    <th className="px-6 py-4 text-center">Fourchette possible</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {data.predictions.map((p, idx) => (
-                    <tr key={idx} className="hover:bg-gray-50/50 transition-colors text-sm">
-                      <td className="px-8 py-5 font-semibold text-gray-700">{p.date}</td>
-                      <td className="px-8 py-5 font-bold text-gray-900">
-                        {p.quantite_predite} {displayUnit}
+                    <tr key={idx} className="hover:bg-gray-50/50">
+                      <td className="px-6 py-4 font-medium text-gray-700">
+                        {new Date(p.date).toLocaleDateString("fr-FR", {
+                          weekday: "long",
+                          day: "numeric",
+                          month: "long",
+                        })}
                       </td>
-                      <td className="px-8 py-5 text-xs text-gray-400 text-center font-mono">
-                        [{p.borne_basse} - {p.borne_haute}] {displayUnit}
+                      <td className="px-6 py-4 font-bold text-gray-900">
+                        ≈ {p.quantite_predite.toLocaleString("fr-FR")} {displayUnit}
+                      </td>
+                      <td className="px-6 py-4 text-center text-gray-500">
+                        entre {p.borne_basse} et {p.borne_haute} {displayUnit}
                       </td>
                     </tr>
                   ))}
@@ -453,6 +296,26 @@ export default function ForecastingPage() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function MetricHelp({
+  title,
+  value,
+  explanation,
+}: {
+  title: string;
+  value: string;
+  explanation: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+        {title}
+      </p>
+      <p className="mt-2 text-2xl font-black text-gray-900">{value}</p>
+      <p className="mt-2 text-xs leading-relaxed text-gray-500">{explanation}</p>
     </div>
   );
 }

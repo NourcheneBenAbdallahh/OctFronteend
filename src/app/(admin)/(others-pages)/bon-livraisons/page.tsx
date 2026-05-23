@@ -1,14 +1,14 @@
-import ComponentCard from "@/components/common/ComponentCard";
-import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import BonLivraisonsTable from "@/components/bon-livraisons/BonLivraisonsTable";
 import {
   listBonLivraisons,
   normalizeBonLivraison,
 } from "@/lib/bon-livraisons.api";
+import { me } from "@/lib/auth.api";
 import { listEmballages } from "@/lib/emballages.api";
 import { listCommandes } from "@/lib/commandes.api";
 import { fetchEntrepots } from "@/lib/entrepot.api";
 import { listUnitesMesure } from "@/lib/unites-mesure.api";
+import { canManageBonLivraisons } from "@/lib/access";
 import { requireServerAccessToken } from "@/lib/requireServerAccessToken";
 import type { UniteMesure } from "@/types/unite-mesure";
 import {
@@ -31,34 +31,33 @@ export default async function BonLivraisonsPage({
 
   const token = await requireServerAccessToken();
   const auth = { token };
+  const user = await me(token);
+  const readOnly = !canManageBonLivraisons(user?.role);
 
-  const [
-    bonLivraisonsResult,
-    emballagesResult,
-    commandesResult,
-    entrepotsResult,
-    unitesMesureResult,
-  ] = await Promise.all([
-    listBonLivraisons(1, 1000, auth),
-    listEmballages(1, 100, auth),
-    listCommandes(1, 100, auth),
-    fetchEntrepots(auth),
-    listUnitesMesure(auth),
-  ]);
+  const bonLivraisonsResult = await listBonLivraisons(1, 1000, auth);
 
-  const rows: TableBonLivraison[] =
-    bonLivraisonsResult.bonLivraisons.data.map(normalizeBonLivraison);
+  let emballages: EmballageOption[] = [];
+  let commandes: CommandeOption[] = [];
+  let entrepots: EntrepotOption[] = [];
+  let unitesMesure: UniteMesure[] = [];
 
-  const emballages: EmballageOption[] =
-    emballagesResult.emballages.data.map((item: any) => ({
+  if (!readOnly) {
+    const [emballagesResult, commandesResult, entrepotsResult, unitesMesureResult] =
+      await Promise.all([
+        listEmballages(1, 100, auth),
+        listCommandes(1, 100, auth),
+        fetchEntrepots(auth),
+        listUnitesMesure(auth),
+      ]);
+
+    emballages = emballagesResult.emballages.data.map((item: any) => ({
       id: item.id,
       label: `${item.code} - ${item.name}`,
       capacity_unit: item.capacity_unit ?? null,
     }));
 
-  const unitesMesure: UniteMesure[] = unitesMesureResult.unitesMesure ?? [];
-  const commandes: CommandeOption[] =
-    commandesResult.commandes.data.map((item: any) => ({
+    unitesMesure = unitesMesureResult.unitesMesure ?? [];
+    commandes = commandesResult.commandes.data.map((item: any) => ({
       id: item.id,
       numero_commande: item.numero_commande,
       quantite: item.quantite,
@@ -69,21 +68,27 @@ export default async function BonLivraisonsPage({
       statut: item.statut,
     }));
 
-  const entrepots: EntrepotOption[] = entrepotsResult.map((item) => ({
-    id: item.id,
-    label: item.nom || `Entrepot #${item.id}`,
-  }));
+    entrepots = entrepotsResult.map((item) => ({
+      id: item.id,
+      label: item.nom || `Entrepot #${item.id}`,
+    }));
+  }
+
+  const rows: TableBonLivraison[] =
+    bonLivraisonsResult.bonLivraisons.data.map(normalizeBonLivraison);
+
   return (
     <div>
       <div className="space-y-6">
-          <BonLivraisonsTable
-            data={rows}
-            pagination={bonLivraisonsResult.bonLivraisons.paginatorInfo}
-            emballages={emballages}
-            commandes={commandes}
-            entrepots={entrepots}
-            unitesMesure={unitesMesure}
-          />
+        <BonLivraisonsTable
+          data={rows}
+          pagination={bonLivraisonsResult.bonLivraisons.paginatorInfo}
+          emballages={emballages}
+          commandes={commandes}
+          entrepots={entrepots}
+          unitesMesure={unitesMesure}
+          readOnly={readOnly}
+        />
       </div>
     </div>
   );

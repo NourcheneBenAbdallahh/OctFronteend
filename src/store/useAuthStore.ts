@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { syncAuthAccessCookie } from '@/lib/authCookie';
+import { clearOnboardingPending } from '@/lib/onboardingStorage';
 
 interface User {
   id: string;
@@ -11,6 +12,7 @@ interface User {
   emailVerifiedAt?: string | null;
   photo?: string; 
   telephone?: string;
+  phoneVerifiedAt?: string | null;
 }
 
 interface AuthState {
@@ -18,6 +20,7 @@ interface AuthState {
   token: string | null;
   isAuthenticated: boolean;
   setAuth: (user: User, token: string) => void;
+  patchUser: (partial: Partial<User>) => void;
   logout: () => void;
 }
 
@@ -37,8 +40,15 @@ export const useAuthStore = create<AuthState>()(
         });
       },
 
+      patchUser: (partial) => {
+        set((state) => ({
+          user: state.user ? { ...state.user, ...partial } : state.user,
+        }));
+      },
+
       logout: () => {
         syncAuthAccessCookie(null);
+        clearOnboardingPending();
         set({ user: null, token: null, isAuthenticated: false });
         localStorage.removeItem('auth-storage');
       },

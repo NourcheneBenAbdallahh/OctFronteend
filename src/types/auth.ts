@@ -5,11 +5,14 @@ export type User = {
   role: string;
   isActive?: boolean;
   emailVerifiedAt?: string | null;
+  telephone?: string | null;
+  phoneVerifiedAt?: string | null;
 };
 
 export type AuthPayload = {
   token: string;
   user: User;
+  isFirstLogin: boolean;
 };
 
 // Input pour login

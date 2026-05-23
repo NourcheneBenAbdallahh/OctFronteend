@@ -79,6 +79,10 @@ const LIST_BON_LIVRAISONS = `
   }
 `;
 
+/**
+ * Liste paginée des BL.
+ * Lecture : rôles LOGISTIQUE, FINANCE (et ADMIN). Écriture : LOGISTIQUE uniquement (`create` / `update` / `delete`).
+ */
 export async function listBonLivraisons(
   page: number = 1,
   first: number = 100,
@@ -102,6 +106,7 @@ const GET_BON_LIVRAISON = `
   }
 `;
 
+/** Détail d’un BL — même périmètre lecture que `listBonLivraisons`. */
 export async function getBonLivraison(id: string | number) {
   return graphqlRequest<{ bonLivraison: BonLivraison | null }>(
     GET_BON_LIVRAISON,

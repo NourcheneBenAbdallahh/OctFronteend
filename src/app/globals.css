@@ -3,7 +3,7 @@
 @import "leaflet/dist/leaflet.css";
 
 
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
   --font-*: initial;
@@ -198,11 +198,21 @@
   *,
   ::after,
   ::before {
-    border-color: var(--color-gray-300); /* Bordures plus visibles comme dans ton screenshot */
+    border-color: var(--color-gray-300);
+  }
+
+  .dark *,
+  .dark ::after,
+  .dark ::before {
+    border-color: var(--color-gray-700);
   }
   
   body {
-    @apply font-outfit bg-gray-50 text-gray-900;
+    @apply font-outfit bg-gray-50 text-gray-900 antialiased;
+  }
+
+  .dark body {
+    @apply bg-gray-950 text-gray-100;
   }
 
   /* Arrondis plus carrés (style ERP) */
@@ -215,7 +225,7 @@
 }
 
 @utility menu-item-active {
-  @apply bg-brand-50 text-brand-500 border-l-4 border-brand-500 rounded-none;
+  @apply bg-brand-50 text-brand-500 border-l-4 border-brand-500 rounded-none dark:bg-brand-500/15 dark:text-brand-400 dark:border-brand-400;
 }
 
 @utility menu-item-inactive {
@@ -782,4 +792,172 @@ span.flatpickr-weekday,
     0 1px 2px 0 rgba(16, 24, 40, 0.06);
   opacity: 0.8;
   cursor: grabbing; /* Changes the cursor to indicate dragging */
+}
+
+/* ── Mode sombre global : modules sans variantes dark: explicites ── */
+@layer base {
+  .dark {
+    color-scheme: dark;
+  }
+}
+
+@layer utilities {
+  /* Surfaces (ne pas écraser les utilitaires dark:bg-* déjà présents) */
+  html.dark :where(.bg-white):not([class*="dark:bg-"]) {
+    background-color: var(--color-gray-900);
+  }
+
+  html.dark :where(.bg-gray-50):not([class*="dark:bg-"]) {
+    background-color: var(--color-gray-800);
+  }
+
+  html.dark :where(.bg-\[\#F8FAFA\]):not([class*="dark:bg-"]) {
+    background-color: var(--color-gray-800);
+  }
+
+  html.dark :where(.bg-\[\#F2F7F7\]):not([class*="dark:bg-"]) {
+    background-color: color-mix(in srgb, var(--color-brand-500) 18%, var(--color-gray-900));
+  }
+
+  html.dark :where(.bg-red-50):not([class*="dark:bg-"]) {
+    background-color: color-mix(in srgb, var(--color-error-500) 22%, var(--color-gray-900));
+  }
+
+  html.dark :where(.bg-emerald-50):not([class*="dark:bg-"]) {
+    background-color: color-mix(in srgb, var(--color-success-500) 22%, var(--color-gray-900));
+  }
+
+  html.dark :where(.bg-amber-50):not([class*="dark:bg-"]) {
+    background-color: color-mix(in srgb, var(--color-warning-500) 22%, var(--color-gray-900));
+  }
+
+  html.dark :where(.bg-indigo-50):not([class*="dark:bg-"]) {
+    background-color: color-mix(in srgb, #6366f1 22%, var(--color-gray-900));
+  }
+
+  html.dark :where(.bg-teal-50):not([class*="dark:bg-"]) {
+    background-color: color-mix(in srgb, var(--color-brand-500) 18%, var(--color-gray-900));
+  }
+
+  /* Texte */
+  html.dark :where(.text-\[\#1C2434\]):not([class*="dark:text-"]) {
+    color: rgb(249 250 251);
+  }
+
+  html.dark :where(.text-gray-900):not([class*="dark:text-"]) {
+    color: rgb(249 250 251);
+  }
+
+  html.dark :where(.text-gray-800):not([class*="dark:text-"]) {
+    color: rgb(229 231 235);
+  }
+
+  html.dark :where(.text-gray-700):not([class*="dark:text-"]) {
+    color: rgb(209 213 219);
+  }
+
+  html.dark :where(.text-gray-600):not([class*="dark:text-"]) {
+    color: rgb(156 163 175);
+  }
+
+  html.dark :where(.text-gray-500):not([class*="dark:text-"]) {
+    color: rgb(152 162 179);
+  }
+
+  html.dark :where(.text-gray-400):not([class*="dark:text-"]) {
+    color: rgb(152 162 179);
+  }
+
+  html.dark :where(.text-red-600):not([class*="dark:text-"]) {
+    color: rgb(252 165 165);
+  }
+
+  html.dark :where(.text-emerald-600):not([class*="dark:text-"]) {
+    color: rgb(110 231 183);
+  }
+
+  /* Bordures */
+  html.dark :where(.border-gray-50):not([class*="dark:border-"]),
+  html.dark :where(.border-gray-100):not([class*="dark:border-"]) {
+    border-color: var(--color-gray-800);
+  }
+
+  html.dark :where(.border-gray-200):not([class*="dark:border-"]) {
+    border-color: var(--color-gray-700);
+  }
+
+  html.dark :where(.border-white):not([class*="dark:border-"]) {
+    border-color: var(--color-gray-700);
+  }
+
+  html.dark :where(.border-red-100):not([class*="dark:border-"]) {
+    border-color: color-mix(in srgb, var(--color-error-500) 40%, var(--color-gray-800));
+  }
+
+  html.dark :where(.border-emerald-100):not([class*="dark:border-"]) {
+    border-color: color-mix(in srgb, var(--color-success-500) 40%, var(--color-gray-800));
+  }
+
+  html.dark :where(.border-\[\#1C2434\]):not([class*="dark:border-"]) {
+    border-color: var(--color-gray-600);
+  }
+
+  html.dark :where(.divide-gray-100):not([class*="dark:divide-"]) > :not(:last-child) {
+    border-color: var(--color-gray-800);
+  }
+
+  /* Séparateurs & lignes */
+  html.dark :where(.bg-gray-100):not([class*="dark:bg-"]) {
+    background-color: var(--color-gray-800);
+  }
+
+  html.dark :where(.bg-gray-200):not([class*="dark:bg-"]) {
+    background-color: var(--color-gray-700);
+  }
+
+  /* Champs de formulaire */
+  html.dark :where(input.bg-white, select.bg-white, textarea.bg-white):not([class*="dark:bg-"]) {
+    background-color: var(--color-gray-900);
+    color: rgb(249 250 251);
+  }
+
+  /* Survols courants */
+  html.dark :where(.hover\:bg-gray-50:hover):not([class*="dark:hover:bg-"]) {
+    background-color: var(--color-gray-800);
+  }
+
+  html.dark :where(.hover\:bg-gray-100:hover):not([class*="dark:hover:bg-"]) {
+    background-color: var(--color-gray-800);
+  }
+
+  html.dark :where(.hover\:text-\[\#1C2434\]:hover):not([class*="dark:hover:text-"]) {
+    color: rgb(249 250 251);
+  }
+
+  html.dark :where(.hover\:text-gray-700:hover):not([class*="dark:hover:text-"]) {
+    color: rgb(229 231 235);
+  }
+
+  /* Ombres portées sur cartes claires */
+  html.dark :where(.shadow-sm, .shadow-lg, .shadow-2xl, .shadow-xl):not([class*="dark:shadow-"]) {
+    --tw-shadow-color: rgb(0 0 0 / 0.35);
+  }
+
+  /* Tables & lignes alternées */
+  html.dark :where(tr.hover\:bg-gray-50:hover):not([class*="dark:hover:bg-"]) {
+    background-color: var(--color-gray-800);
+  }
+
+  html.dark :where(tr.hover\:bg-slate-50:hover):not([class*="dark:hover:bg-"]) {
+    background-color: var(--color-gray-800);
+  }
+
+  /* Boutons « inversés » (fond clair → hover sombre) */
+  html.dark :where(.hover\:bg-gray-900:hover):not([class*="dark:hover:bg-"]) {
+    background-color: var(--color-brand-500);
+  }
+
+  html.dark :where(.hover\:bg-black:hover):not([class*="dark:hover:bg-"]) {
+    background-color: var(--color-brand-600);
+  }
 }

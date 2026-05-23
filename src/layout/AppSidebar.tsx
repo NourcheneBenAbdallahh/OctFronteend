@@ -24,6 +24,7 @@ import { Boxes } from "lucide-react";
 import { ShoppingCart } from "lucide-react";
 import { ArrowLeftRight, BarChart3, Ruler, Users } from "lucide-react";
 import { canAccessPath, sidebarBiNavLabel } from "@/lib/access";
+import { pathToTourSlug } from "@/lib/appTour";
 import { useAuthStore } from "@/store/useAuthStore";
 type NavItem = {
   name: string;
@@ -112,7 +113,7 @@ const navItems: NavItem[] = [
   },
   {
     icon: <PieChartIcon />,
-    name: "Analytics",  
+    name: "Prévisions stock",
     path: "/prediction",
   }
   
@@ -196,6 +197,7 @@ const AppSidebar: React.FC = () => {
             nav.path && (
               <Link
                 href={nav.path}
+                data-tour={`nav-${pathToTourSlug(nav.path)}`}
                 className={`menu-item group ${
                   isActive(nav.path) ? "menu-item-active" : "menu-item-inactive"
                 }`}
@@ -233,6 +235,7 @@ const AppSidebar: React.FC = () => {
                   <li key={subItem.name}>
                     <Link
                       href={subItem.path}
+                      data-tour={`nav-${pathToTourSlug(subItem.path)}`}
                       className={`menu-dropdown-item ${
                         isActive(subItem.path)
                           ? "menu-dropdown-item-active"
@@ -286,6 +289,20 @@ const AppSidebar: React.FC = () => {
 
   // const isActive = (path: string) => path === pathname;
    const isActive = useCallback((path: string) => path === pathname, [pathname]);
+
+  useEffect(() => {
+    const openNavForTour = (event: Event) => {
+      const path = (event as CustomEvent<{ path?: string }>).detail?.path;
+      if (!path) return;
+      visibleNavItems.forEach((nav, index) => {
+        if (nav.subItems?.some((s) => s.path === path)) {
+          setOpenSubmenu({ type: "main", index });
+        }
+      });
+    };
+    window.addEventListener("oct-tour-prepare-nav", openNavForTour);
+    return () => window.removeEventListener("oct-tour-prepare-nav", openNavForTour);
+  }, [visibleNavItems]);
 
   useEffect(() => {
     // Set the height of the submenu items when the submenu is opened
@@ -368,7 +385,7 @@ const AppSidebar: React.FC = () => {
   </Link>
 </div>
       <div className="flex flex-col overflow-y-auto duration-300 ease-linear no-scrollbar">
-        <nav className="mb-6">
+        <nav className="mb-6" data-tour="sidebar-menu">
           <div className="flex flex-col gap-4">
             <div>
               <h2

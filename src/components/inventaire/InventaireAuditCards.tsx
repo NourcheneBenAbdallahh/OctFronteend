@@ -13,6 +13,9 @@ import {
   CheckCheck,
 } from "lucide-react";
 import { TableInventaire } from "@/types/inventaire";
+import { tourPageAttrs } from "@/lib/tourPageAttrs";
+
+const tour = tourPageAttrs("/stock-inventaire");
 
 interface Props {
   data: TableInventaire[];
@@ -48,7 +51,7 @@ export default function InventaireAuditCards({ data, onAdjust, onRegulariser, on
   }
 
   return (
-    <div className="grid grid-cols-1 gap-6 pb-20">
+    <div className="grid grid-cols-1 gap-6 pb-20" {...tour.table}>
       {data.map((row) => {
         const ref = theoriqueRef(row);
         const isLoss = row.ecart < 0;
