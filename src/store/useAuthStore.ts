@@ -2,18 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { syncAuthAccessCookie } from '@/lib/authCookie';
 import { clearOnboardingPending } from '@/lib/onboardingStorage';
-
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  isActive?: boolean;
-  emailVerifiedAt?: string | null;
-  photo?: string; 
-  telephone?: string;
-  phoneVerifiedAt?: string | null;
-}
+import type { User } from '@/types/auth';
 
 interface AuthState {
   user: User | null;

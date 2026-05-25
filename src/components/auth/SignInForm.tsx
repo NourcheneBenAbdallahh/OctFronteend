@@ -50,7 +50,7 @@ export default function SignInForm() {
         setOnboardingPending(data.user.id);
       }
 
-      router.push("/"); 
+      router.push("/bi"); 
     } catch (err: any) {
       setErrors({ general: err.message || "Identifiants incorrects" });
     } finally {

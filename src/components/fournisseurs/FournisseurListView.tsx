@@ -8,9 +8,10 @@ interface Props {
 }
 
 export const FournisseurListView = ({ rows, onEdit, onDelete }: Props) => (
-  <div className="flex-1 overflow-auto">
-    <div className="bg-white border border-gray-100 rounded-[2rem] overflow-hidden shadow-sm">
-      <table className="w-full text-left border-collapse">
+  <div className="min-w-0 flex-1 overflow-auto">
+    <div className="overflow-hidden rounded-[2rem] border border-gray-100 bg-white shadow-sm">
+      <ResponsiveTableWrap>
+      <table className="w-full min-w-[880px] text-left border-collapse">
         <thead>
           <tr className="bg-gray-50/50 border-b border-gray-100 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
             <th className="px-6 py-5">Identité Fournisseur</th>

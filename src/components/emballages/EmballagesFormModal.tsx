@@ -332,24 +332,32 @@ export default function EmballagesFormModal({
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-8">
+                <div className="grid grid-cols-1 items-start gap-6 sm:grid-cols-2 sm:gap-8">
                   <InputField
                     label="Matériau (optionnel)"
                     value={form.material}
                     onChange={(v) => setForm({ ...form, material: v })}
                     error={fieldErrors.material}
                   />
-                  <div className="space-y-3 text-xs font-black">
-                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Statut</label>
+                  <div className="space-y-3">
+                    <label className="ml-1 text-[10px] font-black uppercase tracking-widest text-gray-400">
+                      Statut
+                    </label>
                     <select
-                      className="w-full rounded-2xl border-2 border-gray-50 bg-gray-50 p-4 outline-none focus:bg-white"
+                      className={`w-full rounded-2xl border-2 bg-gray-50 p-4 text-xs font-black text-gray-900 outline-none transition-all focus:bg-white ${
+                        fieldErrors.status
+                          ? "border-red-200 bg-red-50/40"
+                          : "border-gray-50 focus:border-indigo-500/20"
+                      }`}
                       value={form.status}
                       onChange={(e) => setForm({ ...form, status: e.target.value })}
                     >
                       <option value="ACTIVE">Actif</option>
                       <option value="INACTIVE">Inactif</option>
                     </select>
-                    {fieldErrors.status ? <p className="text-[10px] font-bold text-red-600">{fieldErrors.status}</p> : null}
+                    {fieldErrors.status ? (
+                      <p className="text-[10px] font-bold text-red-600">{fieldErrors.status}</p>
+                    ) : null}
                   </div>
                 </div>
               </div>

@@ -49,6 +49,8 @@
   letter-spacing: 0.12em !important;
 }
 
-.oct-driver-popover .driver-popover-close-btn {
-  color: #9ca3af !important;
+.oct-driver-popover .driver-popover-next-btn:disabled,
+.oct-driver-popover .driver-popover-prev-btn:disabled {
+  opacity: 0.65 !important;
+  cursor: wait !important;
 }

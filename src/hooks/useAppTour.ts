@@ -5,49 +5,82 @@ import { useRouter } from "next/navigation";
 import { driver, type Driver } from "driver.js";
 import "driver.js/dist/driver.css";
 import "@/styles/driver-oct.css";
-import { buildAppTourSteps, type AppTourStep } from "@/lib/appTour";
+import { buildAppTourSteps, navTourSelector, type AppTourStep } from "@/lib/appTour";
 
-function waitForElement(selector: string, timeoutMs = 12000): Promise<Element | null> {
-  const tryFind = () => document.querySelector(selector);
+const POLL_MS = 16;
+
+function setTourButtonsBusy(busy: boolean): void {
+  const next = document.querySelector(".driver-popover-next-btn");
+  const prev = document.querySelector(".driver-popover-prev-btn");
+  if (next instanceof HTMLButtonElement) {
+    next.disabled = busy;
+    if (busy) next.dataset.octTourLabel = next.textContent ?? "";
+    next.textContent = busy ? "Chargement…" : next.dataset.octTourLabel ?? "Suivant";
+  }
+  if (prev instanceof HTMLButtonElement) {
+    prev.disabled = busy;
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isVisible(el: Element): boolean {
+  const rect = el.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0;
+}
+
+function waitForElement(selector: string, timeoutMs = 2500): Promise<Element | null> {
+  const tryFind = () => {
+    const el = document.querySelector(selector);
+    return el && isVisible(el) ? el : null;
+  };
 
   const found = tryFind();
   if (found) return Promise.resolve(found);
 
   return new Promise((resolve) => {
     const deadline = Date.now() + timeoutMs;
-    const observer = new MutationObserver(() => {
+    const tick = () => {
       const el = tryFind();
       if (el) {
-        observer.disconnect();
+        cleanup();
         resolve(el);
       } else if (Date.now() > deadline) {
-        observer.disconnect();
+        cleanup();
         resolve(null);
       }
-    });
+    };
+    const observer = new MutationObserver(tick);
     observer.observe(document.body, { childList: true, subtree: true });
-    const interval = window.setInterval(() => {
-      const el = tryFind();
-      if (el) {
-        window.clearInterval(interval);
-        observer.disconnect();
-        resolve(el);
-      } else if (Date.now() > deadline) {
-        window.clearInterval(interval);
-        observer.disconnect();
-        resolve(null);
-      }
-    }, 120);
+    const interval = window.setInterval(tick, POLL_MS);
+    tick();
+
+    function cleanup() {
+      observer.disconnect();
+      window.clearInterval(interval);
+    }
   });
 }
 
 async function resolveStepElement(step: AppTourStep): Promise<Element | null> {
-  const primary = await waitForElement(step.element, 8000);
+  const primary = await waitForElement(step.element, 2000);
   if (primary) return primary;
   if (step.fallbackElement) {
-    return waitForElement(step.fallbackElement, 4000);
+    return waitForElement(step.fallbackElement, 1200);
   }
   return null;
+}
+
+async function waitForPathname(path: string, timeoutMs = 4000): Promise<void> {
+  if (window.location.pathname === path) return;
+
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (window.location.pathname === path) return;
+    await sleep(POLL_MS);
+  }
 }
 
 async function ensureRoute(
@@ -56,15 +89,34 @@ async function ensureRoute(
 ): Promise<void> {
   if (!route || window.location.pathname === route) return;
   router.push(route);
-  await new Promise((r) => setTimeout(r, 120));
+  await waitForPathname(route);
+  await sleep(40);
 }
 
-function prepareSidebarNav(path: string | undefined): Promise<void> {
-  if (!path) return Promise.resolve();
+async function prepareSidebarNav(path: string | undefined): Promise<void> {
+  if (!path) return;
+
+  const navSelector = navTourSelector(path);
+  const existing = document.querySelector(navSelector);
+  if (existing && isVisible(existing)) return;
+
   window.dispatchEvent(
     new CustomEvent("oct-tour-prepare-nav", { detail: { path } })
   );
-  return new Promise((r) => setTimeout(r, 380));
+
+  const opened = await waitForElement(navSelector, 500);
+  if (opened) await sleep(40);
+}
+
+async function prepareStep(
+  router: ReturnType<typeof useRouter>,
+  step: AppTourStep
+): Promise<Element | null> {
+  await Promise.all([
+    step.prepareNav ? prepareSidebarNav(step.prepareNav) : Promise.resolve(),
+    step.route ? ensureRoute(router, step.route) : Promise.resolve(),
+  ]);
+  return resolveStepElement(step);
 }
 
 export function useAppTour() {
@@ -74,56 +126,55 @@ export function useAppTour() {
   const indexRef = useRef(0);
   const onCompleteRef = useRef<(() => void) | undefined>(undefined);
   const activeRef = useRef(false);
+  const transitioningRef = useRef(false);
 
-  const destroyDriver = useCallback(() => {
-    if (driverRef.current?.isActive()) {
-      driverRef.current.destroy();
+  const destroyDriver = useCallback((instance?: Driver | null) => {
+    const target = instance ?? driverRef.current;
+    if (target?.isActive()) {
+      target.destroy();
     }
-    driverRef.current = null;
-    activeRef.current = false;
+    if (!instance || instance === driverRef.current) {
+      driverRef.current = null;
+      activeRef.current = false;
+    }
   }, []);
 
   const showStepAt = useCallback(
-    async (index: number, direction: "next" | "prev" | "init" = "init") => {
+    async (
+      index: number,
+      direction: "next" | "prev" | "init" = "init",
+      previousDriver?: Driver
+    ) => {
       const steps = stepsRef.current;
       const step = steps[index];
 
       if (!step) {
-        destroyDriver();
+        destroyDriver(previousDriver);
         onCompleteRef.current?.();
         return;
       }
 
-      if (step.prepareNav) {
-        await prepareSidebarNav(step.prepareNav);
-      }
+      const element = await prepareStep(router, step);
 
-      if (step.route) {
-        await ensureRoute(router, step.route);
-      }
-
-      const element = await resolveStepElement(step);
       if (!element) {
-        if (step.optional) {
-          const nextIndex =
-            direction === "prev"
-              ? Math.max(0, index - 1)
-              : Math.min(steps.length - 1, index + 1);
-          if (nextIndex === index) {
-            destroyDriver();
-            onCompleteRef.current?.();
-            return;
-          }
-          indexRef.current = nextIndex;
-          return showStepAt(nextIndex, direction);
+        const nextIndex =
+          direction === "prev"
+            ? Math.max(0, index - 1)
+            : Math.min(steps.length - 1, index + 1);
+        if (nextIndex === index) {
+          destroyDriver(previousDriver);
+          onCompleteRef.current?.();
+          return;
         }
+        indexRef.current = nextIndex;
+        return showStepAt(nextIndex, direction, previousDriver);
       }
 
       const total = steps.length;
       const isLast = index === total - 1;
       const isFirst = index === 0;
 
-      destroyDriver();
+      destroyDriver(previousDriver);
 
       const driverInstance = driver({
         animate: true,
@@ -138,10 +189,14 @@ export function useAppTour() {
         prevBtnText: "Précédent",
         doneBtnText: "Terminer",
         popoverClass: "oct-driver-popover",
-        showButtons: isFirst ? ["next", "close"] : isLast ? ["previous", "next", "close"] : ["previous", "next", "close"],
+        showButtons: isFirst
+          ? ["next", "close"]
+          : isLast
+            ? ["previous", "next", "close"]
+            : ["previous", "next", "close"],
         steps: [
           {
-            element: element ?? undefined,
+            element,
             popover: {
               title: step.title,
               description: step.description,
@@ -149,21 +204,34 @@ export function useAppTour() {
               showProgress: true,
               progressText: `${index + 1} / ${total}`,
               onNextClick: (_el, _s, { driver: d }) => {
-                d.destroy();
+                if (transitioningRef.current) return;
                 if (isLast) {
+                  transitioningRef.current = false;
+                  d.destroy();
                   activeRef.current = false;
                   onCompleteRef.current?.();
                   return;
                 }
+                transitioningRef.current = true;
+                setTourButtonsBusy(true);
                 indexRef.current = index + 1;
-                void showStepAt(index + 1, "next");
+                void showStepAt(index + 1, "next", d).finally(() => {
+                  transitioningRef.current = false;
+                  setTourButtonsBusy(false);
+                });
               },
               onPrevClick: (_el, _s, { driver: d }) => {
-                d.destroy();
+                if (transitioningRef.current) return;
+                transitioningRef.current = true;
+                setTourButtonsBusy(true);
                 indexRef.current = Math.max(0, index - 1);
-                void showStepAt(indexRef.current, "prev");
+                void showStepAt(indexRef.current, "prev", d).finally(() => {
+                  transitioningRef.current = false;
+                  setTourButtonsBusy(false);
+                });
               },
               onCloseClick: (_el, _s, { driver: d }) => {
+                transitioningRef.current = false;
                 d.destroy();
                 activeRef.current = false;
                 onCompleteRef.current?.();
@@ -172,7 +240,10 @@ export function useAppTour() {
           },
         ],
         onDestroyed: () => {
-          driverRef.current = null;
+          if (driverRef.current === driverInstance) {
+            driverRef.current = null;
+            activeRef.current = false;
+          }
         },
       });
 
@@ -187,6 +258,7 @@ export function useAppTour() {
     (role: string | undefined | null, onComplete?: () => void) => {
       stepsRef.current = buildAppTourSteps(role);
       indexRef.current = 0;
+      transitioningRef.current = false;
       onCompleteRef.current = onComplete;
       void showStepAt(0);
     },
@@ -194,6 +266,7 @@ export function useAppTour() {
   );
 
   const stopTour = useCallback(() => {
+    transitioningRef.current = false;
     destroyDriver();
     onCompleteRef.current?.();
   }, [destroyDriver]);

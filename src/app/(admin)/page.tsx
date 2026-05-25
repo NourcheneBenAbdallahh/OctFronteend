@@ -41,9 +41,7 @@ export default function Ecommerce() {
  return (
   <div className="flex flex-col gap-6">
     {/* 1. Les 4 KPI du haut */}
-    <div data-tour="page-dashboard-kpi">
     <PackagingMetrics stocks={dashboardStocks} loading={loading} />
-    </div>
 
     <div className="grid grid-cols-12 gap-6 items-start">
       

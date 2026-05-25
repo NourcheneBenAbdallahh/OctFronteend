@@ -19,4 +19,10 @@ describe("mouvement.config", () => {
     expect(needsDestination("SPL")).toBe(true);
     expect(needsLot("SPL")).toBe(false);
   });
+
+  it("PTE nécessite source et lot", () => {
+    expect(needsSource("PTE")).toBe(true);
+    expect(needsDestination("PTE")).toBe(false);
+    expect(needsLot("PTE")).toBe(true);
+  });
 });

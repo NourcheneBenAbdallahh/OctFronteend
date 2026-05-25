@@ -1,25 +1,81 @@
 "use client";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useModal } from "../../hooks/useModal";
 import { Modal } from "../ui/modal";
 import Button from "../ui/button/Button";
 import Input from "../form/input/InputField";
 import Label from "../form/Label";
-import { useAuthStore } from "@/store/useAuthStore"; // Import du store
+import { updateProfile } from "@/lib/auth.api";
+import { getActionErrorMessage } from "@/hooks/useAppFeedback";
+import { useAuthStore } from "@/store/useAuthStore";
+
+function splitName(fullName?: string | null) {
+  const parts = (fullName ?? "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return { firstName: "", lastName: "" };
+  return {
+    firstName: parts[0],
+    lastName: parts.slice(1).join(" "),
+  };
+}
 
 export default function UserInfoCard() {
   const { isOpen, openModal, closeModal } = useModal();
-  const { user } = useAuthStore(); // Récupération des vraies données
+  const { user, token, patchUser } = useAuthStore();
 
-  const handleSave = (e: React.FormEvent) => {
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+
+  const display = splitName(user?.name);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const { firstName: fn, lastName: ln } = splitName(user?.name);
+    setFirstName(fn);
+    setLastName(ln);
+    setEmail(user?.email ?? "");
+    setFeedback(null);
+    setError(false);
+  }, [isOpen, user]);
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Saving changes...");
-    closeModal();
-  };
+    if (!token) return;
 
-  // Séparation du nom (si stocké en une seule chaîne dans ton Laravel)
-  const firstName = user?.name?.split(' ')[0] || "";
-  const lastName = user?.name?.split(' ').slice(1).join(' ') || "";
+    const name = [firstName.trim(), lastName.trim()].filter(Boolean).join(" ");
+    if (name.length < 2) {
+      setError(true);
+      setFeedback("Le nom complet doit contenir au moins 2 caractères.");
+      return;
+    }
+    if (!email.trim()) {
+      setError(true);
+      setFeedback("L'adresse email est obligatoire.");
+      return;
+    }
+
+    setSaving(true);
+    setFeedback(null);
+    setError(false);
+
+    try {
+      const updated = await updateProfile(
+        { name, email: email.trim() },
+        token
+      );
+      patchUser(updated);
+      setFeedback("Profil mis à jour.");
+      setTimeout(() => closeModal(), 600);
+    } catch (err) {
+      setError(true);
+      setFeedback(getActionErrorMessage(err, "Impossible de mettre à jour le profil."));
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="p-6 bg-white border-2 border-gray-100 rounded-[30px] shadow-sm dark:border-gray-800 dark:bg-gray-900/50">
@@ -33,8 +89,8 @@ export default function UserInfoCard() {
           </div>
 
           <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:gap-y-10">
-            <InfoDisplay label="Prénom" value={firstName} />
-            <InfoDisplay label="Nom" value={lastName} />
+            <InfoDisplay label="Prénom" value={display.firstName} />
+            <InfoDisplay label="Nom" value={display.lastName} />
             <InfoDisplay label="Adresse Email" value={user?.email || "Non renseigné"} />
             <InfoDisplay
               label="Téléphone"
@@ -45,7 +101,7 @@ export default function UserInfoCard() {
               }
             />
             <div className="md:col-span-2">
-              <InfoDisplay label="Bio / Rôle" value={user?.role || "Utilisateur"} />
+              <InfoDisplay label="Rôle" value={user?.role || "Utilisateur"} />
             </div>
           </div>
         </div>
@@ -71,7 +127,6 @@ export default function UserInfoCard() {
         </button>
       </div>
 
-      {/* MODAL EDIT */}
       <Modal isOpen={isOpen} onClose={closeModal} className="max-w-[750px]">
         <div className="relative w-full p-8 bg-white rounded-[35px] dark:bg-[#1C2434] max-h-[90vh] overflow-y-auto no-scrollbar">
           <div className="mb-10">
@@ -82,7 +137,6 @@ export default function UserInfoCard() {
           </div>
 
           <form onSubmit={handleSave} className="space-y-8">
-            {/* Section Info Principale */}
             <div className="space-y-5">
               <h5 className="text-[11px] font-[1000] uppercase tracking-[0.2em] text-[#00A09D]">
                 Détails du compte
@@ -90,40 +144,54 @@ export default function UserInfoCard() {
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label className="text-[10px] font-black uppercase tracking-widest ml-2 text-gray-400">Prénom</Label>
-                  <Input type="text" defaultValue={firstName} className="rounded-[20px] bg-[#F8FAFA] border-none font-bold" />
+                  <Input
+                    type="text"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    className="rounded-[20px] bg-[#F8FAFA] border-none font-bold"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label className="text-[10px] font-black uppercase tracking-widest ml-2 text-gray-400">Nom</Label>
-                  <Input type="text" defaultValue={lastName} className="rounded-[20px] bg-[#F8FAFA] border-none font-bold" />
+                  <Input
+                    type="text"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    className="rounded-[20px] bg-[#F8FAFA] border-none font-bold"
+                  />
                 </div>
                 <div className="md:col-span-2 space-y-2">
                   <Label className="text-[10px] font-black uppercase tracking-widest ml-2 text-gray-400">Email</Label>
-                  <Input type="email" defaultValue={user?.email} className="rounded-[20px] bg-[#F8FAFA] border-none font-bold" />
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="rounded-[20px] bg-[#F8FAFA] border-none font-bold"
+                  />
                 </div>
               </div>
             </div>
 
-            {/* Section Social (Optionnel pour PFE, mais garde le design) */}
-            <div className="space-y-5">
-              <h5 className="text-[11px] font-[1000] uppercase tracking-[0.2em] text-[#00A09D]">
-                Réseaux & Bio
-              </h5>
-              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                <Input type="text" placeholder="LinkedIn URL" className="rounded-[20px] bg-[#F8FAFA] border-none font-bold" />
-                <Input type="text" defaultValue={user?.role} className="rounded-[20px] bg-[#F8FAFA] border-none font-bold" />
-              </div>
-            </div>
+            {feedback && (
+              <p className={`text-sm font-bold ${error ? "text-red-600" : "text-emerald-600"}`}>
+                {feedback}
+              </p>
+            )}
 
             <div className="flex items-center gap-4 pt-4">
               <button
                 type="button"
                 onClick={closeModal}
+                disabled={saving}
                 className="flex-1 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400"
               >
                 Annuler
               </button>
-              <Button className="flex-[2] py-5 bg-[#00A09D] text-white font-[1000] text-[11px] uppercase tracking-[0.2em] rounded-[22px] shadow-lg">
-                Mettre à jour
+              <Button
+                disabled={saving}
+                className="flex-[2] py-5 bg-[#00A09D] text-white font-[1000] text-[11px] uppercase tracking-[0.2em] rounded-[22px] shadow-lg"
+              >
+                {saving ? "Enregistrement…" : "Mettre à jour"}
               </Button>
             </div>
           </form>

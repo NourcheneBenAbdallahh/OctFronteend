@@ -55,10 +55,7 @@ export default function OnboardingAndVerificationCard() {
     try {
       const message = await sendPhoneVerificationCode(telephone.trim(), token);
       setCodeSent(true);
-      setPhoneFeedback(
-        message ||
-          "Code envoyé. Consultez votre boîte mail (Mailpit en staging : http://localhost:8025)."
-      );
+      setPhoneFeedback(message || "Code envoyé.");
       patchUser({ telephone: telephone.trim(), phoneVerifiedAt: null });
     } catch (error: unknown) {
       setPhoneError(true);
@@ -99,7 +96,7 @@ export default function OnboardingAndVerificationCard() {
       <ol className="mt-4 space-y-2 text-sm text-gray-700">
         <li>1. Complétez vos informations personnelles dans cette page profil.</li>
         <li>2. Vérifiez votre email (recommandé) pour sécuriser votre compte.</li>
-        <li>3. Vérifiez votre numéro de téléphone par code OTP.</li>
+        <li>3. Vérifiez votre numéro (code reçu par email).</li>
         <li>4. Lancez la visite guidée pour découvrir menus, tableaux et actions.</li>
       </ol>
 
@@ -154,7 +151,7 @@ export default function OnboardingAndVerificationCard() {
         >
           {isPhoneVerified
             ? `Téléphone vérifié : ${user?.telephone ?? ""}`
-            : "Ajoutez votre numéro et validez-le avec le code reçu par email (staging) ou SMS."}
+            : "Saisissez votre numéro : un code à 6 chiffres sera envoyé à votre email."}
         </p>
 
         {!isPhoneVerified && (

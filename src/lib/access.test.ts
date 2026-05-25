@@ -50,8 +50,37 @@ describe("canAccessPath", () => {
 
   it("restreint STOCK au dashboard et aux routes stock", () => {
     expect(canAccessPath("/", "STOCK")).toBe(true);
+    expect(canAccessPath("/stock", "STOCK")).toBe(true);
     expect(canAccessPath("/stock-inventaire", "STOCK")).toBe(true);
     expect(canAccessPath("/commandes", "STOCK")).toBe(false);
+  });
+
+  it("refuse FINANCE et LOGISTIQUE sur /stock", () => {
+    expect(canAccessPath("/stock", "FINANCE")).toBe(false);
+    expect(canAccessPath("/stock", "LOGISTIQUE")).toBe(false);
+    expect(canAccessPath("/stock", "CONTRAT")).toBe(false);
+  });
+
+  it("autorise STOCK et ADMIN sur /mouvements", () => {
+    expect(canAccessPath("/mouvements", "STOCK")).toBe(true);
+    expect(canAccessPath("/mouvements", "ADMIN")).toBe(true);
+  });
+
+  it("refuse FINANCE et LOGISTIQUE sur /mouvements", () => {
+    expect(canAccessPath("/mouvements", "FINANCE")).toBe(false);
+    expect(canAccessPath("/mouvements", "LOGISTIQUE")).toBe(false);
+    expect(canAccessPath("/mouvements", "CONTRAT")).toBe(false);
+  });
+
+  it("autorise STOCK et ADMIN sur /lot", () => {
+    expect(canAccessPath("/lot", "STOCK")).toBe(true);
+    expect(canAccessPath("/lot", "ADMIN")).toBe(true);
+  });
+
+  it("refuse FINANCE et LOGISTIQUE sur /lot", () => {
+    expect(canAccessPath("/lot", "FINANCE")).toBe(false);
+    expect(canAccessPath("/lot", "LOGISTIQUE")).toBe(false);
+    expect(canAccessPath("/lot", "CONTRAT")).toBe(false);
   });
 
   it("autorise ADMIN et STOCK sur /prediction", () => {

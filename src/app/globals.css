@@ -303,6 +303,13 @@
   }
 }
 
+/** Conteneur tableau : scroll horizontal sur petits écrans, scrollbar OCT. */
+@utility table-scroll-x {
+  @apply w-full min-w-0 overflow-x-auto overscroll-x-contain custom-scrollbar;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+}
+
 /** Liste déroulante unités : scrollbar visible, marque OCT (#00A09D). */
 @utility unite-mesure-picker-scroll {
   scrollbar-width: thin;

@@ -78,6 +78,25 @@ mutation ResetPassword(
   )
 }`;
 
+const FORGOT_PASSWORD_BY_PHONE_MUTATION = `
+mutation ForgotPasswordByPhone($telephone: String!) {
+  forgotPasswordByPhone(telephone: $telephone)
+}`;
+
+const RESET_PASSWORD_BY_PHONE_MUTATION = `
+mutation ResetPasswordByPhone(
+  $telephone: String!,
+  $code: String!,
+  $password: String!,
+  $password_confirmation: String!
+) {
+  resetPasswordByPhone(
+    telephone: $telephone,
+    code: $code,
+    password: $password,
+    password_confirmation: $password_confirmation
+  )
+}`;
 
 const ME_QUERY = `
 query Me {
@@ -97,6 +116,28 @@ const LOGOUT_MUTATION = `
 mutation Logout {
   logout
 }`;
+
+const UPDATE_PROFILE_MUTATION = `
+mutation UpdateProfile($input: UpdateProfileInput!) {
+  updateProfile(input: $input) {
+    id
+    name
+    email
+    role
+    isActive
+    emailVerifiedAt
+    telephone
+    phoneVerifiedAt
+    photo
+  }
+}`;
+
+export type UpdateProfileInput = {
+  name?: string;
+  email?: string;
+  telephone?: string;
+  photo?: string | null;
+};
 
 export async function login(input: LoginInput): Promise<AuthPayload> {
   return graphqlRequest<{ login: AuthPayload }>(LOGIN_MUTATION, input, {
@@ -164,6 +205,27 @@ export async function resetPassword(input: {
   }).then((d) => d.resetPassword);
 }
 
+export async function forgotPasswordByPhone(telephone: string): Promise<string> {
+  return graphqlRequest<{ forgotPasswordByPhone: string }>(
+    FORGOT_PASSWORD_BY_PHONE_MUTATION,
+    { telephone },
+    { skipAuth: true }
+  ).then((d) => d.forgotPasswordByPhone);
+}
+
+export async function resetPasswordByPhone(input: {
+  telephone: string;
+  code: string;
+  password: string;
+  password_confirmation: string;
+}): Promise<string> {
+  return graphqlRequest<{ resetPasswordByPhone: string }>(
+    RESET_PASSWORD_BY_PHONE_MUTATION,
+    input,
+    { skipAuth: true }
+  ).then((d) => d.resetPasswordByPhone);
+}
+
 export async function me(token?: string): Promise<User | null> {
   return graphqlRequest<{ me: User }>(ME_QUERY, {}, { token })
     .then((d) => d.me)
@@ -172,4 +234,15 @@ export async function me(token?: string): Promise<User | null> {
 
 export async function logout(token?: string): Promise<boolean> {
   return graphqlRequest<{ logout: boolean }>(LOGOUT_MUTATION, {}, { token }).then((d) => d.logout);
+}
+
+export async function updateProfile(
+  input: UpdateProfileInput,
+  token?: string
+): Promise<User> {
+  return graphqlRequest<{ updateProfile: User }>(
+    UPDATE_PROFILE_MUTATION,
+    { input },
+    { token }
+  ).then((d) => d.updateProfile);
 }

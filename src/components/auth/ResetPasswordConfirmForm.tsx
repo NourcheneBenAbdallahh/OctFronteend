@@ -7,33 +7,42 @@ import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import Button from "@/components/ui/button/Button";
 import { EyeCloseIcon, EyeIcon } from "@/icons";
-import { resetPassword } from "@/lib/auth.api";
+import { resetPassword, resetPasswordByPhone } from "@/lib/auth.api";
 import AuthBrandAside from "@/components/auth/AuthBrandAside";
 
 export default function ResetPasswordConfirmForm() {
   const searchParams = useSearchParams();
+  const channel = searchParams.get("channel") === "phone" ? "phone" : "email";
   const emailFromUrl = searchParams.get("email") ?? "";
   const tokenFromUrl = searchParams.get("token") ?? "";
+  const telephoneFromUrl = searchParams.get("telephone") ?? "";
 
+  const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{
+    code?: string;
     password?: string;
     password_confirmation?: string;
     general?: string;
   }>({});
   const [success, setSuccess] = useState(false);
 
-  const linkInvalid = useMemo(
-    () => !emailFromUrl.trim() || !tokenFromUrl.trim(),
-    [emailFromUrl, tokenFromUrl]
-  );
+  const linkInvalid = useMemo(() => {
+    if (channel === "phone") {
+      return !telephoneFromUrl.trim();
+    }
+    return !emailFromUrl.trim() || !tokenFromUrl.trim();
+  }, [channel, emailFromUrl, tokenFromUrl, telephoneFromUrl]);
 
   const validate = () => {
     const newErrors: typeof errors = {};
+    if (channel === "phone" && !code.trim()) {
+      newErrors.code = "Code requis";
+    }
     if (password.length < 8) newErrors.password = "Min. 8 caractères";
     if (password !== passwordConfirmation) {
       newErrors.password_confirmation = "Les mots de passe ne correspondent pas";
@@ -49,16 +58,25 @@ export default function ResetPasswordConfirmForm() {
     setErrors({});
 
     try {
-      await resetPassword({
-        email: emailFromUrl,
-        token: tokenFromUrl,
-        password,
-        password_confirmation: passwordConfirmation,
-      });
+      if (channel === "phone") {
+        await resetPasswordByPhone({
+          telephone: telephoneFromUrl,
+          code: code.trim(),
+          password,
+          password_confirmation: passwordConfirmation,
+        });
+      } else {
+        await resetPassword({
+          email: emailFromUrl,
+          token: tokenFromUrl,
+          password,
+          password_confirmation: passwordConfirmation,
+        });
+      }
       setSuccess(true);
     } catch (err: unknown) {
       const message =
-        err instanceof Error ? err.message : "Lien invalide ou expiré.";
+        err instanceof Error ? err.message : "Réinitialisation impossible.";
       setErrors({ general: message });
     } finally {
       setLoading(false);
@@ -75,7 +93,7 @@ export default function ResetPasswordConfirmForm() {
           </>
         }
         footerTitle="Accès sécurisé"
-        footerSubtitle="Lien à usage unique"
+        footerSubtitle={channel === "phone" ? "Code par email" : "Lien email"}
       />
 
       <div className="flex flex-col justify-center flex-1 px-10 lg:px-28 bg-white py-12">
@@ -90,13 +108,15 @@ export default function ResetPasswordConfirmForm() {
           {linkInvalid ? (
             <div className="space-y-6">
               <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-xl font-bold text-[10px] text-red-600 uppercase tracking-widest">
-                Lien de réinitialisation invalide ou incomplet.
+                {channel === "phone"
+                  ? "Numéro de téléphone manquant. Reprenez depuis mot de passe oublié."
+                  : "Lien de réinitialisation invalide ou incomplet."}
               </div>
               <Link
                 href="/reset-password"
                 className="inline-flex w-full items-center justify-center py-7 bg-[#00A09D] hover:bg-[#008784] text-white font-[1000] text-[12px] uppercase tracking-[0.3em] rounded-[22px] transition-all"
               >
-                Demander un nouveau lien
+                Retour
               </Link>
             </div>
           ) : success ? (
@@ -113,16 +133,57 @@ export default function ResetPasswordConfirmForm() {
             </div>
           ) : (
             <form className="space-y-6" onSubmit={handleSubmit} noValidate>
-              <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase tracking-widest ml-2 text-gray-400">
-                  Email
-                </Label>
-                <Input
-                  defaultValue={emailFromUrl}
-                  disabled
-                  className="w-full py-5 px-7 rounded-[22px] border-2 border-gray-100 bg-gray-50 text-sm font-bold text-gray-500"
-                />
-              </div>
+              {channel === "phone" ? (
+                <>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest ml-2 text-gray-400">
+                      Téléphone
+                    </Label>
+                    <Input
+                      defaultValue={telephoneFromUrl}
+                      disabled
+                      className="w-full py-5 px-7 rounded-[22px] border-2 border-gray-100 bg-gray-50 text-sm font-bold text-gray-500"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label
+                      className={`text-[10px] font-black uppercase tracking-widest ml-2 ${
+                        errors.code ? "text-red-500" : "text-gray-400"
+                      }`}
+                    >
+                      Code reçu par email
+                    </Label>
+                    <Input
+                      onChange={(e) => {
+                        setCode(e.target.value);
+                        if (errors.code) setErrors({ ...errors, code: undefined });
+                      }}
+                      placeholder="123456"
+                      className={`w-full py-5 px-7 rounded-[22px] border-2 text-sm font-bold tracking-widest transition-all ${
+                        errors.code
+                          ? "border-red-500 bg-red-50/50"
+                          : "border-gray-100 bg-[#F8FAFA] focus:border-[#00A09D]"
+                      }`}
+                    />
+                    {errors.code && (
+                      <p className="text-[10px] font-black text-red-500 uppercase ml-4 mt-1">
+                        {errors.code}
+                      </p>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-widest ml-2 text-gray-400">
+                    Email
+                  </Label>
+                  <Input
+                    defaultValue={emailFromUrl}
+                    disabled
+                    className="w-full py-5 px-7 rounded-[22px] border-2 border-gray-100 bg-gray-50 text-sm font-bold text-gray-500"
+                  />
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label

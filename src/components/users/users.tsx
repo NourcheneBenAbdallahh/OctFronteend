@@ -1,16 +1,19 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Plus, Search, UserCog, BoxSelect, Filter, UserPlus, UserPen, KeyRound, Trash2, X } from "lucide-react";
+import { ChevronRight, Plus, Search, UserCog, BoxSelect, Filter, UserPlus, UserPen, KeyRound, Trash2, X } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
+import { TablePagination } from "@/components/ui/TablePagination";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useUsersAdmin } from "./useUsersAdmin";
 import { UserRow } from "./UserRow";
+import { RoleSearchableDropdown } from "./RoleSearchableDropdown";
 import { 
   UserRole, adminDeleteUser, adminUpdateUserRole, 
   adminSetUserActive, adminCreateUser, adminUpdateUser, adminResetUserPassword
 } from "@/lib/users.api";
 import { AppFeedbackBanner } from "@/components/ui/feedback";
+import { ResponsiveTableWrap } from "@/components/ui/ResponsiveTableWrap";
 
 const ROLE_OPTIONS: UserRole[] = ["ADMIN", "STOCK", "LOGISTIQUE", "FINANCE"];
 const ROLE_LABEL: Record<string, string> = { 
@@ -69,10 +72,6 @@ export default function UsersAdminPage() {
     password: "",
     confirmPassword: "",
   });
-  const [createRoleOpen, setCreateRoleOpen] = useState(false);
-  const [createRoleSearch, setCreateRoleSearch] = useState("");
-  const [roleFilterOpen, setRoleFilterOpen] = useState(false);
-  const [roleFilterSearch, setRoleFilterSearch] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -185,21 +184,7 @@ export default function UsersAdminPage() {
     }
   };
 
-  const filteredRoleOptions = useMemo(
-    () => ROLE_OPTIONS.filter((r) => roleFr(r).toLowerCase().includes(roleFilterSearch.toLowerCase())),
-    [roleFilterSearch]
-  );
-  const filteredCreateRoles = useMemo(
-    () => ROLE_OPTIONS.filter((r) => roleFr(r).toLowerCase().includes(createRoleSearch.toLowerCase())),
-    [createRoleSearch]
-  );
-
   const totalPages = paginatorInfo?.lastPage ?? 1;
-  const pagesToShow = useMemo(() => {
-    if (totalPages <= 1) return [];
-    const pages = new Set<number>([1, totalPages, page - 1, page, page + 1]);
-    return Array.from(pages).filter((p) => p >= 1 && p <= totalPages).sort((a, b) => a - b);
-  }, [page, totalPages]);
 
   return (
     <div className="space-y-6">
@@ -227,94 +212,50 @@ export default function UsersAdminPage() {
       </section>
 
       {/* SEARCH & FILTERS */}
-      <section className="flex flex-wrap items-center gap-4">
-        <div className="flex flex-1 items-center rounded-2xl border border-gray-100 bg-white px-4 py-3 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-          <Search size={18} className="mr-3 text-gray-300" />
+      <section className="flex flex-col gap-3">
+        <div className="flex min-w-0 flex-1 items-center rounded-2xl border border-gray-100 bg-white px-4 py-3 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+          <Search size={18} className="mr-3 shrink-0 text-gray-300" />
           <input
             type="search"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder="Rechercher nom ou email..."
-            className="flex-1 bg-transparent text-sm font-medium outline-none"
+            className="min-w-0 flex-1 bg-transparent text-sm font-medium outline-none"
           />
-          <Filter size={18} className="ml-3 text-gray-400" />
+          <Filter size={18} className="ml-3 shrink-0 text-gray-400" />
         </div>
-        <div className="relative">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="min-w-0 flex-1 sm:max-w-[220px]">
+            <RoleSearchableDropdown
+              value={roleFilter}
+              onChange={(r) => setRoleFilter(r as UserRole | "")}
+              options={ROLE_OPTIONS}
+              roleFr={roleFr}
+              placeholder="Tous les rôles"
+              includeAllOption={{ label: "Tous les rôles" }}
+            />
+          </div>
           <button
             type="button"
-            onClick={() => setRoleFilterOpen((prev) => !prev)}
-            className="inline-flex min-w-[180px] items-center justify-between gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-xs font-bold text-gray-700 transition-all hover:border-indigo-200 hover:text-indigo-600 dark:border-gray-700 dark:bg-gray-900"
+            onClick={() => setCreateModalOpen(true)}
+            className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-2xl border-2 border-gray-900 bg-white px-6 py-3.5 text-[10px] font-black uppercase tracking-widest text-gray-900 shadow-[6px_6px_0px_rgba(0,160,157,0.2)] transition-all hover:bg-gray-900 hover:text-white sm:w-auto sm:px-8 sm:py-4"
           >
-            <span className="truncate">{roleFilter ? roleFr(roleFilter) : "Tous les rôles"}</span>
-            {roleFilterOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            <Plus size={14} /> Nouveau
           </button>
-          {roleFilterOpen && (
-            <div className="absolute right-0 z-30 mt-2 w-64 rounded-2xl border border-gray-200 bg-white p-2 shadow-xl dark:border-gray-700 dark:bg-gray-900">
-              <input
-                type="text"
-                value={roleFilterSearch}
-                onChange={(e) => setRoleFilterSearch(e.target.value)}
-                placeholder="Rechercher rôle..."
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold outline-none focus:border-indigo-500 dark:border-gray-700 dark:bg-gray-800"
-              />
-              <div className="mt-2 max-h-44 space-y-1 overflow-y-auto pr-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setRoleFilter("");
-                    setRoleFilterOpen(false);
-                    setRoleFilterSearch("");
-                  }}
-                  className={`w-full rounded-xl px-3 py-2 text-left text-xs font-semibold transition-all ${
-                    roleFilter === ""
-                      ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300"
-                      : "text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800"
-                  }`}
-                >
-                  Tous les rôles
-                </button>
-                {filteredRoleOptions.map((r) => (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => {
-                      setRoleFilter(r);
-                      setRoleFilterOpen(false);
-                      setRoleFilterSearch("");
-                    }}
-                    className={`w-full rounded-xl px-3 py-2 text-left text-xs font-semibold transition-all ${
-                      roleFilter === r
-                        ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300"
-                        : "text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800"
-                    }`}
-                  >
-                    {roleFr(r)}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-        <button 
-          onClick={() => setCreateModalOpen(true)}
-          className="bg-white text-gray-900 border-2 border-gray-900 px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all shadow-[8px_8px_0px_rgba(0,160,157,0.2)]"
-          >
-          <Plus size={12} className="inline mr-2" /> Ajouter
-        </button>
-
-        <div className="ml-auto inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-3 py-2">
-          <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Lignes</span>
-          <select
-            value={perPage}
-            onChange={(e) => setPerPage(Number(e.target.value))}
-            className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-bold text-gray-700 outline-none"
-          >
-            {[10, 15, 30, 50, 100].map((n) => (
-              <option key={n} value={n}>
-                {n} / page
-              </option>
-            ))}
-          </select>
+          <div className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-3 py-2 sm:ml-auto">
+            <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Lignes</span>
+            <select
+              value={perPage}
+              onChange={(e) => setPerPage(Number(e.target.value))}
+              className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-bold text-gray-700 outline-none"
+            >
+              {[10, 15, 30, 50, 100].map((n) => (
+                <option key={n} value={n}>
+                  {n} / page
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </section>
 
@@ -326,9 +267,10 @@ export default function UsersAdminPage() {
         }}
       />
 
-      <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
+      <div className="overflow-hidden rounded-[2.5rem] border border-gray-100 bg-white shadow-sm">
+      <ResponsiveTableWrap showScrollHint={users.length > 0}>
       {users.length > 0 ? (
-    <table className="w-full text-left border-collapse">
+    <table className="w-full min-w-[920px] text-left border-collapse">
               <thead>
               <tr className="border-b border-gray-50 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
                   <th className="px-8 py-6">Photo</th>
@@ -363,46 +305,15 @@ export default function UsersAdminPage() {
             <h3 className="font-black text-gray-900 dark:text-white">Aucun résultat</h3>
           </div>
         )}
+      </ResponsiveTableWrap>
 
-        {/* PAGINATION */}
         {paginatorInfo && paginatorInfo.lastPage > 1 && (
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-2 pb-4">
-            <button 
-              disabled={page === 1 || loading}
-              onClick={() => setPage(p => p - 1)}
-              className="inline-flex h-9 items-center gap-1 rounded-xl border border-gray-200 px-3 text-xs font-bold text-gray-600 disabled:opacity-30"
-            >
-              <ChevronLeft size={14} /> Précédent
-            </button>
-
-            {pagesToShow.map((p, idx) => {
-              const prev = pagesToShow[idx - 1];
-              const hasGap = idx > 0 && prev && p - prev > 1;
-              return (
-                <React.Fragment key={p}>
-                  {hasGap ? <span className="px-1 text-xs text-gray-400">...</span> : null}
-                  <button
-                    onClick={() => setPage(p)}
-                    disabled={loading}
-                    className={`h-9 min-w-[36px] rounded-xl px-2 text-xs font-black transition-all ${
-                      p === page
-                        ? "bg-[#1C2434] text-white shadow"
-                        : "border border-gray-200 bg-white text-gray-600 hover:border-indigo-200 hover:text-indigo-600"
-                    }`}
-                  >
-                    {p}
-                  </button>
-                </React.Fragment>
-              );
-            })}
-
-            <button 
-              disabled={page === paginatorInfo.lastPage || loading}
-              onClick={() => setPage(p => p + 1)}
-              className="inline-flex h-9 items-center gap-1 rounded-xl border border-gray-200 px-3 text-xs font-bold text-gray-600 disabled:opacity-30"
-            >
-              Suivant <ChevronRight size={14} />
-            </button>
+          <div className="mt-4 flex flex-col items-center gap-3 border-t border-gray-50 px-4 py-6">
+            <TablePagination
+              currentPage={page}
+              totalPages={paginatorInfo.lastPage}
+              onPageChange={setPage}
+            />
           </div>
         )}
         {paginatorInfo && (
@@ -420,10 +331,10 @@ export default function UsersAdminPage() {
           resetCreateForm();
         }}
         position="right"
-        className="w-full max-w-xl overflow-hidden rounded-l-[3rem] bg-white shadow-[-30px_0_60px_rgba(0,0,0,0.1)]"
+        className="w-full max-w-xl overflow-hidden rounded-l-[2rem] bg-white shadow-[-30px_0_60px_rgba(0,0,0,0.1)] sm:rounded-l-[3rem]"
       >
-        <div className="flex h-screen flex-col">
-          <div className="p-10 pb-6">
+        <div className="flex max-h-[100dvh] flex-col">
+          <div className="p-6 pb-4 sm:p-10 sm:pb-6">
             <div className="mb-8 flex items-start justify-between">
               <div>
                 <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.3em] text-indigo-500 underline decoration-2 underline-offset-4">
@@ -447,7 +358,7 @@ export default function UsersAdminPage() {
           </div>
 
           <form onSubmit={handleCreateSubmit} className="flex h-full flex-col">
-            <div className="flex-1 space-y-8 overflow-y-auto px-10 py-4">
+            <div className="flex-1 space-y-6 overflow-y-auto px-6 py-4 sm:space-y-8 sm:px-10">
               <div className="rounded-[2rem] border border-indigo-100/60 bg-indigo-50/50 p-5">
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-indigo-600">
@@ -459,7 +370,7 @@ export default function UsersAdminPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <label className="ml-1 block text-[10px] font-black uppercase tracking-widest text-gray-400">Nom</label>
                   <input
@@ -484,7 +395,7 @@ export default function UsersAdminPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <label className="ml-1 block text-[10px] font-black uppercase tracking-widest text-gray-400">Téléphone</label>
                   <input
@@ -497,47 +408,12 @@ export default function UsersAdminPage() {
                 </div>
                 <div className="space-y-2">
                   <label className="ml-1 block text-[10px] font-black uppercase tracking-widest text-gray-400">Rôle</label>
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setCreateRoleOpen((prev) => !prev)}
-                      className="inline-flex w-full items-center justify-between gap-2 rounded-2xl border-2 border-gray-50 bg-gray-50 p-4 text-left text-xs font-black text-gray-700 outline-none transition-all hover:border-indigo-500/20 hover:bg-white"
-                    >
-                      <span className="truncate">{roleFr(createForm.role)}</span>
-                      {createRoleOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                    </button>
-                    {createRoleOpen && (
-                      <div className="absolute left-0 top-full z-30 mt-2 w-full rounded-2xl border border-gray-200 bg-white p-2 shadow-xl">
-                        <input
-                          type="text"
-                          value={createRoleSearch}
-                          onChange={(e) => setCreateRoleSearch(e.target.value)}
-                          placeholder="Rechercher rôle..."
-                          className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold outline-none focus:border-indigo-500"
-                        />
-                        <div className="mt-2 max-h-44 space-y-1 overflow-y-auto pr-1">
-                          {filteredCreateRoles.map((r) => (
-                            <button
-                              key={r}
-                              type="button"
-                              onClick={() => {
-                                setCreateForm((prev) => ({ ...prev, role: r }));
-                                setCreateRoleOpen(false);
-                                setCreateRoleSearch("");
-                              }}
-                              className={`w-full rounded-xl px-3 py-2 text-left text-xs font-semibold transition-all ${
-                                createForm.role === r
-                                  ? "bg-indigo-50 text-indigo-700"
-                                  : "text-gray-700 hover:bg-gray-50"
-                              }`}
-                            >
-                              {roleFr(r)}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  <RoleSearchableDropdown
+                    value={createForm.role}
+                    onChange={(r) => setCreateForm((prev) => ({ ...prev, role: r as UserRole }))}
+                    options={ROLE_OPTIONS}
+                    roleFr={roleFr}
+                  />
                 </div>
               </div>
 
@@ -564,21 +440,21 @@ export default function UsersAdminPage() {
               </label>
             </div>
 
-            <div className="flex items-center gap-4 border-t border-gray-50 bg-white p-10">
+            <div className="flex flex-col gap-3 border-t border-gray-50 bg-white p-6 sm:flex-row sm:items-center sm:gap-4 sm:p-10">
               <button
                 type="button"
                 onClick={() => {
                   setCreateModalOpen(false);
                   resetCreateForm();
                 }}
-                className="h-16 rounded-2xl border-2 border-gray-100 px-8 text-[11px] font-black uppercase tracking-widest text-gray-400 transition-all hover:bg-gray-50"
+                className="h-14 rounded-2xl border-2 border-gray-100 px-6 text-[11px] font-black uppercase tracking-widest text-gray-400 transition-all hover:bg-gray-50 sm:h-16 sm:px-8"
               >
                 Annuler
               </button>
               <button
                 type="submit"
                 disabled={savingId === "create-user"}
-                className="flex h-16 flex-1 items-center justify-center gap-2 rounded-2xl bg-[#1C2434] text-[12px] font-black uppercase tracking-[0.2em] text-white shadow-xl transition-all hover:bg-indigo-600 disabled:opacity-50"
+                className="flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl bg-[#1C2434] text-[12px] font-black uppercase tracking-[0.2em] text-white shadow-xl transition-all hover:bg-indigo-600 disabled:opacity-50 sm:h-16"
               >
                 {savingId === "create-user" ? "Création..." : "Créer l'utilisateur"}
               </button>
@@ -595,10 +471,10 @@ export default function UsersAdminPage() {
           setSelectedUserName("");
         }}
         position="right"
-        className="w-full max-w-xl overflow-hidden rounded-l-[3rem] bg-white shadow-[-30px_0_60px_rgba(0,0,0,0.1)]"
+        className="w-full max-w-xl overflow-hidden rounded-l-[2rem] bg-white shadow-[-30px_0_60px_rgba(0,0,0,0.1)] sm:rounded-l-[3rem]"
       >
-        <div className="flex h-screen flex-col">
-          <div className="p-10 pb-6">
+        <div className="flex max-h-[100dvh] flex-col">
+          <div className="p-6 pb-4 sm:p-10 sm:pb-6">
             <div className="mb-8 flex items-start justify-between">
               <div>
                 <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.3em] text-indigo-500 underline decoration-2 underline-offset-4">
@@ -619,7 +495,7 @@ export default function UsersAdminPage() {
           </div>
 
           <form onSubmit={handleEditSubmit} className="flex h-full flex-col">
-            <div className="flex-1 space-y-8 overflow-y-auto px-10 py-4">
+            <div className="flex-1 space-y-6 overflow-y-auto px-6 py-4 sm:space-y-8 sm:px-10">
               <div className="rounded-[2rem] border border-indigo-100/60 bg-indigo-50/50 p-5">
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-indigo-600">
@@ -662,18 +538,18 @@ export default function UsersAdminPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-4 border-t border-gray-50 bg-white p-10">
+            <div className="flex flex-col gap-3 border-t border-gray-50 bg-white p-6 sm:flex-row sm:items-center sm:gap-4 sm:p-10">
               <button
                 type="button"
                 onClick={() => setEditModalOpen(false)}
-                className="h-16 rounded-2xl border-2 border-gray-100 px-8 text-[11px] font-black uppercase tracking-widest text-gray-400 transition-all hover:bg-gray-50"
+                className="h-14 rounded-2xl border-2 border-gray-100 px-6 text-[11px] font-black uppercase tracking-widest text-gray-400 transition-all hover:bg-gray-50 sm:h-16 sm:px-8"
               >
                 Annuler
               </button>
               <button
                 type="submit"
                 disabled={savingId === `edit-${selectedUserId}`}
-                className="flex h-16 flex-1 items-center justify-center gap-2 rounded-2xl bg-[#1C2434] text-[12px] font-black uppercase tracking-[0.2em] text-white shadow-xl transition-all hover:bg-indigo-600 disabled:opacity-50"
+                className="flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl bg-[#1C2434] text-[12px] font-black uppercase tracking-[0.2em] text-white shadow-xl transition-all hover:bg-indigo-600 disabled:opacity-50 sm:h-16"
               >
                 {savingId === `edit-${selectedUserId}` ? "Enregistrement..." : "Enregistrer"}
               </button>
@@ -736,10 +612,10 @@ export default function UsersAdminPage() {
           setPasswordForm({ password: "", confirmPassword: "" });
         }}
         position="right"
-        className="w-full max-w-xl overflow-hidden rounded-l-[3rem] bg-white shadow-[-30px_0_60px_rgba(0,0,0,0.1)]"
+        className="w-full max-w-xl overflow-hidden rounded-l-[2rem] bg-white shadow-[-30px_0_60px_rgba(0,0,0,0.1)] sm:rounded-l-[3rem]"
       >
-        <div className="flex h-screen flex-col">
-          <div className="p-10 pb-6">
+        <div className="flex max-h-[100dvh] flex-col">
+          <div className="p-6 pb-4 sm:p-10 sm:pb-6">
             <div className="mb-8 flex items-start justify-between">
               <div>
                 <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.3em] text-indigo-500 underline decoration-2 underline-offset-4">
@@ -760,7 +636,7 @@ export default function UsersAdminPage() {
           </div>
 
           <form onSubmit={handlePasswordSubmit} className="flex h-full flex-col">
-            <div className="flex-1 space-y-8 overflow-y-auto px-10 py-4">
+            <div className="flex-1 space-y-6 overflow-y-auto px-6 py-4 sm:space-y-8 sm:px-10">
               <div className="rounded-[2rem] border border-indigo-100/60 bg-indigo-50/50 p-5">
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-indigo-600">
@@ -801,11 +677,11 @@ export default function UsersAdminPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-4 border-t border-gray-50 bg-white p-10">
+            <div className="flex flex-col gap-3 border-t border-gray-50 bg-white p-6 sm:flex-row sm:items-center sm:gap-4 sm:p-10">
               <button
                 type="button"
                 onClick={() => setPasswordModalOpen(false)}
-                className="h-16 rounded-2xl border-2 border-gray-100 px-8 text-[11px] font-black uppercase tracking-widest text-gray-400 transition-all hover:bg-gray-50"
+                className="h-14 rounded-2xl border-2 border-gray-100 px-6 text-[11px] font-black uppercase tracking-widest text-gray-400 transition-all hover:bg-gray-50 sm:h-16 sm:px-8"
               >
                 Annuler
               </button>
@@ -816,7 +692,7 @@ export default function UsersAdminPage() {
                   passwordForm.password.length < 8 ||
                   passwordForm.password !== passwordForm.confirmPassword
                 }
-                className="flex h-16 flex-1 items-center justify-center gap-2 rounded-2xl bg-[#1C2434] text-[12px] font-black uppercase tracking-[0.2em] text-white shadow-xl transition-all hover:bg-indigo-600 disabled:opacity-50"
+                className="flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl bg-[#1C2434] text-[12px] font-black uppercase tracking-[0.2em] text-white shadow-xl transition-all hover:bg-indigo-600 disabled:opacity-50 sm:h-16"
               >
                 {savingId === "reset-password" ? "Traitement..." : "Confirmer"}
               </button>

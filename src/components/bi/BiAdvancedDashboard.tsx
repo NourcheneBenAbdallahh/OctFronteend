@@ -66,6 +66,9 @@ import {
   uniqueEntrepotNames,
 } from "@/lib/bi.data";
 import { exportBiSummaryPdf } from "@/lib/bi.pdf";
+import { tourPageAttrs } from "@/lib/tourPageAttrs";
+
+const tour = tourPageAttrs("/bi");
 
 const PERIOD_OPTIONS: { key: BiPeriodKey; label: string }[] = [
   { key: "7d", label: "7 j" },
@@ -412,7 +415,10 @@ export default function BiAdvancedDashboard() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex flex-wrap rounded-full border border-gray-200 bg-gray-50 p-1 dark:border-gray-700 dark:bg-gray-800">
+          <div
+            className="flex flex-wrap rounded-full border border-gray-200 bg-gray-50 p-1 dark:border-gray-700 dark:bg-gray-800"
+            {...tour.search}
+          >
             {PERIOD_OPTIONS.map((o) => (
               <button
                 key={o.key}
@@ -554,6 +560,7 @@ export default function BiAdvancedDashboard() {
             onClick={handleExportPdf}
             disabled={exporting || loading}
             className="inline-flex items-center gap-2 rounded-full bg-[#1C2434] px-4 py-2 text-xs font-bold text-white hover:bg-black disabled:opacity-50 dark:bg-[#00A09D] dark:hover:bg-[#008e8b]"
+            {...tour.actions}
           >
             <Download className="w-4 h-4" />
             {exporting ? "Export…" : "PDF"}
@@ -561,6 +568,7 @@ export default function BiAdvancedDashboard() {
         </div>
       </header>
 
+      <div className="flex flex-col gap-6" {...tour.table}>
       {scope === "full" ? (
       <>
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -1299,6 +1307,7 @@ export default function BiAdvancedDashboard() {
         )}
       </div>
       ) : null}
+      </div>
     </div>
   );
 }

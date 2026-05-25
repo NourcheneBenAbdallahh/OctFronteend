@@ -4,12 +4,13 @@ import React, { useState } from "react";
 import { X, Save, Settings2 } from "lucide-react";
 import type { UniteMesure } from "@/types/unite-mesure";
 import { createUniteMesure, updateUniteMesure } from "@/lib/unites-mesure.api";
+import { OptionSearchablePicker } from "@/components/ui/OptionSearchablePicker";
 
 const DIMENSIONS = [
-  { value: "masse", label: "Masse" },
-  { value: "volume", label: "Volume" },
-  { value: "nombre", label: "Nombre (pièce, palette…)" },
-  { value: "surface", label: "Surface" },
+  { id: "masse", label: "Masse" },
+  { id: "volume", label: "Volume" },
+  { id: "nombre", label: "Nombre (pièce, palette…)" },
+  { id: "surface", label: "Surface" },
 ];
 
 export default function UnitesMesureFormModal({
@@ -150,18 +151,17 @@ export default function UnitesMesureFormModal({
           </div>
 
           <div className="space-y-3">
-            <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Dimension</label>
-            <select
-              className="w-full rounded-2xl border-2 border-gray-50 bg-gray-50 p-4 text-xs font-black outline-none focus:bg-white"
+            <label className="ml-1 text-[10px] font-black uppercase tracking-widest text-gray-400">
+              Dimension
+            </label>
+            <OptionSearchablePicker
               value={form.dimension}
-              onChange={(e) => setForm({ ...form, dimension: e.target.value })}
-            >
-              {DIMENSIONS.map((d) => (
-                <option key={d.value} value={d.value}>
-                  {d.label}
-                </option>
-              ))}
-            </select>
+              onChange={(dimension) => setForm({ ...form, dimension })}
+              options={DIMENSIONS}
+              placeholder="Choisir une dimension…"
+              searchPlaceholder="Rechercher (Masse, Volume…)"
+              noResultsText="Aucune dimension"
+            />
           </div>
 
           <div className="bg-gray-50/80 p-10 rounded-[2.5rem] space-y-8 border border-gray-100">

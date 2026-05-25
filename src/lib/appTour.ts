@@ -91,19 +91,6 @@ export function buildAppTourSteps(role: string | undefined | null): AppTourStep[
 
   const modules = accessibleModules(role);
 
-  if (modules.some((m) => m.path === "/")) {
-    steps.push({
-      id: "page-dashboard",
-      route: "/",
-      element: '[data-tour="page-dashboard-kpi"]',
-      fallbackElement: '[data-tour="page-content"]',
-      title: "Tableau de bord",
-      description:
-        "Vue d’ensemble : indicateurs clés, tendances de stock et raccourcis vers l’activité récente.",
-      side: "bottom",
-    });
-  }
-
   for (const mod of modules) {
     if (!mod.path || mod.path === "/") continue;
 
@@ -118,14 +105,16 @@ export function buildAppTourSteps(role: string | undefined | null): AppTourStep[
       side: "right",
     });
 
+    const isBi = mod.path === "/bi";
     steps.push({
       id: `table-${slug}`,
       route: mod.path,
       element: pageTableSelector(mod.path),
       fallbackElement: '[data-tour="page-content"]',
-      title: `${mod.title} — tableau`,
-      description:
-        "Ici vous voyez la liste principale : lignes, statuts, pagination et actions sur chaque enregistrement.",
+      title: isBi ? `${mod.title} — indicateurs` : `${mod.title} — tableau`,
+      description: isBi
+        ? "KPIs, graphiques et synthèses selon votre rôle : consommation stock, pipeline commandes ou facturation."
+        : "Ici vous voyez la liste principale : lignes, statuts, pagination et actions sur chaque enregistrement.",
       side: "top",
     });
 
@@ -134,9 +123,10 @@ export function buildAppTourSteps(role: string | undefined | null): AppTourStep[
       route: mod.path,
       element: pageSearchSelector(mod.path),
       optional: true,
-      title: `${mod.title} — recherche`,
-      description:
-        "Tapez ici pour filtrer la liste en temps réel (nom, référence, partenaire…).",
+      title: isBi ? `${mod.title} — période` : `${mod.title} — recherche`,
+      description: isBi
+        ? "Choisissez la fenêtre d’analyse (7 jours à 12 mois) pour recalculer tous les indicateurs."
+        : "Tapez ici pour filtrer la liste en temps réel (nom, référence, partenaire…).",
       side: "bottom",
     });
 
@@ -145,9 +135,10 @@ export function buildAppTourSteps(role: string | undefined | null): AppTourStep[
       route: mod.path,
       element: pageActionsSelector(mod.path),
       optional: true,
-      title: `${mod.title} — actions`,
-      description:
-        "Utilisez ce bouton pour créer un nouvel enregistrement ou lancer l’action principale du module.",
+      title: isBi ? `${mod.title} — export` : `${mod.title} — actions`,
+      description: isBi
+        ? "Exportez la synthèse BI au format PDF pour partage ou archivage."
+        : "Utilisez ce bouton pour créer un nouvel enregistrement ou lancer l’action principale du module.",
       side: "left",
     });
   }

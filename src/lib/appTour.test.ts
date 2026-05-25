@@ -21,6 +21,9 @@ describe("appTour", () => {
     const admin = buildAppTourSteps("ADMIN");
     expect(admin[0].id).toBe("welcome");
     expect(admin[admin.length - 1].id).toBe("finish");
+    expect(admin.some((s) => s.id === "page-dashboard")).toBe(false);
+    expect(admin.some((s) => s.id === "nav-bi")).toBe(true);
+    expect(admin.some((s) => s.id === "table-bi")).toBe(true);
     expect(admin.some((s) => s.id === "nav-fournisseurs")).toBe(true);
     expect(admin.some((s) => s.id === "table-fournisseurs")).toBe(true);
     expect(admin.some((s) => s.id === "search-fournisseurs")).toBe(true);
