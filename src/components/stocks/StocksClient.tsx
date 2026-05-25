@@ -16,6 +16,12 @@ import StocksTableView from "./StocksTableView";
 import StockDetailsDrawer from "./StockDetailsDrawer";
 import StockEditDrawer from "./StockEditDrawer";
 import { deleteStock, updateStock } from "@/lib/stock.api";
+import {
+  applyStockFilters,
+  computeStocksStats,
+  paginateRows,
+  stockTotalPages,
+} from "@/lib/stock.filters";
 import { AppConfirmModal, AppFeedbackBanner } from "@/components/ui/feedback";
 import { getActionErrorMessage, useAppFeedback } from "@/hooks/useAppFeedback";
 
@@ -109,95 +115,10 @@ export default function StocksClient({ initialStocks }: Props) {
     setCurrentPage(1);
   };
 
-  const filteredRows = useMemo(() => {
-    let data = [...rows];
-    const q = filters.search.trim().toLowerCase();
-
-    if (q) {
-      data = data.filter((stock) => {
-        const entrepot = stock.entrepot?.nom || stock.entrepot?.name || "";
-        const emballage = stock.emballage?.name || stock.emballage?.code || "";
-        const user = stock.user?.name || stock.user?.email || "";
-        const lot = stock.lot?.code_lot || "";
-
-        return (
-          entrepot.toLowerCase().includes(q) ||
-          emballage.toLowerCase().includes(q) ||
-          user.toLowerCase().includes(q) ||
-          lot.toLowerCase().includes(q) ||
-          String(stock.id).includes(q)
-        );
-      });
-    }
-
-    if (filters.entrepot) {
-      data = data.filter((stock) => {
-        const entrepot = stock.entrepot?.nom || stock.entrepot?.name || "";
-        return entrepot === filters.entrepot;
-      });
-    }
-
-    if (filters.emballage) {
-      data = data.filter((stock) => {
-        const emballage = stock.emballage?.name || stock.emballage?.code || "";
-        return emballage === filters.emballage;
-      });
-    }
-
-    if (filters.user) {
-      data = data.filter((stock) => {
-        const user = stock.user?.name || stock.user?.email || "";
-        return user === filters.user;
-      });
-    }
-
-    if (filters.sens) {
-      data = data.filter((stock) => stock.sens === filters.sens);
-    }
-
-    if (filters.dateFrom) {
-      const from = new Date(filters.dateFrom);
-      data = data.filter((stock) => {
-        if (!stock.date_stock) return false;
-        return new Date(stock.date_stock) >= from;
-      });
-    }
-
-    if (filters.dateTo) {
-      const to = new Date(filters.dateTo);
-      to.setHours(23, 59, 59, 999);
-      data = data.filter((stock) => {
-        if (!stock.date_stock) return false;
-        return new Date(stock.date_stock) <= to;
-      });
-    }
-
-if (filters.sort === "recent") {
-  data.sort(
-    (a, b) =>
-      new Date(b.date_stock || 0).getTime() -
-      new Date(a.date_stock || 0).getTime()
+  const filteredRows = useMemo(
+    () => applyStockFilters(rows, filters),
+    [rows, filters]
   );
-}
-
-if (filters.sort === "oldest") {
-  data.sort(
-    (a, b) =>
-      new Date(a.date_stock || 0).getTime() -
-      new Date(b.date_stock || 0).getTime()
-  );
-}
-
-if (filters.sort === "quantite_desc") {
-  data.sort((a, b) => Number(b.quantite || 0) - Number(a.quantite || 0));
-}
-
-if (filters.sort === "quantite_asc") {
-  data.sort((a, b) => Number(a.quantite || 0) - Number(b.quantite || 0));
-}
-
-    return data;
-  }, [rows, filters]);
 
   const focusTargetPage = useMemo(() => {
     if (!focusId || displayViewMode !== "table") return null;
@@ -210,12 +131,12 @@ if (filters.sort === "quantite_asc") {
 
   const activePage =
     focusPinned && focusTargetPage !== null ? focusTargetPage : currentPage;
-  const totalPages = Math.ceil(filteredRows.length / itemsPerPage);
+  const totalPages = stockTotalPages(filteredRows.length, itemsPerPage);
 
-  const paginatedRows = useMemo(() => {
-    const start = (activePage - 1) * itemsPerPage;
-    return filteredRows.slice(start, start + itemsPerPage);
-  }, [filteredRows, activePage, itemsPerPage]);
+  const paginatedRows = useMemo(
+    () => paginateRows(filteredRows, activePage, itemsPerPage),
+    [filteredRows, activePage, itemsPerPage]
+  );
 
   useEffect(() => {
     if (!focusId || focusTargetPage === null) return;
@@ -227,23 +148,10 @@ if (filters.sort === "quantite_asc") {
     return () => window.clearTimeout(timer);
   }, [focusId, focusTargetPage, filteredRows]);
 
-  const stats: StocksStatsType = useMemo(() => {
-    return {
-      totalMouvements: rows.length,
-      totalEntrees: rows
-        .filter((r) => r.sens === "entree")
-        .reduce((acc, r) => acc + Number(r.quantite || 0), 0),
-      totalSorties: rows
-        .filter((r) => r.sens === "sortie")
-        .reduce((acc, r) => acc + Number(r.quantite || 0), 0),
-      mouvementsToday: rows.filter((r) => {
-        if (!r.date_stock) return false;
-        const d = new Date(r.date_stock);
-        const today = new Date();
-        return d.toDateString() === today.toDateString();
-      }).length,
-    };
-  }, [rows]);
+  const stats: StocksStatsType = useMemo(
+    () => computeStocksStats(rows),
+    [rows]
+  );
 
   const handleView = (stock: Stock) => {
     setSelectedStock(stock);

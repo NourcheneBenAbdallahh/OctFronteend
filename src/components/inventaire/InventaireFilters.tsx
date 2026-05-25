@@ -15,6 +15,9 @@ import {
 } from "lucide-react";
 import type { InventaireFilters, TableInventaire } from "@/types/inventaire";
 import { EMPTY_INVENTAIRE_FILTERS } from "@/lib/inventaire.filters";
+import { tourPageAttrs } from "@/lib/tourPageAttrs";
+
+const tour = tourPageAttrs("/stock-inventaire");
 
 type EntrepotOption = { id: string; label: string };
 
@@ -57,6 +60,7 @@ export default function InventaireFiltersBar({
             className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-[#00A09D] transition-colors"
           />
           <input
+            {...tour.search}
             value={filters.search}
             onChange={(e) => onChange({ ...filters, search: e.target.value })}
             placeholder="Rechercher emballage, entrepôt, session…"

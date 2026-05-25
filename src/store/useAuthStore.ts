@@ -1,23 +1,15 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { syncAuthAccessCookie } from '@/lib/authCookie';
-
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  isActive?: boolean;
-  emailVerifiedAt?: string | null;
-  photo?: string; 
-  telephone?: string;
-}
+import { clearOnboardingPending } from '@/lib/onboardingStorage';
+import type { User } from '@/types/auth';
 
 interface AuthState {
   user: User | null;
   token: string | null;
   isAuthenticated: boolean;
   setAuth: (user: User, token: string) => void;
+  patchUser: (partial: Partial<User>) => void;
   logout: () => void;
 }
 
@@ -37,8 +29,15 @@ export const useAuthStore = create<AuthState>()(
         });
       },
 
+      patchUser: (partial) => {
+        set((state) => ({
+          user: state.user ? { ...state.user, ...partial } : state.user,
+        }));
+      },
+
       logout: () => {
         syncAuthAccessCookie(null);
+        clearOnboardingPending();
         set({ user: null, token: null, isAuthenticated: false });
         localStorage.removeItem('auth-storage');
       },

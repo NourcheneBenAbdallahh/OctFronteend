@@ -1,6 +1,7 @@
 import React from "react";
 import { AdminUser, UserRole } from "@/lib/users.api";
-import { Check, ChevronDown, ChevronUp, KeyRound, Pencil, Power, Trash2 } from "lucide-react";
+import { KeyRound, Pencil, Power, Trash2 } from "lucide-react";
+import { RoleSearchableDropdown } from "./RoleSearchableDropdown";
 
 interface UserRowProps {
   user: AdminUser;
@@ -20,12 +21,6 @@ export const UserRow = ({
   onEdit, onPwd, onDelete, roleFr, roleOptions 
 }: UserRowProps) => {
   const isSaving = !!savingId && (savingId.includes(String(user.id)) || savingId === "reset-password");
-  const [roleOpen, setRoleOpen] = React.useState(false);
-  const [roleSearch, setRoleSearch] = React.useState("");
-
-  const filteredRoles = roleOptions.filter((r) =>
-    roleFr(r).toLowerCase().includes(roleSearch.toLowerCase())
-  );
 
   return (
     <tr className="group align-middle transition-all hover:bg-gray-50/50 dark:hover:bg-gray-800/50">
@@ -47,52 +42,16 @@ export const UserRow = ({
           {user.telephone || "Sans téléphone"}
         </div>
       </td>
-      <td className="px-8 py-6">
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setRoleOpen((prev) => !prev)}
+      <td className="px-4 py-6 sm:px-8">
+        <div className="min-w-[140px] max-w-[200px]">
+          <RoleSearchableDropdown
+            value={String(user.role).toUpperCase()}
+            onChange={(r) => onUpdateRole(String(user.id), r as UserRole)}
+            options={roleOptions}
+            roleFr={roleFr}
             disabled={isSaving}
-            className="inline-flex min-w-[130px] items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-gray-700 transition-all hover:border-indigo-200 hover:text-indigo-600 disabled:opacity-40 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
-          >
-            <span className="truncate">{roleFr(String(user.role))}</span>
-            {roleOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-          </button>
-
-          {roleOpen && (
-            <div className="absolute left-0 top-full z-20 mt-2 w-56 rounded-2xl border border-gray-200 bg-white p-2 shadow-xl dark:border-gray-700 dark:bg-gray-900">
-              <input
-                type="text"
-                value={roleSearch}
-                onChange={(e) => setRoleSearch(e.target.value)}
-                placeholder="Rechercher rôle..."
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold outline-none focus:border-indigo-500 dark:border-gray-700 dark:bg-gray-800"
-              />
-              <div className="mt-2 max-h-40 overflow-y-auto space-y-1 pr-1">
-                {filteredRoles.map((r) => (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => {
-                      setRoleOpen(false);
-                      setRoleSearch("");
-                      onUpdateRole(String(user.id), r);
-                    }}
-                    className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs font-semibold transition-all ${
-                      String(user.role).toUpperCase() === String(r).toUpperCase()
-                        ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300"
-                        : "text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800"
-                    }`}
-                  >
-                    <span>{roleFr(r)}</span>
-                    {String(user.role).toUpperCase() === String(r).toUpperCase() ? (
-                      <Check size={12} />
-                    ) : null}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+            dropdownZClassName="z-[1300]"
+          />
         </div>
       </td>
       <td className="px-8 py-6 text-center">

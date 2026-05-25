@@ -7,6 +7,11 @@ import {
   deleteBonLivraison,
   normalizeBonLivraison,
 } from "@/lib/bon-livraisons.api";
+import {
+  computeResteALivrer,
+  isQuantiteRecueBLValide,
+  MESSAGE_QUANTITE_BL_TROP_ELEVEE,
+} from "@/lib/bon-livraisons.validation";
 import { graphqlRequest } from "@/lib/graphqlClient";
 import { useAuthStore } from "@/store/useAuthStore";
 import {
@@ -17,9 +22,14 @@ import {
   CommandeOption,
 } from "@/types/bon-livraison";
 import { 
-  X, FileText, Upload, Edit2, AlertCircle, ShoppingCart, Truck, CheckCircle2, Search, ArrowRight
+  X, FileText, Upload, Edit2, AlertCircle, ShoppingCart, Truck, CheckCircle2, Search, ArrowRight, Eye, Download
 } from "lucide-react";
 import { CommandeSearchablePicker } from "@/components/bon-livraisons/CommandeSearchablePicker";
+import { BonLivraisonDocumentModal } from "@/components/bon-livraisons/BonLivraisonDocumentModal";
+import {
+  downloadBlob,
+  fetchBonLivraisonDocument,
+} from "@/lib/bon-livraisons.document";
 import { UniteMesureSearchablePicker } from "@/components/unites-mesure/UniteMesureSearchablePicker";
 import {
   convertQuantityBetweenUnites,
@@ -152,6 +162,7 @@ export default function BonLivraisonsTable({
   commandes,
   entrepots,
   unitesMesure,
+  readOnly = false,
 }: {
   data: TableBonLivraison[];
   pagination: BonLivraisonsPaginatorInfo;
@@ -159,6 +170,8 @@ export default function BonLivraisonsTable({
   commandes: CommandeOption[];
   entrepots: EntrepotOption[];
   unitesMesure: UniteMesure[];
+  /** Agent Finance : consultation sans création ni édition. */
+  readOnly?: boolean;
 }) {
   const token = useAuthStore((state) => state.token);
   const [rows, setRows] = useState<TableBonLivraison[]>(data);
@@ -180,6 +193,7 @@ export default function BonLivraisonsTable({
     feedback,
     confirm,
     showSuccess,
+    showError,
     clearFeedback,
     openConfirm,
     closeConfirm,
@@ -187,8 +201,24 @@ export default function BonLivraisonsTable({
   } = useAppFeedback();
 
   const [currentPage, setCurrentPage] = useState(1);
+  const [documentViewerBl, setDocumentViewerBl] = useState<TableBonLivraison | null>(null);
+  const [documentDownloadLoadingId, setDocumentDownloadLoadingId] = useState<string | null>(null);
 
   useEffect(() => setRows(data), [data]);
+
+  const handleDownloadDocument = async (bl: TableBonLivraison) => {
+    if (!bl.document_bl) return;
+    setDocumentDownloadLoadingId(String(bl.id));
+    try {
+      const result = await fetchBonLivraisonDocument(bl.id, "attachment", token ?? undefined);
+      downloadBlob(result.blob, result.filename);
+      showSuccess("Justificatif téléchargé.");
+    } catch (e: unknown) {
+      showError(e instanceof Error ? e.message : "Téléchargement impossible.");
+    } finally {
+      setDocumentDownloadLoadingId(null);
+    }
+  };
 
   useEffect(() => {
     async function loadUsers() {
@@ -245,6 +275,12 @@ export default function BonLivraisonsTable({
   }, [selectedCommande, editing, commandes]);
   const isCommandeFullyReceived = selectedCommandeForForm?.statut === "RECEPTIONNEE";
 
+  const entrepotNomPourAnnulation = useMemo(() => {
+    if (!editing) return "l'entrepôt";
+    const id = String(editing.entrepot_id ?? form.entrepot_id ?? "");
+    return entrepots.find((e) => String(e.id) === id)?.label ?? "l'entrepôt";
+  }, [editing, form.entrepot_id, entrepots]);
+
   const dejaRecu = useMemo(() => {
     if (!selectedCommandeForForm) return 0;
     return Number(selectedCommandeForForm.quantite_recue_total ?? 0);
@@ -255,7 +291,10 @@ export default function BonLivraisonsTable({
     if (selectedCommandeForForm.reste !== undefined && selectedCommandeForForm.reste !== null) {
       return Number(selectedCommandeForForm.reste);
     }
-    return Number(selectedCommandeForForm.quantite) - Number(selectedCommandeForForm.quantite_recue_total ?? 0);
+    return computeResteALivrer(
+      Number(selectedCommandeForForm.quantite),
+      Number(selectedCommandeForForm.quantite_recue_total ?? 0)
+    );
   }, [selectedCommandeForForm]);
 
   const commandeUnitByNumero = useMemo(() => {
@@ -396,6 +435,28 @@ export default function BonLivraisonsTable({
   }, [currentPage, totalPages]);
 
 
+  async function performEditUpdate(payload: {
+    statut?: "VALIDE" | "ANNULE";
+    quantite_recue: number;
+    date_reception?: string;
+    emballage_id?: string;
+    numero_commande?: string;
+    entrepot_id?: string;
+  }) {
+    if (!editing) return;
+    const res = await updateBonLivraison(editing.id, payload);
+    setRows((prev) =>
+      prev.map((r) =>
+        String(r.id) === String(editing.id) ? normalizeBonLivraison(res.updateBonLivraison) : r
+      )
+    );
+    showSuccess("Bon de livraison modifié.");
+    setIsDrawerOpen(false);
+    setForm(emptyForm);
+    setQuantiteUniteSaisie("");
+    setFile(null);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!editing && !file) { setErrorMessage("Le document BL est obligatoire"); return; }
@@ -406,25 +467,58 @@ export default function BonLivraisonsTable({
         setErrorMessage("Indiquez une quantité reçue valide et une unité compatible avec l'emballage.");
         return;
       }
-      if (qPrincipal > maxAllowed) {
+      const dejaRecuForm = Number(selectedCommandeForForm?.quantite_recue_total ?? 0);
+      const qteCmd = Number(selectedCommandeForForm?.quantite ?? 0);
+      if (
+        !isQuantiteRecueBLValide(qPrincipal, qteCmd, dejaRecuForm)
+      ) {
         setErrorMessage(
-          `La quantité convertie (${formatQuantitePrincipale(qPrincipal)} ${principalUnitCode}) dépasse le reste à livrer (${formatQuantitePrincipale(maxAllowed)} ${principalUnitCode}).`
+          qPrincipal > maxAllowed
+            ? `La quantité convertie (${formatQuantitePrincipale(qPrincipal)} ${principalUnitCode}) dépasse le reste à livrer (${formatQuantitePrincipale(maxAllowed)} ${principalUnitCode}).`
+            : MESSAGE_QUANTITE_BL_TROP_ELEVEE
         );
         return;
       }
     }
 
+    const qSave =
+      quantiteEnPrincipal != null && Number.isFinite(quantiteEnPrincipal)
+        ? quantiteEnPrincipal
+        : Number(String(form.quantite_recue).replace(",", "."));
+    const payload = { ...form, quantite_recue: qSave };
+
+    const isCancelling =
+      Boolean(editing) && form.statut === "ANNULE" && editing?.statut !== "ANNULE";
+
+    if (isCancelling) {
+      clearFeedback();
+      const q = Number(editing?.quantite_recue ?? qSave);
+      openConfirm({
+        title: "Annuler ce bon de livraison ?",
+        detail: editing?.numero_bl,
+        description: `Cette annulation retirera ${formatQuantitePrincipale(q)} du stock de l'entrepôt ${entrepotNomPourAnnulation}.`,
+        variant: "danger",
+        confirmLabel: "Confirmer l'annulation",
+        onConfirm: () =>
+          void runConfirmedAction(async () => {
+            setSubmitLoading(true);
+            try {
+              await performEditUpdate(payload);
+            } catch (err: unknown) {
+              setErrorMessage(getFriendlyErrorMessage(err));
+              throw err;
+            } finally {
+              setSubmitLoading(false);
+            }
+          }, { closeOnSuccess: true }),
+      });
+      return;
+    }
+
     setSubmitLoading(true);
     try {
-      const qSave =
-        quantiteEnPrincipal != null && Number.isFinite(quantiteEnPrincipal)
-          ? quantiteEnPrincipal
-          : Number(String(form.quantite_recue).replace(",", "."));
-      const payload = { ...form, quantite_recue: qSave };
       if (editing) {
-        const res = await updateBonLivraison(editing.id, payload);
-        setRows(prev => prev.map(r => String(r.id) === String(editing.id) ? normalizeBonLivraison(res.updateBonLivraison) : r));
-        showSuccess("Bon de livraison modifié.");
+        await performEditUpdate(payload);
       } else {
         const createPayload = {
           date_reception: payload.date_reception,
@@ -434,14 +528,14 @@ export default function BonLivraisonsTable({
           entrepot_id: payload.entrepot_id,
         };
         const created = await createBonLivraisonWithFile(createPayload as any, file!);
-        setRows(prev => [normalizeBonLivraison(created), ...prev]);
+        setRows((prev) => [normalizeBonLivraison(created), ...prev]);
         showSuccess("Bon de livraison créé.");
+        setIsDrawerOpen(false);
+        setForm(emptyForm);
+        setQuantiteUniteSaisie("");
+        setFile(null);
       }
-      setIsDrawerOpen(false);
-      setForm(emptyForm);
-      setQuantiteUniteSaisie("");
-      setFile(null);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setErrorMessage(getFriendlyErrorMessage(err));
     } finally {
       setSubmitLoading(false);
@@ -472,11 +566,18 @@ export default function BonLivraisonsTable({
     {/* HEADER SECTION */}
     <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
       <div>
-        <h1 className="text-3xl font-black text-gray-900 tracking-tight">
+        <h1 className="text-3xl font-black text-gray-900 tracking-tight flex items-center gap-3 flex-wrap">
           Flux Réceptions
+          {readOnly ? (
+            <span className="text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+              Lecture seule
+            </span>
+          ) : null}
         </h1>
         <p className="text-sm text-gray-500 font-medium italic mt-1">
-          Gestion des bons de livraison et entrées en stock
+          {readOnly
+            ? "Consultation des bons de livraison (lecture seule)"
+            : "Gestion des bons de livraison et entrées en stock"}
         </p>
       </div>
 
@@ -491,17 +592,19 @@ export default function BonLivraisonsTable({
             className="w-full rounded-2xl border border-gray-200 bg-white pl-10 pr-4 py-3 text-sm outline-none focus:ring-4 focus:ring-indigo-600/5 focus:border-indigo-600 md:w-80 transition-all shadow-sm"
           />
         </div>
-        <button
-          onClick={() => {
-            setEditing(null);
-            setForm(emptyForm);
-            setQuantiteUniteSaisie("");
-            setIsDrawerOpen(true);
-          }}
-          className="bg-white text-gray-900 border-2 border-gray-900 px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all shadow-[8px_8px_0px_rgba(0,160,157,0.2)]"
-        >
-          NOUVEAU
-        </button>
+        {!readOnly ? (
+          <button
+            onClick={() => {
+              setEditing(null);
+              setForm(emptyForm);
+              setQuantiteUniteSaisie("");
+              setIsDrawerOpen(true);
+            }}
+            className="bg-white text-gray-900 border-2 border-gray-900 px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all shadow-[8px_8px_0px_rgba(0,160,157,0.2)]"
+          >
+            NOUVEAU
+          </button>
+        ) : null}
       </div>
     </div>   
 
@@ -588,7 +691,10 @@ export default function BonLivraisonsTable({
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400">Référence BL</th>
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400 text-center">Commande</th>
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400 text-center">Quantité Reçue</th>
-              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400 text-right">Actions</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400 text-center">Justificatif</th>
+              {!readOnly ? (
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400 text-right">Actions</th>
+              ) : null}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
@@ -633,29 +739,62 @@ export default function BonLivraisonsTable({
                   </div>
                 </td>
                 <td className="px-6 py-5">
-                  <div className="flex justify-end gap-1">
-                    <button onClick={() => {
-                        setEditing(bl);
-                        const cmd = commandes.find((c) => c.numero_commande === bl.numero_commande);
-                        const emb = cmd
-                          ? emballages.find((e) => String(e.id) === String(cmd.emballage_id))
-                          : null;
-                        setQuantiteUniteSaisie(resolvePrincipalUnitCode(emb?.capacity_unit ?? null, unitesMesure));
-                        setForm({
+                  {bl.document_bl ? (
+                    <div className="flex items-center justify-center gap-1">
+                      <button
+                        type="button"
+                        title="Visualiser le justificatif"
+                        onClick={() => setDocumentViewerBl(bl)}
+                        className="p-2.5 text-gray-400 transition-all rounded-xl hover:bg-white hover:text-indigo-600"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        title="Télécharger le justificatif"
+                        disabled={documentDownloadLoadingId === String(bl.id)}
+                        onClick={() => handleDownloadDocument(bl)}
+                        className="p-2.5 text-gray-400 transition-all rounded-xl hover:bg-white hover:text-amber-600 disabled:opacity-40"
+                      >
+                        <Download className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="block text-center text-[10px] font-bold uppercase tracking-widest text-gray-300">
+                      —
+                    </span>
+                  )}
+                </td>
+                {!readOnly ? (
+                  <td className="px-6 py-5">
+                    <div className="flex justify-end gap-1">
+                      <button
+                        onClick={() => {
+                          setEditing(bl);
+                          const cmd = commandes.find((c) => c.numero_commande === bl.numero_commande);
+                          const emb = cmd
+                            ? emballages.find((e) => String(e.id) === String(cmd.emballage_id))
+                            : null;
+                          setQuantiteUniteSaisie(
+                            resolvePrincipalUnitCode(emb?.capacity_unit ?? null, unitesMesure)
+                          );
+                          setForm({
                             date_reception: bl.date_reception?.split("T")[0] || "",
                             emballage_id: String(bl.emballage_id),
                             quantite_recue: String(bl.quantite_recue),
                             numero_commande: bl.numero_commande,
                             entrepot_id: String(bl.entrepot_id),
                             statut: bl.statut || "VALIDE",
-                        });
-                        setIsDrawerOpen(true);
-                      }} className="p-2.5 text-gray-400 hover:text-indigo-600 hover:bg-white rounded-xl transition-all">
-                      <Edit2 className="h-4 w-4" />
-                    </button>
-                    
-                  </div>
-                </td>
+                          });
+                          setIsDrawerOpen(true);
+                        }}
+                        className="p-2.5 text-gray-400 hover:text-indigo-600 hover:bg-white rounded-xl transition-all"
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </td>
+                ) : null}
               </tr>
             ))}
           </tbody>
@@ -672,8 +811,15 @@ export default function BonLivraisonsTable({
   </div>
 )}
 
+      <BonLivraisonDocumentModal
+        open={Boolean(documentViewerBl)}
+        onClose={() => setDocumentViewerBl(null)}
+        bonLivraisonId={documentViewerBl?.id ?? null}
+        numeroBl={documentViewerBl?.numero_bl}
+      />
+
       {/* DRAWER DESIGN */}
-      {isDrawerOpen && (
+      {!readOnly && isDrawerOpen && (
         <>
           <div className="fixed inset-0 z-[100] bg-gray-900/30 backdrop-blur-[2px] transition-all" onClick={() => setIsDrawerOpen(false)} />
           <div className="fixed inset-y-0 right-0 z-[101] w-full max-w-md bg-white shadow-[-20px_0_50px_rgba(0,0,0,0.05)] animate-in slide-in-from-right duration-500 rounded-l-[2.5rem] border-l border-gray-100 flex flex-col">
@@ -818,6 +964,11 @@ export default function BonLivraisonsTable({
                   {isCancelledBL && (
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                       Ce BL est annulé: revalidation impossible.
+                    </p>
+                  )}
+                  {isEditMode && form.statut === "ANNULE" && editing?.statut !== "ANNULE" && (
+                    <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">
+                      Cette annulation retirera {formatQuantitePrincipale(Number(editing?.quantite_recue ?? 0))} du stock de l&apos;entrepôt {entrepotNomPourAnnulation}.
                     </p>
                   )}
                 </div>

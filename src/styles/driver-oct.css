@@ -1,0 +1,56 @@
+/** Thème OCT pour la visite guidée (driver.js) */
+.oct-driver-popover {
+  border-radius: 1.25rem !important;
+  border: 1px solid rgb(229 231 235) !important;
+  box-shadow: 0 25px 50px -12px rgba(28, 36, 52, 0.25) !important;
+  max-width: 22rem !important;
+}
+
+.oct-driver-popover .driver-popover-title {
+  font-size: 1rem !important;
+  font-weight: 900 !important;
+  color: #1c2434 !important;
+  letter-spacing: -0.02em !important;
+}
+
+.oct-driver-popover .driver-popover-description {
+  font-size: 0.8125rem !important;
+  line-height: 1.55 !important;
+  color: #6b7280 !important;
+}
+
+.oct-driver-popover .driver-popover-progress-text {
+  font-size: 0.625rem !important;
+  font-weight: 800 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.15em !important;
+  color: #00a09d !important;
+}
+
+.oct-driver-popover .driver-popover-next-btn,
+.oct-driver-popover .driver-popover-done-btn {
+  background: #00a09d !important;
+  border: none !important;
+  border-radius: 9999px !important;
+  font-size: 0.625rem !important;
+  font-weight: 800 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.12em !important;
+  padding: 0.5rem 1.25rem !important;
+  color: #fff !important;
+  text-shadow: none !important;
+}
+
+.oct-driver-popover .driver-popover-prev-btn {
+  border-radius: 9999px !important;
+  font-size: 0.625rem !important;
+  font-weight: 800 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.12em !important;
+}
+
+.oct-driver-popover .driver-popover-next-btn:disabled,
+.oct-driver-popover .driver-popover-prev-btn:disabled {
+  opacity: 0.65 !important;
+  cursor: wait !important;
+}

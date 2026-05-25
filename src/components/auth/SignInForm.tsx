@@ -10,7 +10,8 @@ import Checkbox from "@/components/form/input/Checkbox";
 import { login } from "@/lib/auth.api";
 import { isValidEmailFormat } from "@/lib/email-validation"; 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useAuthStore } from "@/store/useAuthStore"; // Import du store
+import { useAuthStore } from "@/store/useAuthStore";
+import { setOnboardingPending } from "@/lib/onboardingStorage";
 
 export default function SignInForm() {
   const [email, setEmail] = useState("");
@@ -45,8 +46,11 @@ export default function SignInForm() {
       
   
       setAuth(data.user, data.token);
-      
-      router.push("/"); 
+      if (data.isFirstLogin) {
+        setOnboardingPending(data.user.id);
+      }
+
+      router.push("/bi"); 
     } catch (err: any) {
       setErrors({ general: err.message || "Identifiants incorrects" });
     } finally {

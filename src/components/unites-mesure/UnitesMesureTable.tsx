@@ -5,10 +5,13 @@ import { Ruler } from "lucide-react";
 import type { UniteMesure } from "@/types/unite-mesure";
 import { deleteUniteMesure } from "@/lib/unites-mesure.api";
 import { AppConfirmModal, AppFeedbackBanner } from "@/components/ui/feedback";
+import { TablePagination } from "@/components/ui/TablePagination";
 import { getActionErrorMessage, useAppFeedback } from "@/hooks/useAppFeedback";
 import { UnitesMesureHeader } from "./UnitesMesureHeader";
 import { UnitesMesureListView } from "./UnitesMesureListView";
 import UnitesMesureFormModal from "./UnitesMesureFormModal";
+
+const PAGE_SIZE = 10;
 
 interface Props {
   data: UniteMesure[];
@@ -20,6 +23,7 @@ export default function UnitesMesureTable({ data, onRefresh }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [editing, setEditing] = useState<UniteMesure | null>(null);
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
   const {
     feedback,
     confirm,
@@ -35,6 +39,10 @@ export default function UnitesMesureTable({ data, onRefresh }: Props) {
     setRows(data);
   }, [data]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [query]);
+
   const filteredRows = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return rows;
@@ -45,6 +53,12 @@ export default function UnitesMesureTable({ data, onRefresh }: Props) {
         r.dimension.toLowerCase().includes(q)
     );
   }, [rows, query]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
+  const paginatedRows = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filteredRows.slice(start, start + PAGE_SIZE);
+  }, [filteredRows, page]);
 
   const requestDelete = (id: string | number) => {
     const item = rows.find((r) => String(r.id) === String(id));
@@ -83,7 +97,7 @@ export default function UnitesMesureTable({ data, onRefresh }: Props) {
         {filteredRows.length > 0 ? (
           <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
             <UnitesMesureListView
-              rows={filteredRows}
+              rows={paginatedRows}
               onEdit={(item) => {
                 setEditing(item);
                 setIsOpen(true);
@@ -103,6 +117,16 @@ export default function UnitesMesureTable({ data, onRefresh }: Props) {
           </div>
         )}
       </div>
+
+      {filteredRows.length > 0 && totalPages > 1 && (
+        <div className="mt-4 flex justify-center rounded-[2rem] border border-gray-50 bg-white py-6 shadow-sm">
+          <TablePagination
+            currentPage={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+          />
+        </div>
+      )}
 
       <AppConfirmModal confirm={confirm} onClose={closeConfirm} />
 

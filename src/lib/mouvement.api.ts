@@ -109,6 +109,7 @@ export async function fetchEntrepots(): Promise<EntrepotRef[]> {
     query {
       entrepots {
         id
+        nom
         adresse
       }
     }

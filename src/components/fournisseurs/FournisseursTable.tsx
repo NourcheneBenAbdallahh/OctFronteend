@@ -12,6 +12,9 @@ import { FournisseurForm } from "./FournisseurForm";
 import { TableFournisseur, normalizeFournisseur } from "@/types/fournisseur";
 import { AppConfirmModal, AppFeedbackBanner } from "@/components/ui/feedback";
 import { getActionErrorMessage, useAppFeedback } from "@/hooks/useAppFeedback";
+import { tourPageAttrs } from "@/lib/tourPageAttrs";
+
+const tour = tourPageAttrs("/fournisseurs");
 
 const ITEMS_PER_PAGE = 10;
 
@@ -207,7 +210,7 @@ export default function FournisseursTable({
 
       <AppFeedbackBanner feedback={feedback} onDismiss={clearFeedback} />
 
-      <div className="flex-1">
+      <div className="flex-1" {...tour.table}>
         <FournisseurListView
           rows={paginatedRows}
           onEdit={(f) => {

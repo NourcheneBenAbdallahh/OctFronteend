@@ -54,25 +54,29 @@ export function friendlyGraphqlMessage(raw: string): string {
     return "Votre session a expiré. Reconnectez-vous.";
   }
   if (
-    /aucun mouvement de stock validé|mouvements de stock validé|mouvements validés/i.test(
+    /aucune sortie|sorties enregistrées|mouvements validés|historique trop court/i.test(
       m
     )
   ) {
     return m;
   }
   if (/historique insuffisant|pas assez de données/i.test(m)) {
-    return m.length > 200
-      ? "Historique de mouvements insuffisant. Créez et validez des mouvements dans « Mouvements de stock »."
+    return m.length > 220
+      ? "Pas assez de jours avec des sorties validées. Enregistrez des sorties dans « Mouvements de stock »."
       : m;
   }
   if (/analyse prédictive|service d'analyse/i.test(m)) {
     return m;
   }
-  if (/internal server error|500/i.test(m)) {
+  if (/internal server error|500|502|503|504/i.test(m)) {
     return "Le service est momentanément indisponible. Réessayez plus tard.";
   }
-  if (/network|failed to fetch|load failed/i.test(m)) {
-    return "Connexion impossible. Vérifiez votre réseau.";
+  if (
+    /network|failed to fetch|load failed|connection refused|econnrefused|enotfound|erreur réseau/i.test(
+      m
+    )
+  ) {
+    return "Connexion impossible au serveur. Vérifiez que le backend tourne (port 8000) et réessayez.";
   }
   if (/capacity_unit|selected capacity unit/i.test(m)) {
     return "L’unité de capacité choisie n’est pas valide. Sélectionnez une unité dans la liste.";
@@ -133,7 +137,14 @@ function clearClientSessionAndRedirect(): void {
 
   document.cookie = `${AUTH_ACCESS_TOKEN_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`;
 
-  if (!window.location.pathname.startsWith("/signin")) {
+  const path = window.location.pathname;
+  const isPublicAuthPage =
+    path.startsWith("/signin") ||
+    path.startsWith("/signup") ||
+    path.startsWith("/reset-password") ||
+    path.startsWith("/verify-email");
+
+  if (!isPublicAuthPage) {
     window.location.replace("/signin");
   }
 }
@@ -153,9 +164,22 @@ export function readPersistedAuthToken(): string | undefined {
 }
 
 const DEFAULT_GRAPHQL_ENDPOINT = "http://localhost:8000/graphql";
+const DEFAULT_GRAPHQL_PORT = "8000";
+
+/**
+ * Navigateur : API sur le même hôte que la page (port 8000).
+ * Évite d’appeler une IP LAN figée au build quand on ouvre http://localhost:3000.
+ */
+function browserGraphqlEndpointFromLocation(): string {
+  const { hostname, protocol } = window.location;
+  const port =
+    process.env.NEXT_PUBLIC_GRAPHQL_PORT?.trim() || DEFAULT_GRAPHQL_PORT;
+  return `${protocol}//${hostname}:${port}/graphql`;
+}
 
 function publicGraphqlEndpoint(): string {
   return (
+    browserGraphqlEndpointFromLocation() ||
     process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT ||
     process.env.NEXT_PUBLIC_GRAPHQL_URL ||
     DEFAULT_GRAPHQL_ENDPOINT
@@ -168,13 +192,10 @@ function publicGraphqlEndpoint(): string {
  * - Navigateur : NEXT_PUBLIC_GRAPHQL_ENDPOINT → ex. localhost
  */
 export function getGraphqlEndpoint(): string {
-  if (typeof window === "undefined") {
-    return (
-      process.env.GRAPHQL_ENDPOINT ||
-      publicGraphqlEndpoint()
-    );
+  if (typeof window !== "undefined") {
+    return browserGraphqlEndpointFromLocation();
   }
-  return publicGraphqlEndpoint();
+  return process.env.GRAPHQL_ENDPOINT || publicGraphqlEndpoint();
 }
 
 function resolveBearer(options?: GraphqlRequestOptions): string | undefined {
@@ -191,22 +212,32 @@ export async function graphqlRequest<T>(
   const endpoint = getGraphqlEndpoint();
   const bearer = resolveBearer(options);
 
-  const res = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
-    },
-    body: JSON.stringify({ query, variables }),
-    cache: "no-store",
-  });
+  let res: Response;
+  try {
+    res = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
+      },
+      body: JSON.stringify({ query, variables }),
+      cache: "no-store",
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(friendlyGraphqlMessage(msg));
+  }
 
   let json: { data?: T; errors?: GraphQLErrorItem[]; message?: string };
   try {
     json = await res.json();
   } catch {
-    throw new Error(`Réponse GraphQL invalide (HTTP ${res.status}).`);
+    throw new Error(
+      friendlyGraphqlMessage(
+        res.status >= 500 ? `HTTP ${res.status}` : `Réponse GraphQL invalide (HTTP ${res.status}).`
+      )
+    );
   }
 
   if (!res.ok) {
@@ -257,21 +288,31 @@ export async function graphqlMultipartRequest<T>(
     idx++;
   }
 
-  const res = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
-    },
-    body: formData,
-    cache: "no-store",
-  });
+  let res: Response;
+  try {
+    res = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
+      },
+      body: formData,
+      cache: "no-store",
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(friendlyGraphqlMessage(msg));
+  }
 
   let json: { data?: T; errors?: GraphQLErrorItem[]; message?: string };
   try {
     json = await res.json();
   } catch {
-    throw new Error(`Reponse GraphQL invalide (HTTP ${res.status}).`);
+    throw new Error(
+      friendlyGraphqlMessage(
+        res.status >= 500 ? `HTTP ${res.status}` : `Reponse GraphQL invalide (HTTP ${res.status}).`
+      )
+    );
   }
 
   if (!res.ok) {

@@ -78,6 +78,7 @@ export type EmballageRef = {
 export function sanitizeUpdateEmballageInput(input: Partial<Emballages>) {
   const sanitized: Record<string, unknown> = {};
   if (input.name !== undefined) sanitized.name = input.name;
+  if (input.type !== undefined) sanitized.type = input.type;
   if (input.description !== undefined) sanitized.description = input.description || null;
   if (input.capacity_value !== undefined) sanitized.capacity_value = input.capacity_value ?? null;
   if (input.capacity_unit !== undefined) sanitized.capacity_unit = input.capacity_unit || null;

@@ -10,6 +10,22 @@ import {
   updateCommande,
 } from "@/lib/commandes.api";
 import {
+  computeCommandeStatusCounts,
+  computeFluxTotalQuantite,
+  computeJoursRestants,
+  computeReliquatTotal,
+  computeTauxReceptionPct,
+  countCommandesEnRetard,
+  filterCommandesByQuery,
+  formatDelaiEcheanceLabel,
+  isCommandeEnRetardTimeline,
+} from "@/lib/commandes.helpers";
+import {
+  formatDateInputLocal,
+  isDateLivraisonPrevueValide,
+  MESSAGE_DATE_LIVRAISON_PASSEE,
+} from "@/lib/commandes.validation";
+import {
   CommandeStatut,
   CommandesPaginatorInfo,
   ContratForCommande,
@@ -100,20 +116,16 @@ const OrderTimelineDetail = ({
   emballageLabel?: string;
   emballageQuantiteUnite?: string;
 }) => {
-  const dateCrea = new Date(item.date_commande || new Date());
-  const datePrevue = new Date(item.date_livraison_prevue);
-  const aujourdhui = new Date();
+  const joursRestants = computeJoursRestants(item.date_livraison_prevue);
 
-  // Calcul des jours
-  const joursRestants = Math.ceil((datePrevue.getTime() - aujourdhui.getTime()) / (1000 * 60 * 60 * 24));
-  
   // Utilisation de tes champs : quantite_recue_total et reste
   const qteTotale = Number(item.quantite || 0);
   const qteRecue = Number((item as any).quantite_recue_total || 0); 
   const resteARecevoir = Number((item as any).reste || 0);
   
   const ratio = qteTotale > 0 ? Math.min((qteRecue / qteTotale) * 100, 100) : 0;
-  const estEnRetard = joursRestants < 0 && item.statut !== "RECEPTIONNEE";
+  const estEnRetard = isCommandeEnRetardTimeline(joursRestants, item.statut);
+  const labelEcheance = formatDelaiEcheanceLabel(joursRestants, item.statut);
 
   return (
     <div className="bg-gray-50/80 p-8 border-t border-gray-100 animate-in slide-in-from-top duration-300">
@@ -131,7 +143,7 @@ const OrderTimelineDetail = ({
             <div>
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Échéance</p>
               <p className={`text-lg font-black ${estEnRetard ? 'text-red-600' : 'text-gray-900'}`}>
-                {joursRestants > 0 ? `${joursRestants} Jours restants` : estEnRetard ? `${Math.abs(joursRestants)} J. de retard` : "Échéance atteinte"}
+                {labelEcheance}
               </p>
             </div>
           </div>
@@ -227,6 +239,7 @@ export default function CommandesTable({
   const [errorMessage, setErrorMessage] = useState("");
   /** Wizard : 1 = emballage + fournisseur + entrepôt, 2 = date + quantité + contrat, 3 = récapitulatif. */
   const [drawerStep, setDrawerStep] = useState<1 | 2 | 3>(1);
+  const minDateLivraison = useMemo(() => formatDateInputLocal(new Date()), []);
   /** Unité dans laquelle l'utilisateur saisit la quantité (convertie vers l'unité emballage à l'enregistrement). */
   const [quantiteUniteSaisie, setQuantiteUniteSaisie] = useState("");
   const {
@@ -465,6 +478,10 @@ const goToPage = (page: number) => {
         setErrorMessage("Indiquez la date de livraison prévue.");
         return;
       }
+      if (!isDateLivraisonPrevueValide(form.date_livraison_prevue)) {
+        setErrorMessage(MESSAGE_DATE_LIVRAISON_PASSEE);
+        return;
+      }
       if (contractStats?.depasse) {
         setErrorMessage("Quantité supérieure au reste du contrat !");
         return;
@@ -538,6 +555,10 @@ const goToPage = (page: number) => {
       setErrorMessage("Indiquez la date de livraison prévue.");
       return;
     }
+    if (!isDateLivraisonPrevueValide(form.date_livraison_prevue)) {
+      setErrorMessage(MESSAGE_DATE_LIVRAISON_PASSEE);
+      return;
+    }
     if (contractStats?.depasse) { setErrorMessage("Quantité supérieure au reste du contrat !"); return; }
     if (quantiteEnPrincipal == null || !Number.isFinite(quantiteEnPrincipal) || quantiteEnPrincipal < 0) {
       setErrorMessage(
@@ -573,44 +594,12 @@ const goToPage = (page: number) => {
     } finally { setSubmitLoading(false); }
   }
 
-// 1. Calculer le nombre d'éléments par statut pour les badges
-const statusCounts = useMemo(() => {
-  const counts: Record<string, number> = {
-    EN_ATTENTE: 0,
-    VALIDEE: 0,
-    PARTIELLEMENT_RECEPTIONNEE: 0,
-    RECEPTIONNEE: 0,
-    ANNULEE: 0,
-  };
-  
-  rows.forEach((item) => {
-    if (counts[item.statut] !== undefined) {
-      counts[item.statut]++;
-    }
-  });
-  
-  return counts;
-}, [rows]);
+const statusCounts = useMemo(() => computeCommandeStatusCounts(rows), [rows]);
 
-// 2. Mettre à jour la logique de filtrage pour qu'elle comprenne les statuts
-const filteredRows = useMemo(() => {
-  const q = query.trim().toUpperCase();
-  if (!q) return rows;
-
-  // Liste des statuts possibles
-  const statusList = ['EN_ATTENTE', 'VALIDEE', 'PARTIELLEMENT_RECEPTIONNEE', 'RECEPTIONNEE', 'ANNULEE'];
-
-  if (statusList.includes(q)) {
-    // Si on a cliqué sur un bouton de statut
-    return rows.filter(r => r.statut === q);
-  }
-
-  // Sinon, recherche textuelle (Numéro ou Fournisseur)
-  return rows.filter(r => 
-    r.numero_commande?.toLowerCase().includes(query.toLowerCase()) || 
-    fournisseursMap.get(String(r.fournisseur_id))?.toLowerCase().includes(query.toLowerCase())
-  );
-}, [rows, query, fournisseursMap]);
+const filteredRows = useMemo(
+  () => filterCommandesByQuery(rows, query, fournisseursMap),
+  [rows, query, fournisseursMap]
+);
   return (
     <div className="min-h-screen bg-gray-50/50 p-4 lg:p-8 font-sans">
       <AppFeedbackBanner feedback={feedback} onDismiss={clearFeedback} />
@@ -645,7 +634,7 @@ const filteredRows = useMemo(() => {
     <div>
       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Flux Total</p>
       <p className="text-xl font-black text-gray-900">
-        {rows.reduce((acc, curr) => acc + Number(curr.quantite || 0), 0)}
+        {computeFluxTotalQuantite(rows)}
       </p>
     </div>
   </div>
@@ -658,7 +647,7 @@ const filteredRows = useMemo(() => {
     <div>
       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Reliquat Total</p>
       <p className="text-xl font-black text-amber-600">
-        {rows.reduce((acc, curr) => acc + Math.max(0, Number(curr.reste || 0)), 0)}
+        {computeReliquatTotal(rows)}
       </p>
     </div>
   </div>
@@ -671,7 +660,7 @@ const filteredRows = useMemo(() => {
     <div>
       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">En Retard</p>
       <p className="text-xl font-black text-red-600">
-        {rows.filter(r => new Date(r.date_livraison_prevue) < new Date() && r.statut !== 'RECEPTIONNEE').length}
+        {countCommandesEnRetard(rows)}
       </p>
     </div>
   </div>
@@ -684,7 +673,7 @@ const filteredRows = useMemo(() => {
     <div>
       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Taux Réception</p>
       <p className="text-xl font-black text-green-600">
-        {Math.round((rows.filter(r => r.statut === 'RECEPTIONNEE').length / rows.length) * 100 || 0)}%
+        {computeTauxReceptionPct(rows)}%
       </p>
     </div>
   </div>
@@ -1071,6 +1060,7 @@ const filteredRows = useMemo(() => {
                             <input
                               type="date"
                               value={form.date_livraison_prevue}
+                              min={minDateLivraison}
                               onChange={(e) =>
                                 setForm({ ...form, date_livraison_prevue: e.target.value })
                               }

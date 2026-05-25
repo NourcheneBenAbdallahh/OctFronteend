@@ -1,4 +1,5 @@
 import React, { ReactNode } from "react";
+import { ResponsiveTableWrap } from "@/components/ui/ResponsiveTableWrap";
 
 // Props for Table
 interface TableProps {
@@ -61,4 +62,4 @@ const TableCell: React.FC<TableCellProps> = ({
   return <CellTag className={` ${className}`}>{children}</CellTag>;
 };
 
-export { Table, TableHeader, TableBody, TableRow, TableCell };
+export { Table, TableHeader, TableBody, TableRow, TableCell, ResponsiveTableWrap };

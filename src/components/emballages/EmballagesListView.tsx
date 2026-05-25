@@ -1,6 +1,7 @@
 import React from "react";
 import { Edit3, Trash2, Maximize2, Weight, Layers } from "lucide-react";
 import { TableEmballages } from "@/types/emballage";
+import { ResponsiveTableWrap } from "@/components/ui/ResponsiveTableWrap";
 
 interface EmballagesListViewProps {
   rows: TableEmballages[];
@@ -18,7 +19,7 @@ export const EmballagesListView = ({
   onOpenDetail,
 }: EmballagesListViewProps) => (
   <div className="overflow-hidden rounded-[2.5rem] border border-gray-100 bg-white shadow-sm">
-    <div className="overflow-x-auto">
+    <ResponsiveTableWrap>
       <table className="w-full min-w-[720px] text-left border-collapse">
       <thead>
         <tr className="border-b border-gray-50 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
@@ -86,7 +87,7 @@ export const EmballagesListView = ({
         ))}
       </tbody>
     </table>
-    </div>
+    </ResponsiveTableWrap>
   </div>
 );
 

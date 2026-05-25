@@ -1,5 +1,8 @@
 import React from "react";
 import { Search, Filter, Box, ChevronRight, LayoutGrid, List } from "lucide-react";
+import { tourPageAttrs } from "@/lib/tourPageAttrs";
+
+const tour = tourPageAttrs("/emballages");
 
 interface Props {
   query: string;
@@ -48,6 +51,7 @@ export const EmballagesHeader = ({
       <div className="flex min-h-[52px] flex-1 items-center rounded-2xl border border-gray-100 bg-white px-4 py-3 shadow-sm ring-indigo-500/10 transition-all focus-within:ring-2">
         <Search size={18} className="mr-3 shrink-0 text-gray-300" />
         <input
+          {...tour.search}
           className="min-w-0 flex-1 outline-none text-sm font-medium placeholder:text-gray-300"
           placeholder="Rechercher par code ou nom..."
           value={query}
@@ -88,6 +92,7 @@ export const EmballagesHeader = ({
         {canManage ? (
           <button
             type="button"
+            {...tour.actions}
             onClick={onOpenNew}
             className="rounded-2xl border-2 border-gray-900 bg-white px-8 py-4 text-[10px] font-black uppercase tracking-widest text-gray-900 shadow-[8px_8px_0px_rgba(0,160,157,0.2)] transition-all hover:bg-gray-900 hover:text-white"
           >

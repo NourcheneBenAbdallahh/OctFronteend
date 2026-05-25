@@ -91,7 +91,7 @@ export default function StockChatbot({ variant = "widget" }: StockChatbotProps) 
 
       const answer =
         json.data?.askStockBot?.answer?.trim() ||
-        "Aucune réponse du serveur. Vérifiez la mutation askStockBot côté API.";
+        "Je n’ai pas reçu de réponse. Réessayez dans un instant ou reformulez votre question.";
 
       setMessages((prev) => [...prev, { role: "bot", text: answer }]);
     } catch (e) {
@@ -100,7 +100,7 @@ export default function StockChatbot({ variant = "widget" }: StockChatbotProps) 
         ...prev,
         {
           role: "bot",
-          text: `Impossible d’obtenir une réponse : ${err}`,
+          text: `Je n’ai pas pu répondre pour le moment. ${err.includes("Connectez-vous") ? err : "Vérifiez votre connexion ou réessayez. Vous pouvez aussi utiliser : « bilan », « stock faible »."}`,
         },
       ]);
     } finally {
@@ -139,7 +139,7 @@ export default function StockChatbot({ variant = "widget" }: StockChatbotProps) 
                 Assistant
               </p>
               <p className="text-sm font-[1000] text-[#1C2434] dark:text-white">
-                IA + données OCT
+                Assistant stock OCT
               </p>
             </div>
             {!token && (
@@ -151,13 +151,21 @@ export default function StockChatbot({ variant = "widget" }: StockChatbotProps) 
 
           <div className={messagesAreaClass}>
             {messages.length === 0 && (
-              <p className="text-xs leading-relaxed text-gray-500 dark:text-gray-400">
-                Conversation avec <strong>l&apos;IA</strong> : questions sur{" "}
-                <strong>vos stocks, commandes, factures</strong> (la réponse s&apos;appuie sur un
-                extrait de votre base) ou <strong>tout autre sujet</strong>. Le fil garde le
-                contexte des derniers échanges. Sans clé API côté serveur, l&apos;assistant repasse
-                en mode règles simplifiées.
-              </p>
+              <div className="space-y-2 text-xs leading-relaxed text-gray-600 dark:text-gray-400">
+                <p>
+                  Posez une question sur vos <strong>stocks</strong>,{" "}
+                  <strong>commandes</strong>, <strong>factures</strong> ou{" "}
+                  <strong>entrepôts</strong>. Réponse basée sur les données enregistrées dans
+                  l&apos;application.
+                </p>
+                <p className="rounded-lg bg-[#F8FAFA] px-3 py-2 text-[11px] dark:bg-gray-800/80">
+                  <span className="font-bold text-[#1C2434] dark:text-gray-200">
+                    Exemples à taper :
+                  </span>{" "}
+                  « bilan », « combien de contrats », « stock faible », « factures impayées », «
+                  état des commandes ». Vous pouvez aussi poser votre question en phrase complète.
+                </p>
+              </div>
             )}
             {messages.map((msg, index) => (
               <div

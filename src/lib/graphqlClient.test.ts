@@ -18,7 +18,7 @@ describe("friendlyGraphqlMessage", () => {
   });
 
   it("traduit erreur réseau", () => {
-    expect(friendlyGraphqlMessage("Failed to fetch")).toContain("réseau");
+    expect(friendlyGraphqlMessage("Failed to fetch")).toContain("backend");
   });
 
   it("traduit doublon", () => {
@@ -50,9 +50,26 @@ describe("getGraphqlEndpoint", () => {
     process.env = { ...orig };
   });
 
-  it("utilise NEXT_PUBLIC_GRAPHQL_ENDPOINT dans le navigateur", () => {
-    process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT = "http://browser.test/graphql";
-    expect(getGraphqlEndpoint()).toBe("http://browser.test/graphql");
+  it("utilise localhost:8000 quand la page est sur localhost", () => {
+    process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT = "http://192.168.100.19:8000/graphql";
+    Object.defineProperty(window, "location", {
+      value: { hostname: "localhost", protocol: "http:", port: "3000" },
+      configurable: true,
+    });
+    expect(getGraphqlEndpoint()).toBe("http://localhost:8000/graphql");
+  });
+
+  it("utilise l'hôte de la page en LAN (autre IP que localhost)", () => {
+    delete process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT;
+    Object.defineProperty(window, "location", {
+      value: {
+        hostname: "192.168.12.101",
+        protocol: "http:",
+        port: "3000",
+      },
+      configurable: true,
+    });
+    expect(getGraphqlEndpoint()).toBe("http://192.168.12.101:8000/graphql");
   });
 });
 

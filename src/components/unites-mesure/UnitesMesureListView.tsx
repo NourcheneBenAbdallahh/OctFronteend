@@ -1,6 +1,7 @@
 import React from "react";
 import { Edit3, Trash2 } from "lucide-react";
 import type { UniteMesure } from "@/types/unite-mesure";
+import { ResponsiveTableWrap } from "@/components/ui/ResponsiveTableWrap";
 
 function dimClass(d: string) {
   const x = d.toLowerCase();
@@ -24,8 +25,9 @@ export const UnitesMesureListView = ({
   onEdit: (row: UniteMesure) => void;
   onDelete: (id: string | number) => void;
 }) => (
-  <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
-    <table className="w-full text-left border-collapse">
+  <div className="overflow-hidden rounded-[2.5rem] border border-gray-100 bg-white shadow-sm">
+    <ResponsiveTableWrap>
+    <table className="w-full min-w-[760px] text-left border-collapse">
       <thead>
         <tr className="border-b border-gray-50 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
           <th className="px-8 py-6">Code</th>
@@ -80,5 +82,6 @@ export const UnitesMesureListView = ({
         ))}
       </tbody>
     </table>
+    </ResponsiveTableWrap>
   </div>
 );

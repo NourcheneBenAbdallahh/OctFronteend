@@ -39,10 +39,7 @@ export function toAccessRole(
 
 export function shouldBypassRouteAccess(pathname: string): boolean {
   const path = pathname.split("?")[0] || "";
-  const bypass = [
-    "/verify-email",
-    "/reset-password",
-  ];
+  const bypass = ["/verify-email"];
   return bypass.some((p) => path === p || path.startsWith(`${p}/`));
 }
 
@@ -134,7 +131,7 @@ export function canAccessPath(
     return r === "LOGISTIQUE";
   }
   if (path.startsWith("/bon-livraisons")) {
-    return r === "LOGISTIQUE";
+    return r === "LOGISTIQUE" || r === "FINANCE";
   }
   if (path.startsWith("/factures")) {
     return r === "FINANCE";
@@ -185,6 +182,30 @@ export function filterCommandesForCalendarUser<
  * CONTRAT traité comme LOGISTIQUE. FINANCE / STOCK n’ont pas accès à la liste commandes.
  */
 export function canQueryCommandesList(role: string | undefined | null): boolean {
+  if (isAdminUser(role)) return true;
+  return toAccessRole(role) === "LOGISTIQUE";
+}
+
+/** Création / modification / annulation commande (GraphQL mutations commandes). */
+export function canManageCommandes(role: string | undefined | null): boolean {
+  return canQueryCommandesList(role);
+}
+
+/**
+ * Liste / détail BL (GraphQL `bonLivraisons`, `bonLivraison`) : LOGISTIQUE + FINANCE (+ ADMIN).
+ */
+export function canQueryBonLivraisonsList(
+  role: string | undefined | null
+): boolean {
+  if (isAdminUser(role)) return true;
+  const r = toAccessRole(role);
+  return r === "LOGISTIQUE" || r === "FINANCE";
+}
+
+/** Création / édition / annulation BL : LOGISTIQUE (+ ADMIN) uniquement. */
+export function canManageBonLivraisons(
+  role: string | undefined | null
+): boolean {
   if (isAdminUser(role)) return true;
   return toAccessRole(role) === "LOGISTIQUE";
 }
