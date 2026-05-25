@@ -14,6 +14,7 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { AppFeedbackBanner } from "@/components/ui/feedback";
 import { useAppFeedback } from "@/hooks/useAppFeedback";
 import { HelpCircle, FileDown } from "lucide-react";
+import { ResponsiveTableWrap } from "@/components/ui/ResponsiveTableWrap";
 
 interface Emballage {
   id: string;
@@ -264,7 +265,8 @@ export default function ForecastingPage() {
                   Fourchette = scénario prudent (bas) et optimiste (haut).
                 </p>
               </div>
-              <table className="w-full text-sm">
+              <ResponsiveTableWrap showScrollHint={data.predictions.length > 0}>
+              <table className="w-full min-w-[640px] text-sm">
                 <thead>
                   <tr className="border-b border-gray-100 text-left text-xs font-bold uppercase text-gray-400">
                     <th className="px-6 py-4">Date</th>
@@ -292,6 +294,7 @@ export default function ForecastingPage() {
                   ))}
                 </tbody>
               </table>
+              </ResponsiveTableWrap>
             </div>
           </div>
         )}

@@ -1,5 +1,6 @@
 import { Edit3, Trash2, Phone, MapPin, Hash, Globe2 ,ShieldCheck} from "lucide-react";
 import { TableFournisseur } from "@/types/fournisseur";
+import { ResponsiveTableWrap } from "@/components/ui/ResponsiveTableWrap";
 
 interface Props {
   rows: TableFournisseur[];
@@ -115,6 +116,7 @@ export const FournisseurListView = ({ rows, onEdit, onDelete }: Props) => (
           ))}
         </tbody>
       </table>
+      </ResponsiveTableWrap>
     </div>
   </div>
 );

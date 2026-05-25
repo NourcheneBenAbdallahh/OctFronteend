@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import PageBreadcrumb from '@/components/common/PageBreadCrumb';
 import { getAlerts, getUnreadAlertsCount, markAlertAsRead, markAllAlertsAsRead, archiveAlert, Alert, AlertSeverity, AlertStatus } from '@/lib/notifications.api';
 import { useAuthStore } from '@/store/useAuthStore';
+import { ResponsiveTableWrap } from '@/components/ui/ResponsiveTableWrap';
 
 const severityColors: Record<AlertSeverity, string> = {
   info: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
@@ -221,8 +222,8 @@ export default function ClientNotifications({}: ClientNotificationsProps) {
             </div>
           ) : (
             <div className='overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-[0_12px_40px_rgba(15,23,42,0.06)] dark:border-gray-800 dark:bg-white/[0.03]'>
-              <div className='overflow-hidden'>
-                <table className='w-full'>
+              <ResponsiveTableWrap showScrollHint={paginatedAlerts.length > 0}>
+                <table className='w-full min-w-[900px]'>
                   <thead className='border-b border-gray-200 bg-gray-50/80 text-xs font-black uppercase tracking-wider text-gray-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-400'>
                     <tr>
                       <th className='px-6 py-4 text-left'>Severite</th>
@@ -277,7 +278,7 @@ export default function ClientNotifications({}: ClientNotificationsProps) {
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </ResponsiveTableWrap>
 
               <div className='flex flex-col gap-3 border-t border-gray-100 px-6 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-gray-800'>
                 <p className='text-xs font-semibold text-gray-500 dark:text-gray-400'>
