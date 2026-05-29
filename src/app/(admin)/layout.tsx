@@ -46,7 +46,7 @@ export default function AdminLayout({
 
   return (
     <AdminRouteGuard>
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 xl:flex">
+      <div className="min-h-screen min-w-0 bg-gray-50 dark:bg-gray-950 xl:flex">
         <AppSidebar />
         <Backdrop />
         <div

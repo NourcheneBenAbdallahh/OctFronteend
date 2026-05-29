@@ -51,6 +51,7 @@ import {
 import type { UniteMesure } from "@/types/unite-mesure";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AppConfirmModal, AppFeedbackBanner } from "@/components/ui/feedback";
+import { ResponsiveTableWrap } from "@/components/ui/ResponsiveTableWrap";
 import { getActionErrorMessage, useAppFeedback } from "@/hooks/useAppFeedback";
 import {
   X,
@@ -711,10 +712,8 @@ const filteredRows = useMemo(
 
       {/* TABLE SECTION */}
       <div className="overflow-hidden rounded-[2.5rem] border border-gray-100 bg-white shadow-2xl shadow-gray-200/40">
-        <div className="overflow-x-auto">
-
-          
-          <table className="w-full text-left border-collapse">
+        <ResponsiveTableWrap>
+          <table className="w-full min-w-[1050px] text-left border-collapse">
             <thead>
               <tr className="border-b border-gray-50 bg-gray-50/30 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
                 <th className="px-8 py-6 w-10"></th>
@@ -814,8 +813,7 @@ const filteredRows = useMemo(
               ))}
             </tbody>
           </table>
-        </div>
-        
+        </ResponsiveTableWrap>
       </div>
 <div className="mt-6 flex justify-center">
   <Pagination

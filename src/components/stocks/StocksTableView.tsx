@@ -2,6 +2,7 @@
 
 import { Eye, Trash2, ArrowDownToLine, ArrowUpFromLine, User2 } from "lucide-react";
 import type { Stock } from "@/types/stock";
+import { ResponsiveTableWrap } from "@/components/ui/ResponsiveTableWrap";
 
 interface Props {
   rows: Stock[];
@@ -14,8 +15,9 @@ export default function StocksTableView({ rows, onView, onDelete, focusedId }: P
   if (!rows.length) return null;
 
   return (
-    <div className="bg-white border border-gray-100 rounded-[32px] overflow-hidden shadow-sm">
-      <table className="w-full text-left border-collapse">
+    <div className="overflow-hidden rounded-[32px] border border-gray-100 bg-white shadow-sm">
+      <ResponsiveTableWrap>
+      <table className="w-full min-w-[960px] text-left border-collapse">
         <thead>
           <tr className="bg-gray-50/50 border-b border-gray-100">
             <th className="px-6 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Sens</th>
@@ -73,6 +75,7 @@ export default function StocksTableView({ rows, onView, onDelete, focusedId }: P
           })}
         </tbody>
       </table>
+      </ResponsiveTableWrap>
     </div>
   );
 }

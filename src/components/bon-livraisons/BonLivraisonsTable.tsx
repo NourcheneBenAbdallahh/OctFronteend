@@ -40,6 +40,7 @@ import {
 } from "@/lib/unite-conversion";
 import type { UniteMesure } from "@/types/unite-mesure";
 import { AppConfirmModal, AppFeedbackBanner } from "@/components/ui/feedback";
+import { ResponsiveTableWrap } from "@/components/ui/ResponsiveTableWrap";
 import { useAppFeedback } from "@/hooks/useAppFeedback";
 const PER_PAGE = 10;
 const LocalPagination = ({
@@ -685,7 +686,9 @@ export default function BonLivraisonsTable({
     </div>
 
       {/* TABLEAU DESIGN */}
-<div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden">        <table className="w-full text-left border-collapse">
+<div className="overflow-hidden rounded-[2.5rem] border border-gray-100 bg-white shadow-sm">
+        <ResponsiveTableWrap>
+        <table className="w-full min-w-[900px] text-left border-collapse">
           <thead>
             <tr className="bg-gray-50/50">
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400">Référence BL</th>
@@ -799,6 +802,7 @@ export default function BonLivraisonsTable({
             ))}
           </tbody>
         </table>
+        </ResponsiveTableWrap>
       </div>
 
 {totalPages > 1 && (

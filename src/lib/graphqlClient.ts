@@ -166,6 +166,19 @@ export function readPersistedAuthToken(): string | undefined {
 const DEFAULT_GRAPHQL_ENDPOINT = "http://localhost:8000/graphql";
 const DEFAULT_GRAPHQL_PORT = "8000";
 
+const LOCAL_PAGE_HOSTS = new Set(["localhost", "127.0.0.1"]);
+
+/** Hôtes tunnel publics (Cloudflare quick tunnel, ngrok, etc.). */
+const PUBLIC_TUNNEL_HOST_PATTERN =
+  /\.(trycloudflare\.com|ngrok-free\.app|ngrok\.io|ngrok\.app)$/i;
+
+function readExplicitPublicGraphqlEndpoint(): string | undefined {
+  const url =
+    process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT?.trim() ||
+    process.env.NEXT_PUBLIC_GRAPHQL_URL?.trim();
+  return url || undefined;
+}
+
 /**
  * Navigateur : API sur le même hôte que la page (port 8000).
  * Évite d’appeler une IP LAN figée au build quand on ouvre http://localhost:3000.
@@ -177,11 +190,49 @@ function browserGraphqlEndpointFromLocation(): string {
   return `${protocol}//${hostname}:${port}/graphql`;
 }
 
+/**
+ * Cloudflare / ngrok : front et API ont des URLs différentes → utiliser NEXT_PUBLIC_*.
+ * localhost / LAN : garder le même hôte que la page (port 8000).
+ */
+export function shouldUseExplicitBrowserGraphqlEndpoint(
+  explicit: string,
+  pageHostname: string
+): boolean {
+  if (LOCAL_PAGE_HOSTS.has(pageHostname)) {
+    return false;
+  }
+  try {
+    const explicitUrl = new URL(explicit);
+    if (explicitUrl.hostname === pageHostname) {
+      return false;
+    }
+    if (explicitUrl.protocol === "https:") {
+      return true;
+    }
+    return PUBLIC_TUNNEL_HOST_PATTERN.test(explicitUrl.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function resolveBrowserGraphqlEndpoint(): string {
+  const explicit = readExplicitPublicGraphqlEndpoint();
+  if (
+    explicit &&
+    shouldUseExplicitBrowserGraphqlEndpoint(
+      explicit,
+      window.location.hostname
+    )
+  ) {
+    return explicit;
+  }
+  return browserGraphqlEndpointFromLocation();
+}
+
 function publicGraphqlEndpoint(): string {
   return (
+    readExplicitPublicGraphqlEndpoint() ||
     browserGraphqlEndpointFromLocation() ||
-    process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT ||
-    process.env.NEXT_PUBLIC_GRAPHQL_URL ||
     DEFAULT_GRAPHQL_ENDPOINT
   );
 }
@@ -189,11 +240,11 @@ function publicGraphqlEndpoint(): string {
 /**
  * URL GraphQL selon le contexte :
  * - Serveur (SSR dans Docker) : GRAPHQL_ENDPOINT → ex. host.docker.internal
- * - Navigateur : NEXT_PUBLIC_GRAPHQL_ENDPOINT → ex. localhost
+ * - Navigateur : même hôte:8000 (LAN) ou NEXT_PUBLIC_* (tunnel HTTPS)
  */
 export function getGraphqlEndpoint(): string {
   if (typeof window !== "undefined") {
-    return browserGraphqlEndpointFromLocation();
+    return resolveBrowserGraphqlEndpoint();
   }
   return process.env.GRAPHQL_ENDPOINT || publicGraphqlEndpoint();
 }

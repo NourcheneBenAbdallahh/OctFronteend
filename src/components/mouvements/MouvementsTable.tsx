@@ -9,6 +9,7 @@ import {
 import { MouvementStock } from "@/types/mouvement";
 import { StatusBadge, TypeBadge } from "./mouvement-ui";
 import { CheckCircle2, History, Loader2, Trash2, User } from "lucide-react";
+import { ResponsiveTableWrap } from "@/components/ui/ResponsiveTableWrap";
 
 const LocalPagination = ({
   currentPage,
@@ -84,8 +85,8 @@ export default function MouvementsTable({
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="min-w-full border-collapse">
+        <ResponsiveTableWrap>
+          <table className="w-full min-w-[1100px] border-collapse">
             <thead>
               <tr className="border-b border-gray-50 bg-gray-50/30 text-left text-[10px] font-black uppercase tracking-[0.2em] text-[#1C2434]/60">
                 <th className="px-8 py-5">Code & Date_Mvt</th>
@@ -221,7 +222,7 @@ export default function MouvementsTable({
               )}
             </tbody>
           </table>
-        </div>
+        </ResponsiveTableWrap>
       </div>
 
       {!loading && totalPages > 1 && (

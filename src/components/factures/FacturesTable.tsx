@@ -17,6 +17,7 @@ import {
 import Pagination from "@/components/tables/Pagination";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AppConfirmModal, AppFeedbackBanner } from "@/components/ui/feedback";
+import { ResponsiveTableWrap } from "@/components/ui/ResponsiveTableWrap";
 import { getActionErrorMessage, useAppFeedback } from "@/hooks/useAppFeedback";
 
 // Helper functions
@@ -596,9 +597,9 @@ const filteredRows = useMemo(() => {
       </div>
 
       {/* TABLE */}
-      <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden backdrop-blur-sm">
-          
-          <table className="w-full">
+      <div className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-xl backdrop-blur-sm">
+          <ResponsiveTableWrap>
+          <table className="w-full min-w-[1100px]">
             <thead className="bg-gray-50/80 border-b border-gray-100">
               <tr>
                 <th className="w-12 px-3 py-4 text-center text-[10px] font-black uppercase text-gray-500 tracking-wider">
@@ -889,7 +890,7 @@ const filteredRows = useMemo(() => {
               ))}
             </tbody>
           </table>
-        </div>
+        </ResponsiveTableWrap>
         
         {/* PAGINATION */}
         <div className="bg-gray-50 px-6 py-6 border-t border-gray-100">
@@ -951,6 +952,7 @@ const filteredRows = useMemo(() => {
             </div>
           </div>
         </div>
+      </div>
 
       {/* DRAWER FORM */}
       {isDrawerOpen && (
