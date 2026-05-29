@@ -55,6 +55,17 @@ describe("canAccessPath", () => {
     expect(canAccessPath("/commandes", "STOCK")).toBe(false);
   });
 
+  it("autorise STOCK et ADMIN sur /stock-inventaire", () => {
+    expect(canAccessPath("/stock-inventaire", "STOCK")).toBe(true);
+    expect(canAccessPath("/stock-inventaire", "ADMIN")).toBe(true);
+  });
+
+  it("refuse FINANCE et LOGISTIQUE sur /stock-inventaire", () => {
+    expect(canAccessPath("/stock-inventaire", "FINANCE")).toBe(false);
+    expect(canAccessPath("/stock-inventaire", "LOGISTIQUE")).toBe(false);
+    expect(canAccessPath("/stock-inventaire", "CONTRAT")).toBe(false);
+  });
+
   it("refuse FINANCE et LOGISTIQUE sur /stock", () => {
     expect(canAccessPath("/stock", "FINANCE")).toBe(false);
     expect(canAccessPath("/stock", "LOGISTIQUE")).toBe(false);

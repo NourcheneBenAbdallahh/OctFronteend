@@ -6,6 +6,7 @@ import {
   friendlyGraphqlMessage,
   getGraphqlEndpoint,
   readPersistedAuthToken,
+  shouldUseExplicitBrowserGraphqlEndpoint,
 } from "./graphqlClient";
 
 describe("friendlyGraphqlMessage", () => {
@@ -70,6 +71,51 @@ describe("getGraphqlEndpoint", () => {
       configurable: true,
     });
     expect(getGraphqlEndpoint()).toBe("http://192.168.12.101:8000/graphql");
+  });
+
+  it("utilise l'URL tunnel HTTPS quand le front est sur trycloudflare.com", () => {
+    process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT =
+      "https://api-tunnel.trycloudflare.com/graphql";
+    Object.defineProperty(window, "location", {
+      value: {
+        hostname: "app-tunnel.trycloudflare.com",
+        protocol: "https:",
+        port: "",
+      },
+      configurable: true,
+    });
+    expect(getGraphqlEndpoint()).toBe(
+      "https://api-tunnel.trycloudflare.com/graphql"
+    );
+  });
+});
+
+describe("shouldUseExplicitBrowserGraphqlEndpoint", () => {
+  it("refuse une IP LAN figée au build quand la page est sur localhost", () => {
+    expect(
+      shouldUseExplicitBrowserGraphqlEndpoint(
+        "http://192.168.100.19:8000/graphql",
+        "localhost"
+      )
+    ).toBe(false);
+  });
+
+  it("accepte un backend tunnel HTTPS distinct du front", () => {
+    expect(
+      shouldUseExplicitBrowserGraphqlEndpoint(
+        "https://api.trycloudflare.com/graphql",
+        "app.trycloudflare.com"
+      )
+    ).toBe(true);
+  });
+
+  it("ignore une IP LAN explicite quand la page est sur une autre IP LAN", () => {
+    expect(
+      shouldUseExplicitBrowserGraphqlEndpoint(
+        "http://192.168.125.1:8000/graphql",
+        "192.168.12.101"
+      )
+    ).toBe(false);
   });
 });
 
