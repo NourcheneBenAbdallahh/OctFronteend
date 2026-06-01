@@ -67,10 +67,7 @@ export function UniteMesureSearchablePicker({
   }, []);
 
   useLayoutEffect(() => {
-    if (!open) {
-      setPop(null);
-      return;
-    }
+    if (!open) return;
     updatePopPos();
   }, [open, updatePopPos, filtered.length, q]);
 

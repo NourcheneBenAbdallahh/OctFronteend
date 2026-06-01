@@ -74,6 +74,7 @@ export default function FournisseursTable({
   const [isOpen, setIsOpen] = useState(false);
   const [editing, setEditing] = useState<TableFournisseur | null>(null);
   const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"" | "ACTIF" | "INACTIF">("");
   const [currentPage, setCurrentPage] = useState(1);
 
   const emptyForm: Partial<TableFournisseur> = {
@@ -195,14 +196,26 @@ export default function FournisseursTable({
 
   const { sortKey, sortDirection, toggleSort, sortRows } = useTableSort(FOURNISSEUR_SORT_COLUMNS);
 
+  const stats = useMemo(() => {
+    const actifs = rows.filter((f) => f.statut === "ACTIF").length;
+    return {
+      total: rows.length,
+      actifs,
+      inactifs: rows.length - actifs,
+    };
+  }, [rows]);
+
   const filteredRows = useMemo(() => {
     const q = query.toLowerCase();
-    return rows.filter(
-      (f) =>
+    return rows.filter((f) => {
+      const matchesSearch =
+        !q ||
         f.raison_sociale?.toLowerCase().includes(q) ||
-        f.matricule_fiscale?.toLowerCase().includes(q)
-    );
-  }, [rows, query]);
+        f.matricule_fiscale?.toLowerCase().includes(q);
+      const matchesStatus = !statusFilter || f.statut === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+  }, [rows, query, statusFilter]);
 
   const sortedRows = useMemo(
     () => sortRows(filteredRows),
@@ -218,13 +231,16 @@ export default function FournisseursTable({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [query, sortKey, sortDirection]);
+  }, [query, statusFilter, sortKey, sortDirection]);
 
   return (
     <div className="flex flex-col gap-6 min-h-[700px]">
       <FournisseurHeader
         query={query}
         setQuery={setQuery}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
+        stats={stats}
         onOpenNew={() => {
           setEditing(null);
           setForm(emptyForm);
@@ -237,6 +253,7 @@ export default function FournisseursTable({
       <div className="flex-1" {...tour.table}>
         <FournisseurListView
           rows={paginatedRows}
+          scrollDisabled={isOpen}
           sortKey={sortKey}
           sortDirection={sortDirection}
           onSort={toggleSort}

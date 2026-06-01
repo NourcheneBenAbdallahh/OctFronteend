@@ -16,14 +16,17 @@ type Props = {
   numeroBl?: string | null;
 };
 
-export function BonLivraisonDocumentModal({
-  open,
+type BodyProps = Omit<Props, "open"> & {
+  token: string | null;
+};
+
+function BonLivraisonDocumentModalBody({
   onClose,
   bonLivraisonId,
   numeroBl,
-}: Props) {
-  const token = useAuthStore((s) => s.token);
-  const [loading, setLoading] = useState(false);
+  token,
+}: BodyProps) {
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [filename, setFilename] = useState("");
@@ -31,24 +34,10 @@ export function BonLivraisonDocumentModal({
   const [blob, setBlob] = useState<Blob | null>(null);
 
   useEffect(() => {
-    if (!open) {
-      setLoading(false);
-      setError("");
-      setFilename("");
-      setKind("pdf");
-      setBlob(null);
-      setPreviewUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
-        return null;
-      });
-      return;
-    }
     if (!bonLivraisonId) return;
 
     let cancelled = false;
     let objectUrl: string | null = null;
-    setLoading(true);
-    setError("");
 
     fetchBonLivraisonDocument(bonLivraisonId, "inline", token ?? undefined)
       .then((result) => {
@@ -71,7 +60,7 @@ export function BonLivraisonDocumentModal({
       cancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [open, bonLivraisonId, token]);
+  }, [bonLivraisonId, token]);
 
   const handleDownload = () => {
     if (blob && filename) {
@@ -88,13 +77,11 @@ export function BonLivraisonDocumentModal({
       .finally(() => setLoading(false));
   };
 
-  if (!open) return null;
-
   const title = numeroBl ? `Justificatif — ${numeroBl}` : "Justificatif BL";
 
   return (
     <Modal
-      isOpen={open}
+      isOpen
       onClose={onClose}
       className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-[2rem] p-0"
       showCloseButton={false}
@@ -174,5 +161,26 @@ export function BonLivraisonDocumentModal({
         ) : null}
       </div>
     </Modal>
+  );
+}
+
+export function BonLivraisonDocumentModal({
+  open,
+  onClose,
+  bonLivraisonId,
+  numeroBl,
+}: Props) {
+  const token = useAuthStore((s) => s.token);
+
+  if (!open) return null;
+
+  return (
+    <BonLivraisonDocumentModalBody
+      key={String(bonLivraisonId ?? "none")}
+      onClose={onClose}
+      bonLivraisonId={bonLivraisonId}
+      numeroBl={numeroBl}
+      token={token}
+    />
   );
 }

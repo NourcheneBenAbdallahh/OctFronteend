@@ -9,6 +9,7 @@ interface Props extends TableSortHeaderProps {
   rows: TableFournisseur[];
   onEdit: (f: TableFournisseur) => void;  
   onDelete: (id: string | number) => void;
+  scrollDisabled?: boolean;
 }
 
 export const FournisseurListView = ({
@@ -18,8 +19,13 @@ export const FournisseurListView = ({
   sortKey,
   sortDirection,
   onSort,
+  scrollDisabled = false,
 }: Props) => (
-  <div className="no-scrollbar min-w-0 flex-1 overflow-auto overscroll-contain">
+  <div
+    className={`no-scrollbar min-w-0 flex-1 overscroll-contain ${
+      scrollDisabled ? "overflow-hidden" : "overflow-auto"
+    }`}
+  >
     <div className="overflow-hidden rounded-[2rem] border border-gray-100 bg-white shadow-sm">
       <ResponsiveTableWrap>
       <table className="w-full min-w-[880px] text-left border-collapse">

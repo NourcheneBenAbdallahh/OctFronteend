@@ -72,10 +72,7 @@ export function CommandeSearchablePicker({
   }, []);
 
   useLayoutEffect(() => {
-    if (!open) {
-      setPopPos(null);
-      return;
-    }
+    if (!open) return;
     updatePopPos();
   }, [open, updatePopPos]);
 

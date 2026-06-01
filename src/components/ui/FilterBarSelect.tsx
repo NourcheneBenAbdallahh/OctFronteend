@@ -66,10 +66,7 @@ export function FilterBarSelect({
   }, []);
 
   useLayoutEffect(() => {
-    if (!open) {
-      setPop(null);
-      return;
-    }
+    if (!open) return;
     updatePopPos();
   }, [open, updatePopPos, options.length]);
 

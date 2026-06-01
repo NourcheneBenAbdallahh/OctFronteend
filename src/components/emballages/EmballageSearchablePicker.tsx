@@ -64,10 +64,7 @@ export function EmballageSearchablePicker({
   }, []);
 
   useLayoutEffect(() => {
-    if (!open) {
-      setPop(null);
-      return;
-    }
+    if (!open) return;
     updatePopPos();
   }, [open, updatePopPos, filtered.length, q]);
 

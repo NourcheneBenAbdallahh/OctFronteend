@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { driver, type Driver } from "driver.js";
 import "driver.js/dist/driver.css";
@@ -139,7 +139,15 @@ export function useAppTour() {
     }
   }, []);
 
-  const showStepAt = useCallback(
+  type ShowStepAtFn = (
+    index: number,
+    direction?: "next" | "prev" | "init",
+    previousDriver?: Driver
+  ) => Promise<void>;
+
+  const showStepAtRef = useRef<ShowStepAtFn | null>(null);
+
+  const showStepAt = useCallback<ShowStepAtFn>(
     async (
       index: number,
       direction: "next" | "prev" | "init" = "init",
@@ -167,7 +175,7 @@ export function useAppTour() {
           return;
         }
         indexRef.current = nextIndex;
-        return showStepAt(nextIndex, direction, previousDriver);
+        return showStepAtRef.current?.(nextIndex, direction, previousDriver);
       }
 
       const total = steps.length;
@@ -215,7 +223,7 @@ export function useAppTour() {
                 transitioningRef.current = true;
                 setTourButtonsBusy(true);
                 indexRef.current = index + 1;
-                void showStepAt(index + 1, "next", d).finally(() => {
+                void showStepAtRef.current?.(index + 1, "next", d).finally(() => {
                   transitioningRef.current = false;
                   setTourButtonsBusy(false);
                 });
@@ -225,7 +233,7 @@ export function useAppTour() {
                 transitioningRef.current = true;
                 setTourButtonsBusy(true);
                 indexRef.current = Math.max(0, index - 1);
-                void showStepAt(indexRef.current, "prev", d).finally(() => {
+                void showStepAtRef.current?.(indexRef.current, "prev", d).finally(() => {
                   transitioningRef.current = false;
                   setTourButtonsBusy(false);
                 });
@@ -253,6 +261,10 @@ export function useAppTour() {
     },
     [destroyDriver, router]
   );
+
+  useEffect(() => {
+    showStepAtRef.current = showStepAt;
+  }, [showStepAt]);
 
   const startTour = useCallback(
     (role: string | undefined | null, onComplete?: () => void) => {
