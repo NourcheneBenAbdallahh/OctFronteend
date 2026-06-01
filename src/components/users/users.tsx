@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { ChevronRight, Plus, Search, UserCog, BoxSelect, Filter, UserPlus, UserPen, KeyRound, Trash2, X } from "lucide-react";
+import { BoxSelect, UserPlus, UserPen, KeyRound, Trash2, X } from "lucide-react";
+import { UsersHeader } from "./UsersHeader";
 import { Modal } from "@/components/ui/modal";
 import { TablePagination } from "@/components/ui/TablePagination";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -14,12 +15,27 @@ import {
 } from "@/lib/users.api";
 import { AppFeedbackBanner } from "@/components/ui/feedback";
 import { ResponsiveTableWrap } from "@/components/ui/ResponsiveTableWrap";
+import { SortableTh } from "@/components/ui/SortableTableHeader";
+import { useTableSort } from "@/hooks/useTableSort";
+import type { SortColumn } from "@/lib/tableSort";
+import type { AdminUser } from "@/lib/users.api";
 
-const ROLE_OPTIONS: UserRole[] = ["ADMIN", "STOCK", "LOGISTIQUE", "FINANCE"];
-const ROLE_LABEL: Record<string, string> = { 
-  ADMIN: "Administrateur", STOCK: "Stock", LOGISTIQUE: "Logistique", FINANCE: "Finance" 
+const ROLE_OPTIONS: UserRole[] = ["ADMIN", "STOCK", "LOGISTIQUE", "CONTRAT", "FINANCE"];
+const ROLE_LABEL: Record<string, string> = {
+  ADMIN: "Administrateur",
+  STOCK: "Stock",
+  LOGISTIQUE: "Logistique",
+  CONTRAT: "Contrats",
+  FINANCE: "Finance",
 };
 const roleFr = (role: string) => ROLE_LABEL[role.toUpperCase()] ?? role;
+
+const USER_SORT_COLUMNS: Record<string, SortColumn<AdminUser>> = {
+  name: { accessor: (u) => u.name, type: "string" },
+  email: { accessor: (u) => u.email, type: "string" },
+  role: { accessor: (u) => u.role, type: "string" },
+  statut: { accessor: (u) => (u.isActive ? 1 : 0), type: "number" },
+};
 
 export default function UsersAdminPage() {
   const [perPage, setPerPage] = useState(15);
@@ -29,6 +45,12 @@ export default function UsersAdminPage() {
     roleFilter, setRoleFilter, loading, savingId, error, success, handleAction,
     setError, setSuccess,
   } = useUsersAdmin(perPage);
+
+  const { sortKey, sortDirection, toggleSort, sortRows } = useTableSort(USER_SORT_COLUMNS);
+  const sortedUsers = useMemo(
+    () => sortRows(users),
+    [users, sortRows]
+  );
 
   const pageFeedback =
     error != null
@@ -156,7 +178,7 @@ export default function UsersAdminPage() {
     const ok = await handleAction(
       "reset-password",
       () => adminResetUserPassword(selectedUserId, passwordForm.password),
-      "Mot de passe réinitialisé avec succès."
+      "Mot de passe réinitialisé. Un email a été envoyé à l'utilisateur."
     );
 
     if (ok) {
@@ -186,78 +208,22 @@ export default function UsersAdminPage() {
 
   const totalPages = paginatorInfo?.lastPage ?? 1;
 
-  return (
-    <div className="space-y-6">
-      {/* HEADER SECTION */}
-      <section className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h1 className="text-5xl font-black tracking-tighter text-gray-900 dark:text-white">
-            Utilisateurs<span className="text-[#00A09D]">.</span>
-          </h1>
-          <nav className="mt-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-400">
-            <span>Administration</span> <ChevronRight size={10} /> <span>Gestion des accès</span>
-          </nav>
-        </div>
-        <div className="flex min-w-[180px] items-center gap-4 rounded-[2rem] border border-gray-50 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40">
-            <UserCog size={18} />
-          </div>
-          <div>
-            <span className="mb-1 block text-[9px] font-black uppercase text-gray-400">Total</span>
-            <span className="text-xl font-black text-gray-900 dark:text-white">
-              {paginatorInfo?.total ?? 0} comptes
-            </span>
-          </div>
-        </div>
-      </section>
+  const totalUsers = paginatorInfo?.total ?? users.length;
 
-      {/* SEARCH & FILTERS */}
-      <section className="flex flex-col gap-3">
-        <div className="flex min-w-0 flex-1 items-center rounded-2xl border border-gray-100 bg-white px-4 py-3 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-          <Search size={18} className="mr-3 shrink-0 text-gray-300" />
-          <input
-            type="search"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Rechercher nom ou email..."
-            className="min-w-0 flex-1 bg-transparent text-sm font-medium outline-none"
-          />
-          <Filter size={18} className="ml-3 shrink-0 text-gray-400" />
-        </div>
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-          <div className="min-w-0 flex-1 sm:max-w-[220px]">
-            <RoleSearchableDropdown
-              value={roleFilter}
-              onChange={(r) => setRoleFilter(r as UserRole | "")}
-              options={ROLE_OPTIONS}
-              roleFr={roleFr}
-              placeholder="Tous les rôles"
-              includeAllOption={{ label: "Tous les rôles" }}
-            />
-          </div>
-          <button
-            type="button"
-            onClick={() => setCreateModalOpen(true)}
-            className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-2xl border-2 border-gray-900 bg-white px-6 py-3.5 text-[10px] font-black uppercase tracking-widest text-gray-900 shadow-[6px_6px_0px_rgba(0,160,157,0.2)] transition-all hover:bg-gray-900 hover:text-white sm:w-auto sm:px-8 sm:py-4"
-          >
-            <Plus size={14} /> Nouveau
-          </button>
-          <div className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-3 py-2 sm:ml-auto">
-            <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Lignes</span>
-            <select
-              value={perPage}
-              onChange={(e) => setPerPage(Number(e.target.value))}
-              className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-bold text-gray-700 outline-none"
-            >
-              {[10, 15, 30, 50, 100].map((n) => (
-                <option key={n} value={n}>
-                  {n} / page
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </section>
+  return (
+    <div className="flex min-h-[600px] flex-col">
+      <UsersHeader
+        searchInput={searchInput}
+        setSearchInput={setSearchInput}
+        roleFilter={roleFilter}
+        setRoleFilter={setRoleFilter}
+        roleOptions={ROLE_OPTIONS}
+        roleFr={roleFr}
+        onOpenNew={() => setCreateModalOpen(true)}
+        total={totalUsers}
+        perPage={perPage}
+        setPerPage={setPerPage}
+      />
 
       <AppFeedbackBanner
         feedback={pageFeedback}
@@ -274,15 +240,15 @@ export default function UsersAdminPage() {
               <thead>
               <tr className="border-b border-gray-50 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
                   <th className="px-8 py-6">Photo</th>
-                  <th className="px-8 py-6">Utilisateur</th>
-                  <th className="px-8 py-6">Contact</th>
-                  <th className="px-8 py-6">Rôle</th>
-                  <th className="px-8 py-6 text-center">Statut</th>
+                  <SortableTh columnKey="name" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-8 py-6">Utilisateur</SortableTh>
+                  <SortableTh columnKey="email" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-8 py-6">Contact</SortableTh>
+                  <SortableTh columnKey="role" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-8 py-6">Rôle</SortableTh>
+                  <SortableTh columnKey="statut" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-8 py-6" align="center">Statut</SortableTh>
                   <th className="px-8 py-6 text-center">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {users.map((u) => (
+                {sortedUsers.map((u) => (
                   <UserRow 
                     key={u.id}
                     user={u}
@@ -331,64 +297,66 @@ export default function UsersAdminPage() {
           resetCreateForm();
         }}
         position="right"
-        className="w-full max-w-xl overflow-hidden rounded-l-[2rem] bg-white shadow-[-30px_0_60px_rgba(0,0,0,0.1)] sm:rounded-l-[3rem]"
+        showCloseButton={false}
+        className="w-full max-w-xl rounded-l-[2rem] bg-white shadow-[-30px_0_60px_rgba(0,0,0,0.1)] sm:max-w-lg sm:rounded-l-[3rem]"
       >
-        <div className="flex max-h-[100dvh] flex-col">
-          <div className="p-6 pb-4 sm:p-10 sm:pb-6">
-            <div className="mb-8 flex items-start justify-between">
-              <div>
-                <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.3em] text-indigo-500 underline decoration-2 underline-offset-4">
+        <div className="flex h-full min-h-0 flex-col">
+          <div className="shrink-0 border-b border-gray-50 px-5 py-5 sm:px-8 sm:py-7">
+            <div className="mb-4 flex items-start justify-between gap-3 sm:mb-5">
+              <div className="min-w-0">
+                <span className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.3em] text-indigo-500 underline decoration-2 underline-offset-4">
                   Gestion Utilisateurs
                 </span>
-                <h2 className="text-3xl font-black leading-none tracking-tighter text-gray-900">
+                <h2 className="text-2xl font-black leading-tight tracking-tighter text-gray-900 sm:text-3xl">
                   Nouvel Utilisateur
                 </h2>
               </div>
               <button
+                type="button"
                 onClick={() => {
                   setCreateModalOpen(false);
                   resetCreateForm();
                 }}
-                className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-50 text-gray-400 transition-all hover:bg-red-50 hover:text-red-500"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gray-50 text-gray-400 transition-all hover:bg-red-50 hover:text-red-500"
               >
                 <X size={20} />
               </button>
             </div>
-            <div className="h-1.5 w-full rounded-full bg-[#1C2434]" />
+            <div className="h-1 w-full rounded-full bg-[#1C2434] sm:h-1.5" />
           </div>
 
-          <form onSubmit={handleCreateSubmit} className="flex h-full flex-col">
-            <div className="flex-1 space-y-6 overflow-y-auto px-6 py-4 sm:space-y-8 sm:px-10">
-              <div className="rounded-[2rem] border border-indigo-100/60 bg-indigo-50/50 p-5">
+          <form onSubmit={handleCreateSubmit} className="flex min-h-0 flex-1 flex-col">
+            <div className="form-scroll min-h-0 flex-1 space-y-4 px-5 py-4 sm:space-y-5 sm:px-8 sm:py-5">
+              <div className="rounded-2xl border border-indigo-100/60 bg-indigo-50/50 p-4 sm:rounded-[1.5rem] sm:p-5">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-indigo-600">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-indigo-600 sm:h-10 sm:w-10">
                     <UserPlus size={18} />
                   </div>
-                  <p className="text-xs font-bold text-indigo-700">
+                  <p className="text-xs font-bold leading-snug text-indigo-700">
                     Crée un compte avec rôle et accès immédiats.
                   </p>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <label className="ml-1 block text-[10px] font-black uppercase tracking-widest text-gray-400">Nom</label>
                   <input
                     type="text"
                     value={createForm.name}
                     onChange={(e) => setCreateForm((prev) => ({ ...prev, name: e.target.value }))}
-                    className="w-full rounded-2xl border-2 border-gray-50 bg-gray-50 p-4 text-xs font-black outline-none transition-all focus:border-indigo-500/20 focus:bg-white"
+                    className="w-full min-w-0 rounded-2xl border-2 border-gray-50 bg-gray-50 px-4 py-3 text-sm font-semibold outline-none transition-all focus:border-indigo-500/20 focus:bg-white sm:text-xs sm:font-black"
                     placeholder="Nom complet"
                     required
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1.5 sm:col-span-1">
                   <label className="ml-1 block text-[10px] font-black uppercase tracking-widest text-gray-400">Email</label>
                   <input
                     type="email"
                     value={createForm.email}
                     onChange={(e) => setCreateForm((prev) => ({ ...prev, email: e.target.value }))}
-                    className="w-full rounded-2xl border-2 border-gray-50 bg-gray-50 p-4 text-xs font-black outline-none transition-all focus:border-indigo-500/20 focus:bg-white"
+                    className="w-full min-w-0 rounded-2xl border-2 border-gray-50 bg-gray-50 px-4 py-3 text-sm font-semibold outline-none transition-all focus:border-indigo-500/20 focus:bg-white sm:text-xs sm:font-black"
                     placeholder="utilisateur@domaine.com"
                     required
                   />
@@ -396,17 +364,17 @@ export default function UsersAdminPage() {
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <label className="ml-1 block text-[10px] font-black uppercase tracking-widest text-gray-400">Téléphone</label>
                   <input
                     type="text"
                     value={createForm.telephone}
                     onChange={(e) => setCreateForm((prev) => ({ ...prev, telephone: e.target.value }))}
-                    className="w-full rounded-2xl border-2 border-gray-50 bg-gray-50 p-4 text-xs font-black outline-none transition-all focus:border-indigo-500/20 focus:bg-white"
+                    className="w-full min-w-0 rounded-2xl border-2 border-gray-50 bg-gray-50 px-4 py-3 text-sm font-semibold outline-none transition-all focus:border-indigo-500/20 focus:bg-white sm:text-xs sm:font-black"
                     placeholder="+216 ..."
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <label className="ml-1 block text-[10px] font-black uppercase tracking-widest text-gray-400">Rôle</label>
                   <RoleSearchableDropdown
                     value={createForm.role}
@@ -417,44 +385,44 @@ export default function UsersAdminPage() {
                 </div>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <label className="ml-1 block text-[10px] font-black uppercase tracking-widest text-gray-400">Mot de passe</label>
                 <input
                   type="password"
                   value={createForm.password}
                   onChange={(e) => setCreateForm((prev) => ({ ...prev, password: e.target.value }))}
-                  className="w-full rounded-2xl border-2 border-gray-50 bg-gray-50 p-4 text-xs font-black outline-none transition-all focus:border-indigo-500/20 focus:bg-white"
+                  className="w-full min-w-0 rounded-2xl border-2 border-gray-50 bg-gray-50 px-4 py-3 text-sm font-semibold outline-none transition-all focus:border-indigo-500/20 focus:bg-white sm:text-xs sm:font-black"
                   placeholder="Minimum recommandé: 8 caractères"
                   required
                 />
               </div>
 
-              <label className="inline-flex items-center gap-2 rounded-2xl border border-gray-100 bg-white px-4 py-3 text-xs font-semibold text-gray-700">
+              <label className="flex w-full items-center gap-2 rounded-2xl border border-gray-100 bg-white px-4 py-3 text-xs font-semibold text-gray-700">
                 <input
                   type="checkbox"
                   checked={createForm.is_active}
                   onChange={(e) => setCreateForm((prev) => ({ ...prev, is_active: e.target.checked }))}
-                  className="h-4 w-4 rounded border-gray-300"
+                  className="h-4 w-4 shrink-0 rounded border-gray-300"
                 />
                 Compte actif à la création
               </label>
             </div>
 
-            <div className="flex flex-col gap-3 border-t border-gray-50 bg-white p-6 sm:flex-row sm:items-center sm:gap-4 sm:p-10">
+            <div className="flex shrink-0 flex-col gap-3 border-t border-gray-100 bg-white px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex-row sm:items-center sm:gap-4 sm:px-8 sm:py-5">
               <button
                 type="button"
                 onClick={() => {
                   setCreateModalOpen(false);
                   resetCreateForm();
                 }}
-                className="h-14 rounded-2xl border-2 border-gray-100 px-6 text-[11px] font-black uppercase tracking-widest text-gray-400 transition-all hover:bg-gray-50 sm:h-16 sm:px-8"
+                className="h-12 rounded-2xl border-2 border-gray-100 px-6 text-[11px] font-black uppercase tracking-widest text-gray-400 transition-all hover:bg-gray-50 sm:h-14 sm:px-8"
               >
                 Annuler
               </button>
               <button
                 type="submit"
                 disabled={savingId === "create-user"}
-                className="flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl bg-[#1C2434] text-[12px] font-black uppercase tracking-[0.2em] text-white shadow-xl transition-all hover:bg-indigo-600 disabled:opacity-50 sm:h-16"
+                className="flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-[#1C2434] text-[11px] font-black uppercase tracking-[0.15em] text-white shadow-xl transition-all hover:bg-indigo-600 disabled:opacity-50 sm:h-14 sm:text-[12px] sm:tracking-[0.2em]"
               >
                 {savingId === "create-user" ? "Création..." : "Créer l'utilisateur"}
               </button>
@@ -471,85 +439,87 @@ export default function UsersAdminPage() {
           setSelectedUserName("");
         }}
         position="right"
-        className="w-full max-w-xl overflow-hidden rounded-l-[2rem] bg-white shadow-[-30px_0_60px_rgba(0,0,0,0.1)] sm:rounded-l-[3rem]"
+        showCloseButton={false}
+        className="w-full max-w-xl rounded-l-[2rem] bg-white shadow-[-30px_0_60px_rgba(0,0,0,0.1)] sm:max-w-lg sm:rounded-l-[3rem]"
       >
-        <div className="flex max-h-[100dvh] flex-col">
-          <div className="p-6 pb-4 sm:p-10 sm:pb-6">
-            <div className="mb-8 flex items-start justify-between">
-              <div>
-                <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.3em] text-indigo-500 underline decoration-2 underline-offset-4">
+        <div className="flex h-full min-h-0 flex-col">
+          <div className="shrink-0 border-b border-gray-50 px-5 py-5 sm:px-8 sm:py-7">
+            <div className="mb-4 flex items-start justify-between gap-3 sm:mb-5">
+              <div className="min-w-0">
+                <span className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.3em] text-indigo-500 underline decoration-2 underline-offset-4">
                   Gestion Utilisateurs
                 </span>
-                <h2 className="text-3xl font-black leading-none tracking-tighter text-gray-900">
+                <h2 className="text-2xl font-black leading-tight tracking-tighter text-gray-900 sm:text-3xl">
                   Modifier Utilisateur
                 </h2>
               </div>
               <button
+                type="button"
                 onClick={() => setEditModalOpen(false)}
-                className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-50 text-gray-400 transition-all hover:bg-red-50 hover:text-red-500"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gray-50 text-gray-400 transition-all hover:bg-red-50 hover:text-red-500"
               >
                 <X size={20} />
               </button>
             </div>
-            <div className="h-1.5 w-full rounded-full bg-[#1C2434]" />
+            <div className="h-1 w-full rounded-full bg-[#1C2434] sm:h-1.5" />
           </div>
 
-          <form onSubmit={handleEditSubmit} className="flex h-full flex-col">
-            <div className="flex-1 space-y-6 overflow-y-auto px-6 py-4 sm:space-y-8 sm:px-10">
-              <div className="rounded-[2rem] border border-indigo-100/60 bg-indigo-50/50 p-5">
+          <form onSubmit={handleEditSubmit} className="flex min-h-0 flex-1 flex-col">
+            <div className="form-scroll min-h-0 flex-1 space-y-4 px-5 py-4 sm:space-y-5 sm:px-8 sm:py-5">
+              <div className="rounded-2xl border border-indigo-100/60 bg-indigo-50/50 p-4 sm:rounded-[1.5rem] sm:p-5">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-indigo-600">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-indigo-600 sm:h-10 sm:w-10">
                     <UserPen size={18} />
                   </div>
-                  <p className="text-xs font-bold text-indigo-700">
+                  <p className="text-xs font-bold leading-snug text-indigo-700">
                     Modifie les informations de <span className="font-black">{selectedUserName || "cet utilisateur"}</span>.
                   </p>
                 </div>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <label className="ml-1 block text-[10px] font-black uppercase tracking-widest text-gray-400">Nom</label>
                 <input
                   type="text"
                   value={editForm.name}
                   onChange={(e) => setEditForm((prev) => ({ ...prev, name: e.target.value }))}
-                  className="w-full rounded-2xl border-2 border-gray-50 bg-gray-50 p-4 text-xs font-black outline-none transition-all focus:border-indigo-500/20 focus:bg-white"
+                  className="w-full min-w-0 rounded-2xl border-2 border-gray-50 bg-gray-50 px-4 py-3 text-sm font-semibold outline-none transition-all focus:border-indigo-500/20 focus:bg-white sm:text-xs sm:font-black"
                   required
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <label className="ml-1 block text-[10px] font-black uppercase tracking-widest text-gray-400">Email</label>
                 <input
                   type="email"
                   value={editForm.email}
                   onChange={(e) => setEditForm((prev) => ({ ...prev, email: e.target.value }))}
-                  className="w-full rounded-2xl border-2 border-gray-50 bg-gray-50 p-4 text-xs font-black outline-none transition-all focus:border-indigo-500/20 focus:bg-white"
+                  className="w-full min-w-0 rounded-2xl border-2 border-gray-50 bg-gray-50 px-4 py-3 text-sm font-semibold outline-none transition-all focus:border-indigo-500/20 focus:bg-white sm:text-xs sm:font-black"
                   required
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <label className="ml-1 block text-[10px] font-black uppercase tracking-widest text-gray-400">Téléphone</label>
                 <input
                   type="text"
                   value={editForm.telephone}
                   onChange={(e) => setEditForm((prev) => ({ ...prev, telephone: e.target.value }))}
-                  className="w-full rounded-2xl border-2 border-gray-50 bg-gray-50 p-4 text-xs font-black outline-none transition-all focus:border-indigo-500/20 focus:bg-white"
+                  className="w-full min-w-0 rounded-2xl border-2 border-gray-50 bg-gray-50 px-4 py-3 text-sm font-semibold outline-none transition-all focus:border-indigo-500/20 focus:bg-white sm:text-xs sm:font-black"
                 />
               </div>
             </div>
 
-            <div className="flex flex-col gap-3 border-t border-gray-50 bg-white p-6 sm:flex-row sm:items-center sm:gap-4 sm:p-10">
+            <div className="flex shrink-0 flex-col gap-3 border-t border-gray-100 bg-white px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex-row sm:items-center sm:gap-4 sm:px-8 sm:py-5">
               <button
                 type="button"
                 onClick={() => setEditModalOpen(false)}
-                className="h-14 rounded-2xl border-2 border-gray-100 px-6 text-[11px] font-black uppercase tracking-widest text-gray-400 transition-all hover:bg-gray-50 sm:h-16 sm:px-8"
+                className="h-12 rounded-2xl border-2 border-gray-100 px-6 text-[11px] font-black uppercase tracking-widest text-gray-400 transition-all hover:bg-gray-50 sm:h-14 sm:px-8"
               >
                 Annuler
               </button>
               <button
                 type="submit"
                 disabled={savingId === `edit-${selectedUserId}`}
-                className="flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl bg-[#1C2434] text-[12px] font-black uppercase tracking-[0.2em] text-white shadow-xl transition-all hover:bg-indigo-600 disabled:opacity-50 sm:h-16"
+                className="flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-[#1C2434] text-[11px] font-black uppercase tracking-[0.15em] text-white shadow-xl transition-all hover:bg-indigo-600 disabled:opacity-50 sm:h-14 sm:text-[12px] sm:tracking-[0.2em]"
               >
                 {savingId === `edit-${selectedUserId}` ? "Enregistrement..." : "Enregistrer"}
               </button>
@@ -612,62 +582,64 @@ export default function UsersAdminPage() {
           setPasswordForm({ password: "", confirmPassword: "" });
         }}
         position="right"
-        className="w-full max-w-xl overflow-hidden rounded-l-[2rem] bg-white shadow-[-30px_0_60px_rgba(0,0,0,0.1)] sm:rounded-l-[3rem]"
+        showCloseButton={false}
+        className="w-full max-w-xl rounded-l-[2rem] bg-white shadow-[-30px_0_60px_rgba(0,0,0,0.1)] sm:max-w-lg sm:rounded-l-[3rem]"
       >
-        <div className="flex max-h-[100dvh] flex-col">
-          <div className="p-6 pb-4 sm:p-10 sm:pb-6">
-            <div className="mb-8 flex items-start justify-between">
-              <div>
-                <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.3em] text-indigo-500 underline decoration-2 underline-offset-4">
+        <div className="flex h-full min-h-0 flex-col">
+          <div className="shrink-0 border-b border-gray-50 px-5 py-5 sm:px-8 sm:py-7">
+            <div className="mb-4 flex items-start justify-between gap-3 sm:mb-5">
+              <div className="min-w-0">
+                <span className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.3em] text-indigo-500 underline decoration-2 underline-offset-4">
                   Sécurité
                 </span>
-                <h2 className="text-3xl font-black leading-none tracking-tighter text-gray-900">
+                <h2 className="text-2xl font-black leading-tight tracking-tighter text-gray-900 sm:text-3xl">
                   Réinitialiser Mot de Passe
                 </h2>
               </div>
               <button
+                type="button"
                 onClick={() => setPasswordModalOpen(false)}
-                className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-50 text-gray-400 transition-all hover:bg-red-50 hover:text-red-500"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gray-50 text-gray-400 transition-all hover:bg-red-50 hover:text-red-500"
               >
                 <X size={20} />
               </button>
             </div>
-            <div className="h-1.5 w-full rounded-full bg-[#1C2434]" />
+            <div className="h-1 w-full rounded-full bg-[#1C2434] sm:h-1.5" />
           </div>
 
-          <form onSubmit={handlePasswordSubmit} className="flex h-full flex-col">
-            <div className="flex-1 space-y-6 overflow-y-auto px-6 py-4 sm:space-y-8 sm:px-10">
-              <div className="rounded-[2rem] border border-indigo-100/60 bg-indigo-50/50 p-5">
+          <form onSubmit={handlePasswordSubmit} className="flex min-h-0 flex-1 flex-col">
+            <div className="form-scroll min-h-0 flex-1 space-y-4 px-5 py-4 sm:space-y-5 sm:px-8 sm:py-5">
+              <div className="rounded-2xl border border-indigo-100/60 bg-indigo-50/50 p-4 sm:rounded-[1.5rem] sm:p-5">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-indigo-600">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-indigo-600 sm:h-10 sm:w-10">
                     <KeyRound size={18} />
                   </div>
-                  <p className="text-xs font-bold text-indigo-700">
+                  <p className="text-xs font-bold leading-snug text-indigo-700">
                     Utilisateur: <span className="font-black">{selectedUserName || "-"}</span>
                   </p>
                 </div>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <label className="ml-1 block text-[10px] font-black uppercase tracking-widest text-gray-400">Nouveau mot de passe</label>
                 <input
                   type="password"
                   value={passwordForm.password}
                   onChange={(e) => setPasswordForm((prev) => ({ ...prev, password: e.target.value }))}
-                  className="w-full rounded-2xl border-2 border-gray-50 bg-gray-50 p-4 text-xs font-black outline-none transition-all focus:border-indigo-500/20 focus:bg-white"
+                  className="w-full min-w-0 rounded-2xl border-2 border-gray-50 bg-gray-50 px-4 py-3 text-sm font-semibold outline-none transition-all focus:border-indigo-500/20 focus:bg-white sm:text-xs sm:font-black"
                   required
                 />
                 {passwordForm.password.length > 0 && passwordForm.password.length < 8 && (
                   <p className="ml-2 mt-1 text-[10px] font-bold italic text-red-500">Le mot de passe doit contenir au moins 8 caractères.</p>
                 )}
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <label className="ml-1 block text-[10px] font-black uppercase tracking-widest text-gray-400">Confirmer mot de passe</label>
                 <input
                   type="password"
                   value={passwordForm.confirmPassword}
                   onChange={(e) => setPasswordForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
-                  className="w-full rounded-2xl border-2 border-gray-50 bg-gray-50 p-4 text-xs font-black outline-none transition-all focus:border-indigo-500/20 focus:bg-white"
+                  className="w-full min-w-0 rounded-2xl border-2 border-gray-50 bg-gray-50 px-4 py-3 text-sm font-semibold outline-none transition-all focus:border-indigo-500/20 focus:bg-white sm:text-xs sm:font-black"
                   required
                 />
                 {passwordForm.confirmPassword.length > 0 &&
@@ -677,11 +649,11 @@ export default function UsersAdminPage() {
               </div>
             </div>
 
-            <div className="flex flex-col gap-3 border-t border-gray-50 bg-white p-6 sm:flex-row sm:items-center sm:gap-4 sm:p-10">
+            <div className="flex shrink-0 flex-col gap-3 border-t border-gray-100 bg-white px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex-row sm:items-center sm:gap-4 sm:px-8 sm:py-5">
               <button
                 type="button"
                 onClick={() => setPasswordModalOpen(false)}
-                className="h-14 rounded-2xl border-2 border-gray-100 px-6 text-[11px] font-black uppercase tracking-widest text-gray-400 transition-all hover:bg-gray-50 sm:h-16 sm:px-8"
+                className="h-12 rounded-2xl border-2 border-gray-100 px-6 text-[11px] font-black uppercase tracking-widest text-gray-400 transition-all hover:bg-gray-50 sm:h-14 sm:px-8"
               >
                 Annuler
               </button>
@@ -692,7 +664,7 @@ export default function UsersAdminPage() {
                   passwordForm.password.length < 8 ||
                   passwordForm.password !== passwordForm.confirmPassword
                 }
-                className="flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl bg-[#1C2434] text-[12px] font-black uppercase tracking-[0.2em] text-white shadow-xl transition-all hover:bg-indigo-600 disabled:opacity-50 sm:h-16"
+                className="flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-[#1C2434] text-[11px] font-black uppercase tracking-[0.15em] text-white shadow-xl transition-all hover:bg-indigo-600 disabled:opacity-50 sm:h-14 sm:text-[12px] sm:tracking-[0.2em]"
               >
                 {savingId === "reset-password" ? "Traitement..." : "Confirmer"}
               </button>

@@ -100,7 +100,7 @@ export default function LotEditDrawer({ lot, open, onClose, onSubmit }: Props) {
         </div>
 
         {/* FORMULAIRE */}
-        <form id="edit-lot-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-8 py-8 space-y-8">
+        <form id="edit-lot-form" onSubmit={handleSubmit} className="form-scroll flex-1 space-y-8 px-8 py-8">
           
           {/* Grille Code & Emballage */}
           <div className="grid grid-cols-2 gap-6">

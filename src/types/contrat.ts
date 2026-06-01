@@ -19,6 +19,8 @@ id: string;
   taux_penalite_retard?: number | null;
   plafond_penalite?: number | null;
   statut: "ACTIF" | "EXPIRE" | "SUSPENDU";
+  document_contrat?: string | null;
+  note_statut?: string | null;
 
   fournisseur_id: string;
   emballage_id: string;
@@ -72,6 +74,8 @@ export function normalizeContrat(c: Contrat): Contrat {
     taux_penalite_retard: c.taux_penalite_retard ?? 0.002,
     plafond_penalite: c.plafond_penalite ?? 5,
     statut: c.statut ?? "ACTIF",
+    document_contrat: c.document_contrat ?? null,
+    note_statut: c.note_statut ?? null,
     fournisseur: c.fournisseur ? { ...c.fournisseur } : undefined,
     emballage: c.emballage ? { ...c.emballage } : undefined,
     created_by: c.created_by ?? null,
@@ -99,6 +103,7 @@ export function sanitizeContratInput(input: Partial<Contrat>) {
   if (input.taux_penalite_retard !== undefined) sanitized.taux_penalite_retard = input.taux_penalite_retard ?? 0.002;
   if (input.plafond_penalite !== undefined) sanitized.plafond_penalite = input.plafond_penalite ?? 5;
   if (input.statut !== undefined) sanitized.statut = input.statut ?? "ACTIF";
+  if (input.note_statut !== undefined) sanitized.note_statut = input.note_statut?.trim() || null;
   if (input.fournisseur_id !== undefined) sanitized.fournisseur_id = input.fournisseur_id;
   if (input.emballage_id !== undefined) sanitized.emballage_id = input.emballage_id;
   return sanitized;

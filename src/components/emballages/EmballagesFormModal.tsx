@@ -279,7 +279,7 @@ export default function EmballagesFormModal({
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col">
-          <div className="min-h-0 flex-1 overflow-y-auto px-12 py-6 space-y-8">
+          <div className="form-scroll min-h-0 flex-1 space-y-8 px-12 py-6">
             {submitError && (
               <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800">
                 {submitError}

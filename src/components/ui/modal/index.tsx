@@ -57,13 +57,13 @@ export const Modal: React.FC<ModalProps> = ({
   const contentClasses = isFullscreen
     ? "w-full h-full"
     : isRightPanel
-    ? "relative h-screen w-full max-w-2xl rounded-none bg-white dark:bg-gray-900"
+    ? "relative flex h-[100dvh] max-h-[100dvh] min-h-0 w-full max-w-2xl flex-col overflow-hidden rounded-none bg-white dark:bg-gray-900"
     : "relative w-full rounded-3xl bg-white  dark:bg-gray-900";
 
   return (
     <div
       className={`fixed inset-0 flex modal z-99999 ${
-        isRightPanel ? "items-stretch justify-end" : "items-center justify-center overflow-y-auto"
+        isRightPanel ? "items-stretch justify-end" : "items-center justify-center overflow-y-auto no-scrollbar"
       }`}
     >
       {!isFullscreen && (
@@ -102,7 +102,9 @@ export const Modal: React.FC<ModalProps> = ({
             </svg>
           </button>
         )}
-        <div>{children}</div>
+        <div className={isRightPanel ? "flex min-h-0 flex-1 flex-col" : undefined}>
+          {children}
+        </div>
       </div>
       <style jsx>{`
         @keyframes slideInRight {

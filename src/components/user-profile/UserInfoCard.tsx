@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import React, { useEffect, useState } from "react";
 import { useModal } from "../../hooks/useModal";
 import { Modal } from "../ui/modal";
@@ -20,16 +20,28 @@ function splitName(fullName?: string | null) {
 
 export default function UserInfoCard() {
   const { isOpen, openModal, closeModal } = useModal();
+  const {
+    isOpen: isPasswordModalOpen,
+    openModal: openPasswordModal,
+    closeModal: closePasswordModal,
+  } = useModal();
   const { user, token, patchUser } = useAuthStore();
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
+  const [telephone, setTelephone] = useState("");
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState(false);
+  const [passwordPrompt, setPasswordPrompt] = useState("");
+  const [passwordError, setPasswordError] = useState<string | null>(null);
 
   const display = splitName(user?.name);
+  const emailChanged =
+    email.trim().toLowerCase() !== (user?.email ?? "").trim().toLowerCase();
+  const telephoneChanged =
+    telephone.trim() !== (user?.telephone ?? "").trim();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -37,50 +49,125 @@ export default function UserInfoCard() {
     setFirstName(fn);
     setLastName(ln);
     setEmail(user?.email ?? "");
+    setTelephone(user?.telephone ?? "");
     setFeedback(null);
     setError(false);
+    setPasswordPrompt("");
+    setPasswordError(null);
   }, [isOpen, user]);
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!token) return;
-
+  const buildPayload = () => {
     const name = [firstName.trim(), lastName.trim()].filter(Boolean).join(" ");
+    const trimmedPhone = telephone.trim();
+    return { name, trimmedPhone };
+  };
+
+  const validateBaseForm = () => {
+    const { name, trimmedPhone } = buildPayload();
     if (name.length < 2) {
       setError(true);
       setFeedback("Le nom complet doit contenir au moins 2 caractères.");
-      return;
+      return false;
     }
     if (!email.trim()) {
       setError(true);
       setFeedback("L'adresse email est obligatoire.");
-      return;
+      return false;
     }
+    if (trimmedPhone && !/^[0-9+ ]{8,}$/.test(trimmedPhone)) {
+      setError(true);
+      setFeedback("Numéro de téléphone invalide.");
+      return false;
+    }
+    return true;
+  };
+
+  const submitProfile = async (passwordForEmail?: string) => {
+    if (!token) return;
+    const { name, trimmedPhone } = buildPayload();
 
     setSaving(true);
     setFeedback(null);
     setError(false);
 
     try {
-      const updated = await updateProfile(
-        { name, email: email.trim() },
-        token
-      );
+      const payload: {
+        name: string;
+        email?: string;
+        current_password?: string;
+        telephone?: string | null;
+      } = { name };
+      if (emailChanged) {
+        payload.email = email.trim();
+        payload.current_password = passwordForEmail;
+      }
+      if (telephoneChanged) {
+        payload.telephone = trimmedPhone || null;
+      }
+
+      const updated = await updateProfile(payload, token);
       patchUser(updated);
-      setFeedback("Profil mis à jour.");
+      const messages: string[] = ["Profil mis à jour."];
+      if (emailChanged) {
+        messages.push("Un email de vérification sera envoyé si l'adresse a changé.");
+      }
+      if (telephoneChanged && trimmedPhone) {
+        messages.push("Le numéro devra être revérifié.");
+      }
+      setFeedback(messages.join(" "));
+      setPasswordPrompt("");
+      setPasswordError(null);
+      closePasswordModal();
       setTimeout(() => closeModal(), 600);
     } catch (err) {
-      setError(true);
-      setFeedback(getActionErrorMessage(err, "Impossible de mettre à jour le profil."));
+      if (emailChanged) {
+        setPasswordError(
+          getActionErrorMessage(err, "Mot de passe incorrect. L'email reste inchangé.")
+        );
+      } else {
+        setError(true);
+        setFeedback(getActionErrorMessage(err, "Impossible de mettre à jour le profil."));
+      }
     } finally {
       setSaving(false);
     }
   };
 
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validateBaseForm()) return;
+
+    if (emailChanged) {
+      setPasswordPrompt("");
+      setPasswordError(null);
+      openPasswordModal();
+      return;
+    }
+
+    await submitProfile();
+  };
+
+  const handlePasswordConfirm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!passwordPrompt.trim()) {
+      setPasswordError("Le mot de passe actuel est requis.");
+      return;
+    }
+    setPasswordError(null);
+    await submitProfile(passwordPrompt);
+  };
+
+  const handlePasswordCancel = () => {
+    setEmail(user?.email ?? "");
+    setPasswordPrompt("");
+    setPasswordError(null);
+    closePasswordModal();
+  };
+
   return (
     <div className="p-6 bg-white border-2 border-gray-100 rounded-[30px] shadow-sm dark:border-gray-800 dark:bg-gray-900/50">
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex-1">
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-3 mb-8">
             <div className="w-2 h-8 bg-[#00A09D] rounded-full"></div>
             <h4 className="text-xl font-[1000] uppercase tracking-tighter text-[#1C2434] dark:text-white">
@@ -88,7 +175,7 @@ export default function UserInfoCard() {
             </h4>
           </div>
 
-          <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:gap-y-10">
+          <div className="grid min-w-0 grid-cols-1 gap-8 md:grid-cols-2 lg:gap-y-10">
             <InfoDisplay label="Prénom" value={display.firstName} />
             <InfoDisplay label="Nom" value={display.lastName} />
             <InfoDisplay label="Adresse Email" value={user?.email || "Non renseigné"} />
@@ -107,22 +194,10 @@ export default function UserInfoCard() {
         </div>
 
         <button
+          type="button"
           onClick={openModal}
           className="flex items-center justify-center gap-2 px-6 py-3 text-[10px] font-black uppercase tracking-widest text-[#00A09D] transition-all bg-emerald-50 rounded-full hover:bg-[#00A09D] hover:text-white group"
         >
-          <svg
-            className="transition-transform group-hover:scale-110"
-            width="18"
-            height="18"
-            viewBox="0 0 18 18"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              d="M15.0911 2.78206C14.2125 1.90338 12.7878 1.90338 11.9092 2.78206L4.57524 10.116C4.26682 10.4244 4.0547 10.8158 3.96468 11.2426L3.31231 14.3352C3.25997 14.5833 3.33653 14.841 3.51583 15.0203C3.69512 15.1996 3.95286 15.2761 4.20096 15.2238L7.29355 14.5714C7.72031 14.4814 8.11172 14.2693 8.42013 13.9609L15.7541 6.62695C16.6327 5.74827 16.6327 4.32365 15.7541 3.44497L15.0911 2.78206Z"
-              fill="currentColor"
-            />
-          </svg>
           Éditer
         </button>
       </div>
@@ -136,40 +211,96 @@ export default function UserInfoCard() {
             <div className="h-1.5 w-12 bg-[#00A09D] rounded-full"></div>
           </div>
 
-          <form onSubmit={handleSave} className="space-y-8">
+          <form onSubmit={handleSave} className="space-y-8" name="oct-profile-identity">
             <div className="space-y-5">
               <h5 className="text-[11px] font-[1000] uppercase tracking-[0.2em] text-[#00A09D]">
-                Détails du compte
+                Identité
               </h5>
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest ml-2 text-gray-400">Prénom</Label>
+                  <Label className="text-[10px] font-black uppercase tracking-widest ml-2 text-gray-400">
+                    Prénom
+                  </Label>
                   <Input
                     type="text"
+                    name="oct-first-name"
+                    autoComplete="given-name"
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
                     className="rounded-[20px] bg-[#F8FAFA] border-none font-bold"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest ml-2 text-gray-400">Nom</Label>
+                  <Label className="text-[10px] font-black uppercase tracking-widest ml-2 text-gray-400">
+                    Nom
+                  </Label>
                   <Input
                     type="text"
+                    name="oct-last-name"
+                    autoComplete="family-name"
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
                     className="rounded-[20px] bg-[#F8FAFA] border-none font-bold"
                   />
                 </div>
-                <div className="md:col-span-2 space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest ml-2 text-gray-400">Email</Label>
-                  <Input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="rounded-[20px] bg-[#F8FAFA] border-none font-bold"
-                  />
-                </div>
               </div>
+            </div>
+
+            <div className="space-y-3 overflow-visible rounded-[20px] border border-gray-100 bg-[#F8FAFA] p-5 dark:border-gray-700 dark:bg-white/5">
+              <h5 className="text-[11px] font-[1000] uppercase tracking-[0.2em] text-[#00A09D]">
+                Email
+              </h5>
+              <div className="space-y-2">
+                <Label
+                  htmlFor="oct-profile-email"
+                  className="text-[10px] font-black uppercase tracking-widest ml-2 text-gray-400"
+                >
+                  Adresse email
+                </Label>
+                <Input
+                  id="oct-profile-email"
+                  type="email"
+                  name="oct-profile-email"
+                  autoComplete="username email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="rounded-[20px] bg-white border-none font-bold"
+                />
+              </div>
+              {emailChanged ? (
+                <p className="text-xs font-semibold text-[#00A09D]">
+                  Une nouvelle fenêtre demandera votre mot de passe pour confirmer le changement
+                  d&apos;email.
+                </p>
+              ) : (
+                <p className="text-xs font-semibold text-gray-500">
+                  Modifier l&apos;email nécessitera votre mot de passe actuel.
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-3 rounded-[20px] border border-gray-100 bg-[#F8FAFA] p-5 dark:border-gray-700 dark:bg-white/5">
+              <h5 className="text-[11px] font-[1000] uppercase tracking-[0.2em] text-[#00A09D]">
+                Téléphone
+              </h5>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase tracking-widest ml-2 text-gray-400">
+                  Numéro de téléphone
+                </Label>
+                <Input
+                  type="tel"
+                  name="oct-profile-telephone"
+                  autoComplete="tel"
+                  value={telephone}
+                  onChange={(e) => setTelephone(e.target.value)}
+                  placeholder="+216 00 000 000"
+                  className="rounded-[20px] bg-white border-none font-bold"
+                />
+              </div>
+              <p className="text-xs font-semibold text-gray-500">
+                Laisser vide pour supprimer le numéro. Un changement nécessite une
+                nouvelle vérification.
+              </p>
             </div>
 
             {feedback && (
@@ -197,17 +328,71 @@ export default function UserInfoCard() {
           </form>
         </div>
       </Modal>
+
+      <Modal
+        isOpen={isPasswordModalOpen}
+        onClose={handlePasswordCancel}
+        className="max-w-[520px]"
+      >
+        <div className="relative w-full rounded-[30px] bg-white p-8 dark:bg-[#1C2434]">
+          <h4 className="mb-2 text-2xl font-[1000] uppercase tracking-tight text-[#1C2434] dark:text-white">
+            Confirmer l&apos;email
+          </h4>
+          <p className="mb-6 text-sm font-semibold text-gray-500">
+            Saisissez votre mot de passe actuel pour modifier l&apos;adresse email.
+          </p>
+
+          <form onSubmit={handlePasswordConfirm} className="space-y-4">
+            <div className="space-y-2">
+              <Label
+                htmlFor="oct-profile-password-prompt"
+                className="ml-2 text-[10px] font-black uppercase tracking-widest text-gray-400"
+              >
+                Mot de passe actuel
+              </Label>
+              <Input
+                id="oct-profile-password-prompt"
+                type="password"
+                name="oct-profile-password-prompt"
+                autoComplete="current-password"
+                value={passwordPrompt}
+                onChange={(e) => setPasswordPrompt(e.target.value)}
+                className="rounded-[20px] bg-[#F8FAFA] border-none font-bold"
+              />
+            </div>
+
+            {passwordError && <p className="text-sm font-bold text-red-600">{passwordError}</p>}
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={handlePasswordCancel}
+                disabled={saving}
+                className="flex-1 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400"
+              >
+                Annuler
+              </button>
+              <Button
+                disabled={saving}
+                className="flex-[1.5] rounded-[20px] bg-[#00A09D] py-4 text-[10px] font-black uppercase tracking-widest text-white"
+              >
+                {saving ? "Vérification..." : "Confirmer"}
+              </Button>
+            </div>
+          </form>
+        </div>
+      </Modal>
     </div>
   );
 }
 
 function InfoDisplay({ label, value }: { label: string; value: string }) {
   return (
-    <div>
+    <div className="min-w-0">
       <p className="mb-1 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400">
         {label}
       </p>
-      <p className="text-sm font-bold text-gray-800 dark:text-white/90">
+      <p className="text-sm font-bold break-words text-gray-800 dark:text-white/90">
         {value || "---"}
       </p>
     </div>

@@ -132,7 +132,7 @@ export default function EmballagesDetailsDrawer({
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-8 py-4 scrollbar-hide sm:px-10">
+        <div className="form-scroll min-h-0 flex-1 space-y-6 px-8 py-4 sm:px-10">
           <div className="rounded-[1.75rem] border border-gray-100 bg-gray-50/80 p-6">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
               Identification

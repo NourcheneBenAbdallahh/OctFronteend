@@ -6,7 +6,7 @@ import { Metadata } from "next";
 import React from "react";
 
 export const metadata: Metadata = {
-  title: "Profil Utilisateur | Système de Gestion OCT",
+  title: "Profil utilisateur",
   description: "Gestion du profil utilisateur pour le suivi des emballages et stocks.",
 };
 
@@ -36,13 +36,11 @@ export default function Profile() {
 
         {/* 2. Grid pour les informations détaillées */}
         <div className="grid grid-cols-1 gap-8 xl:grid-cols-2">
-          {/* Carte Informations Personnelles */}
-          <div className="transition-all duration-300 hover:translate-y-[-5px]">
+          <div>
             <UserInfoCard />
           </div>
 
-          {/* Carte Coordonnées / Adresse */}
-          <div className="transition-all duration-300 hover:translate-y-[-5px]">
+          <div>
             <UserAddressCard />
           </div>
         </div>

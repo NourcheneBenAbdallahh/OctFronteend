@@ -117,7 +117,7 @@ export function MouvementSearchableSelect({
           </div>
           <ul
             className={cn(
-              "overflow-y-auto overscroll-contain p-1.5 [scrollbar-gutter:stable]",
+              "unite-mesure-picker-scroll p-1.5",
               listMaxHeightClassName
             )}
           >

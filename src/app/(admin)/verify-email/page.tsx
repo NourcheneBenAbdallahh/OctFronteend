@@ -3,7 +3,7 @@ import { Suspense } from 'react';
 import ClientVerifyEmail from './ClientVerifyEmail';
 
 export const metadata: Metadata = {
-  title: 'Verify Email - OCT Admin',
+  title: 'Vérification email',
   description: 'Email verification page',
 };
 

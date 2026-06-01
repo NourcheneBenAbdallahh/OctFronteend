@@ -1,11 +1,11 @@
 import UsersAdminPage from "@/components/users/users";
 
-export default function BiPage() {
+export default function UsersPage() {
   return (
- <div className="p-6">
-      <div className="mt-8">  
-            <UsersAdminPage />
+    <div className="space-y-6">
+      <div className="mt-8">
+        <UsersAdminPage />
       </div>
-      </div>
+    </div>
   );
 }

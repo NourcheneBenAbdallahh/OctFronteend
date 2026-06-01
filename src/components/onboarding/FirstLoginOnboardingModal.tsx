@@ -64,7 +64,7 @@ export default function FirstLoginOnboardingModal({
         </span>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-8 py-6 text-center">
+      <div className="form-scroll flex-1 px-8 py-6 text-center">
         <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#00A09D]/15 text-[#00A09D]">
           <MapPin className="h-8 w-8" />
         </div>

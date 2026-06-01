@@ -147,7 +147,7 @@ export function CommandeSearchablePicker({
         </div>
         <ul
           className={cn(
-            "unite-mesure-picker-scroll overflow-y-auto overscroll-contain p-1.5 [scrollbar-gutter:stable]",
+            "unite-mesure-picker-scroll p-1.5",
             listMaxHeightClassName
           )}
         >

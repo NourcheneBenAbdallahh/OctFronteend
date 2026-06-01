@@ -14,6 +14,8 @@ id
   representant_nom
   representant_role
   statut
+  note_statut
+  notes_evaluation
   latitude
   longitude
   adresse_geocodee
@@ -92,6 +94,8 @@ export function sanitizeFournisseurInput(input: Partial<Fournisseur>) {
     representant_nom,
     representant_role,
     statut,
+    note_statut,
+    notes_evaluation,
     latitude,
     longitude,
     adresse_geocodee,
@@ -109,6 +113,8 @@ export function sanitizeFournisseurInput(input: Partial<Fournisseur>) {
   if (representant_nom !== undefined) sanitized.representant_nom = representant_nom || null;
   if (representant_role !== undefined) sanitized.representant_role = representant_role || null;
   if (statut !== undefined) sanitized.statut = statut === "INACTIF" ? "INACTIF" : "ACTIF";
+  if (note_statut !== undefined) sanitized.note_statut = note_statut?.trim() || null;
+  if (notes_evaluation !== undefined) sanitized.notes_evaluation = notes_evaluation?.trim() || null;
 
   if (latitude !== undefined) sanitized.latitude = latitude === null ? null : Number(latitude);
   if (longitude !== undefined) sanitized.longitude = longitude === null ? null : Number(longitude);

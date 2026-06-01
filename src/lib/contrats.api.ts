@@ -20,10 +20,13 @@ export const CONTRAT_FIELDS = `
   taux_penalite_retard
   plafond_penalite
   statut
+  document_contrat
+  note_statut
   fournisseur_id
   fournisseur {
     id
     raison_sociale
+    email
   }
   emballage_id
   emballage {
@@ -146,6 +149,24 @@ export async function extractContratFromFile(file: File) {
   return graphqlMultipartRequest<{ extractContratFromFile: ContratExtractionResult }>(
     EXTRACT_CONTRAT_FROM_FILE,
     { file: null },
+    { file },
+    { token: token || undefined }
+  );
+}
+
+const UPLOAD_CONTRAT_DOCUMENT = `
+  mutation UploadContratDocument($id: ID!, $file: Upload!) {
+    uploadContratDocument(id: $id, file: $file) {
+      ${CONTRAT_FIELDS}
+    }
+  }
+`;
+
+export async function uploadContratDocument(id: string | number, file: File) {
+  const token = useAuthStore.getState().token;
+  return graphqlMultipartRequest<{ uploadContratDocument: Contrat }>(
+    UPLOAD_CONTRAT_DOCUMENT,
+    { id, file: null },
     { file },
     { token: token || undefined }
   );

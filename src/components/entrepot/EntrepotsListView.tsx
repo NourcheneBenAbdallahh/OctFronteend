@@ -54,9 +54,16 @@ export const EntrepotsListView = ({
               <div className="flex items-center gap-1 mt-2 text-gray-400">
                 <MapPin size={10} />
                 <span className="text-[10px] font-bold uppercase truncate">
-                  {it.adresse}
+                  {it.latitude != null && it.longitude != null
+                    ? `${Number(it.latitude).toFixed(4)}, ${Number(it.longitude).toFixed(4)}`
+                    : it.adresse}
                 </span>
               </div>
+              {it.latitude != null && it.longitude != null && (
+                <p className="mt-0.5 truncate text-[9px] font-semibold text-gray-400">
+                  {it.adresse}
+                </p>
+              )}
             </div>
 
             <div className="space-y-3">

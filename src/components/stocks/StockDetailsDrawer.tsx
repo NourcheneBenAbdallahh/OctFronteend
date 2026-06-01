@@ -63,7 +63,7 @@ export default function StockDetailsDrawer({ stock, open, onClose }: Props) {
         </div>
 
         {/* CONTENU AÉRÉ */}
-        <div className="flex-1 overflow-y-auto px-10 py-6 space-y-8">
+        <div className="form-scroll flex-1 space-y-8 px-10 py-6">
           
           {/* SECTION QUANTITÉ IMPACT */}
           <div className="bg-gray-50 rounded-[32px] p-8 flex items-center justify-between overflow-hidden relative">

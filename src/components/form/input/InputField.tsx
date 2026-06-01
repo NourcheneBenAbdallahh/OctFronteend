@@ -13,6 +13,8 @@ interface InputProps {
   max?: string;
   step?: number;
   disabled?: boolean;
+  tabIndex?: number;
+  autoComplete?: string;
   success?: boolean;
   error?: boolean;
   hint?: string; // Optional hint text
@@ -31,6 +33,8 @@ const Input: FC<InputProps> = ({
   max,
   step,
   disabled = false,
+  tabIndex,
+  autoComplete,
   success = false,
   error = false,
   hint,
@@ -63,6 +67,8 @@ const Input: FC<InputProps> = ({
         max={max}
         step={step}
         disabled={disabled}
+        tabIndex={tabIndex}
+        autoComplete={autoComplete}
         className={inputClasses}
       />
 

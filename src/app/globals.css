@@ -289,6 +289,26 @@
   scrollbar-width: none; /* Firefox */
 }
 
+/** Alias historique (barres de filtres, modales) — même comportement que no-scrollbar. */
+@utility scrollbar-hide {
+  &::-webkit-scrollbar {
+    display: none;
+  }
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/** Zone formulaire / drawer : scroll actif, barre masquée (comme Inventaire, Flux Réceptions). */
+@utility form-scroll {
+  @apply overflow-y-auto overscroll-contain no-scrollbar;
+}
+
+/** Barre de filtres horizontale : scroll actif, barre masquée. */
+@utility filter-bar-scroll {
+  @apply overflow-x-auto overscroll-x-contain no-scrollbar;
+  -webkit-overflow-scrolling: touch;
+}
+
 @utility custom-scrollbar {
   &::-webkit-scrollbar {
     @apply size-1.5;
@@ -303,25 +323,29 @@
   }
 }
 
-/** Conteneur tableau : scroll horizontal sur petits écrans, scrollbar OCT. */
+/** Conteneur tableau : scroll horizontal sur petits écrans, barre masquée. */
 @utility table-scroll-x {
-  @apply w-full min-w-0 overflow-x-auto overscroll-x-contain custom-scrollbar;
+  @apply w-full min-w-0 overflow-x-auto overscroll-x-contain no-scrollbar;
   -webkit-overflow-scrolling: touch;
-  scrollbar-gutter: stable;
 }
 
-/** Liste déroulante unités : scrollbar visible, marque OCT (#00A09D). */
+/** Listes déroulantes (pickers) : scroll actif, barre masquée. */
 @utility unite-mesure-picker-scroll {
+  @apply overflow-y-auto overscroll-contain no-scrollbar;
+}
+
+/** Liste déroulante rôles / pickers indigo (modales admin). */
+@utility role-picker-scroll {
   scrollbar-width: thin;
-  scrollbar-color: rgb(0 160 157 / 0.55) rgb(241 245 249);
+  scrollbar-color: rgb(79 70 229 / 0.45) rgb(241 245 249);
   &::-webkit-scrollbar {
     @apply w-2;
   }
   &::-webkit-scrollbar-track {
-    @apply rounded-full bg-gray-100 dark:bg-gray-800/80;
+    @apply rounded-full bg-gray-100/90 dark:bg-gray-800/80;
   }
   &::-webkit-scrollbar-thumb {
-    @apply rounded-full bg-[#00A09D]/35 hover:bg-[#00A09D]/60 dark:bg-[#00A09D]/45;
+    @apply rounded-full bg-indigo-400/40 hover:bg-indigo-500/65 dark:bg-indigo-500/45;
   }
 }
 

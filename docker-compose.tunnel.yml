@@ -4,4 +4,4 @@ services:
   frontend:
     build:
       args:
-        NEXT_PUBLIC_GRAPHQL_ENDPOINT: ${TUNNEL_BACKEND_GRAPHQL:-${TUNNEL_BACKEND_URL}/graphql}
+        NEXT_PUBLIC_GRAPHQL_ENDPOINT: ${TUNNEL_BACKEND_GRAPHQL}

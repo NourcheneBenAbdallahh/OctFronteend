@@ -8,6 +8,9 @@ export type User = {
   photo?: string | null;
   telephone?: string | null;
   phoneVerifiedAt?: string | null;
+  country?: string | null;
+  city?: string | null;
+  postalCode?: string | null;
 };
 
 export type AuthPayload = {

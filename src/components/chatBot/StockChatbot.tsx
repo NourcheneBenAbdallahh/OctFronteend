@@ -115,8 +115,8 @@ export default function StockChatbot({ variant = "widget" }: StockChatbotProps) 
 
   const messagesAreaClass =
     variant === "page"
-      ? "min-h-[min(55vh,420px)] max-h-[min(65vh,520px)] space-y-3 overflow-y-auto p-4"
-      : "h-[min(50vh,320px)] space-y-3 overflow-y-auto p-4";
+      ? "form-scroll min-h-[min(55vh,420px)] max-h-[min(65vh,520px)] space-y-3 p-4"
+      : "form-scroll h-[min(50vh,320px)] space-y-3 p-4";
 
   return (
     <>

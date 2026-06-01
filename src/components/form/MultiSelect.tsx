@@ -130,7 +130,7 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
 
           {isOpen && (
             <div
-              className="absolute left-0 z-40 w-full overflow-y-auto bg-white rounded-lg shadow-sm top-full max-h-select dark:bg-gray-900"
+              className="no-scrollbar absolute left-0 top-full z-40 max-h-select w-full overflow-y-auto overscroll-contain rounded-lg bg-white shadow-sm dark:bg-gray-900"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex flex-col">

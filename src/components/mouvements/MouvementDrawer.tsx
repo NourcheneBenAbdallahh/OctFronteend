@@ -155,7 +155,7 @@ export default function MouvementStepperModal({
         className="fixed inset-0 bg-[#1C2434]/60 backdrop-blur-md"
         onClick={onClose}
       />
-      <div className="relative z-[101] flex min-h-[100dvh] w-full items-stretch justify-center overflow-y-auto overflow-x-hidden p-0 sm:min-h-full sm:items-center sm:p-3 md:p-4">
+      <div className="no-scrollbar relative z-[101] flex min-h-[100dvh] w-full items-stretch justify-center overflow-y-auto overflow-x-hidden p-0 sm:min-h-full sm:items-center sm:p-3 md:p-4">
         <div className="relative flex h-[100dvh] max-h-[100dvh] w-full max-w-full flex-1 flex-col overflow-hidden bg-white shadow-2xl ring-1 ring-gray-200/60 animate-in zoom-in-95 duration-200 sm:h-[min(92vh,840px)] sm:max-h-[min(92vh,840px)] sm:max-w-6xl sm:flex-none sm:rounded-3xl">
         {/* En-tête : fixe, ne défile pas */}
         <div className="shrink-0 border-b border-gray-100 bg-gradient-to-b from-[#f8fafb] to-white px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-4 sm:px-10 sm:py-7 sm:pt-7">
@@ -243,7 +243,7 @@ export default function MouvementStepperModal({
 
         {/* Corps : occupe l’espace sous le header ; scroll interne unique */}
         <div className="flex min-h-0 flex-1 flex-col bg-[#eef3f4] pb-[env(safe-area-inset-bottom,0px)]">
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden px-4 py-6 sm:px-12 sm:py-12 [scrollbar-gutter:stable]">
+          <div className="form-scroll flex min-h-0 flex-1 flex-col overflow-x-hidden px-4 py-6 sm:px-12 sm:py-12">
             <div
               className={`mx-auto w-full max-w-5xl min-h-0 ${sparseStep ? "flex min-h-full flex-col justify-center py-2" : ""}`}
             >

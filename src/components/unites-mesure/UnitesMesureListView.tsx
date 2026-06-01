@@ -2,6 +2,7 @@ import React from "react";
 import { Edit3, Trash2 } from "lucide-react";
 import type { UniteMesure } from "@/types/unite-mesure";
 import { ResponsiveTableWrap } from "@/components/ui/ResponsiveTableWrap";
+import { SortableTh, type TableSortHeaderProps } from "@/components/ui/SortableTableHeader";
 
 function dimClass(d: string) {
   const x = d.toLowerCase();
@@ -20,22 +21,25 @@ export const UnitesMesureListView = ({
   rows,
   onEdit,
   onDelete,
+  sortKey,
+  sortDirection,
+  onSort,
 }: {
   rows: UniteMesure[];
   onEdit: (row: UniteMesure) => void;
   onDelete: (id: string | number) => void;
-}) => (
+} & TableSortHeaderProps) => (
   <div className="overflow-hidden rounded-[2.5rem] border border-gray-100 bg-white shadow-sm">
     <ResponsiveTableWrap>
     <table className="w-full min-w-[760px] text-left border-collapse">
       <thead>
         <tr className="border-b border-gray-50 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
-          <th className="px-8 py-6">Code</th>
-          <th className="px-8 py-6">Libellé</th>
-          <th className="px-8 py-6">Dimension</th>
-          <th className="px-8 py-6">Facteur → kg</th>
-          <th className="px-8 py-6">Facteur → L</th>
-          <th className="px-8 py-6 text-center">Ordre</th>
+          <SortableTh columnKey="code" sortKey={sortKey} sortDirection={sortDirection} onSort={onSort} className="px-8 py-6">Code</SortableTh>
+          <SortableTh columnKey="label" sortKey={sortKey} sortDirection={sortDirection} onSort={onSort} className="px-8 py-6">Libellé</SortableTh>
+          <SortableTh columnKey="dimension" sortKey={sortKey} sortDirection={sortDirection} onSort={onSort} className="px-8 py-6">Dimension</SortableTh>
+          <SortableTh columnKey="facteur_kg" sortKey={sortKey} sortDirection={sortDirection} onSort={onSort} className="px-8 py-6">Facteur → kg</SortableTh>
+          <SortableTh columnKey="facteur_l" sortKey={sortKey} sortDirection={sortDirection} onSort={onSort} className="px-8 py-6">Facteur → L</SortableTh>
+          <SortableTh columnKey="sort_order" sortKey={sortKey} sortDirection={sortDirection} onSort={onSort} className="px-8 py-6" align="center">Ordre</SortableTh>
           <th className="px-8 py-6 text-center">Actions</th>
         </tr>
       </thead>

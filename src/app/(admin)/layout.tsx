@@ -2,8 +2,10 @@
 
 import AdminRouteGuard from "@/components/access/AdminRouteGuard";
 import StockChatbot from "@/components/chatBot/StockChatbot";
+import AlertToastStack from "@/components/notifications/AlertToastStack";
 import AppInteractiveTour from "@/components/onboarding/AppInteractiveTour";
 import FirstLoginOnboardingModal from "@/components/onboarding/FirstLoginOnboardingModal";
+import { LiveAlertsProvider } from "@/context/LiveAlertsContext";
 import { useSidebar } from "@/context/SidebarContext";
 import { canUseStockAi } from "@/lib/access";
 import { useFirstLoginOnboarding } from "@/hooks/useFirstLoginOnboarding";
@@ -46,6 +48,7 @@ export default function AdminLayout({
 
   return (
     <AdminRouteGuard>
+      <LiveAlertsProvider>
       <div className="min-h-screen min-w-0 bg-gray-50 dark:bg-gray-950 xl:flex">
         <AppSidebar />
         <Backdrop />
@@ -71,6 +74,8 @@ export default function AdminLayout({
         active={interactiveTourActive}
         onDone={endInteractiveTour}
       />
+      <AlertToastStack />
+      </LiveAlertsProvider>
     </AdminRouteGuard>
   );
 }

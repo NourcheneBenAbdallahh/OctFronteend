@@ -3,15 +3,24 @@
 import { Eye, Trash2, ArrowDownToLine, ArrowUpFromLine, User2 } from "lucide-react";
 import type { Stock } from "@/types/stock";
 import { ResponsiveTableWrap } from "@/components/ui/ResponsiveTableWrap";
+import { SortableTh, type TableSortHeaderProps } from "@/components/ui/SortableTableHeader";
 
-interface Props {
+interface Props extends TableSortHeaderProps {
   rows: Stock[];
   onView?: (stock: Stock) => void;
   onDelete?: (stock: Stock) => void;
   focusedId?: string | number | null;
 }
 
-export default function StocksTableView({ rows, onView, onDelete, focusedId }: Props) {
+export default function StocksTableView({
+  rows,
+  onView,
+  onDelete,
+  focusedId,
+  sortKey,
+  sortDirection,
+  onSort,
+}: Props) {
   if (!rows.length) return null;
 
   return (
@@ -19,13 +28,13 @@ export default function StocksTableView({ rows, onView, onDelete, focusedId }: P
       <ResponsiveTableWrap>
       <table className="w-full min-w-[960px] text-left border-collapse">
         <thead>
-          <tr className="bg-gray-50/50 border-b border-gray-100">
-            <th className="px-6 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Sens</th>
-            <th className="px-6 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Référence Lot</th>
-            <th className="px-6 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Entrepôt & Emballage</th>
-            <th className="px-6 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-right">Quantité</th>
-            <th className="px-6 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Date</th>
-            <th className="px-6 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-right">Actions</th>
+          <tr className="bg-gray-50/50 border-b border-gray-100 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
+            <SortableTh columnKey="sens" sortKey={sortKey} sortDirection={sortDirection} onSort={onSort} className="px-6 py-5">Sens</SortableTh>
+            <SortableTh columnKey="lot" sortKey={sortKey} sortDirection={sortDirection} onSort={onSort} className="px-6 py-5">Référence Lot</SortableTh>
+            <SortableTh columnKey="entrepot" sortKey={sortKey} sortDirection={sortDirection} onSort={onSort} className="px-6 py-5">Entrepôt & Emballage</SortableTh>
+            <SortableTh columnKey="quantite" sortKey={sortKey} sortDirection={sortDirection} onSort={onSort} className="px-6 py-5" align="right">Quantité</SortableTh>
+            <SortableTh columnKey="date" sortKey={sortKey} sortDirection={sortDirection} onSort={onSort} className="px-6 py-5">Date</SortableTh>
+            <th className="px-6 py-5 text-right">Actions</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-50">

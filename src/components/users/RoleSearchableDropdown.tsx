@@ -22,7 +22,8 @@ export function RoleSearchableDropdown({
   placeholder = "Choisir un rôle…",
   disabled,
   includeAllOption,
-  dropdownZClassName = "z-[1200]",
+  /** Au-dessus des modales drawer (z-99999), comme CountrySearchablePicker */
+  dropdownZClassName = "z-[100002]",
 }: Props) {
   const pickerOptions = [
     ...(includeAllOption ? [{ id: "", label: includeAllOption.label }] : []),

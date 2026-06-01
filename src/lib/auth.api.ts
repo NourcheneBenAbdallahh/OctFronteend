@@ -78,26 +78,6 @@ mutation ResetPassword(
   )
 }`;
 
-const FORGOT_PASSWORD_BY_PHONE_MUTATION = `
-mutation ForgotPasswordByPhone($telephone: String!) {
-  forgotPasswordByPhone(telephone: $telephone)
-}`;
-
-const RESET_PASSWORD_BY_PHONE_MUTATION = `
-mutation ResetPasswordByPhone(
-  $telephone: String!,
-  $code: String!,
-  $password: String!,
-  $password_confirmation: String!
-) {
-  resetPasswordByPhone(
-    telephone: $telephone,
-    code: $code,
-    password: $password,
-    password_confirmation: $password_confirmation
-  )
-}`;
-
 const ME_QUERY = `
 query Me {
   me {
@@ -109,6 +89,9 @@ query Me {
     emailVerifiedAt
     telephone
     phoneVerifiedAt
+    country
+    city
+    postalCode
   }
 }`;
 
@@ -129,13 +112,20 @@ mutation UpdateProfile($input: UpdateProfileInput!) {
     telephone
     phoneVerifiedAt
     photo
+    country
+    city
+    postalCode
   }
 }`;
 
 export type UpdateProfileInput = {
   name?: string;
   email?: string;
-  telephone?: string;
+  current_password?: string;
+  telephone?: string | null;
+  country?: string | null;
+  city?: string | null;
+  postal_code?: string | null;
   photo?: string | null;
 };
 
@@ -203,27 +193,6 @@ export async function resetPassword(input: {
   return graphqlRequest<{ resetPassword: string }>(RESET_PASSWORD_MUTATION, input, {
     skipAuth: true,
   }).then((d) => d.resetPassword);
-}
-
-export async function forgotPasswordByPhone(telephone: string): Promise<string> {
-  return graphqlRequest<{ forgotPasswordByPhone: string }>(
-    FORGOT_PASSWORD_BY_PHONE_MUTATION,
-    { telephone },
-    { skipAuth: true }
-  ).then((d) => d.forgotPasswordByPhone);
-}
-
-export async function resetPasswordByPhone(input: {
-  telephone: string;
-  code: string;
-  password: string;
-  password_confirmation: string;
-}): Promise<string> {
-  return graphqlRequest<{ resetPasswordByPhone: string }>(
-    RESET_PASSWORD_BY_PHONE_MUTATION,
-    input,
-    { skipAuth: true }
-  ).then((d) => d.resetPasswordByPhone);
 }
 
 export async function me(token?: string): Promise<User | null> {
