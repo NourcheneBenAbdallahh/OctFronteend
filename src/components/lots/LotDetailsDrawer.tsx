@@ -124,7 +124,7 @@ export default function LotDetailsDrawer({ lot, open, onClose }: Props) {
             <div className="p-6 bg-orange-50/30 border border-orange-100/50 rounded-[32px] relative overflow-hidden">
               <MessageSquareText size={60} className="absolute -right-4 -bottom-4 text-orange-200 opacity-20" />
               <p className="text-[14px] leading-relaxed font-medium text-gray-700 relative z-10 italic">
-                "{lot.commentaire?.trim() || "Aucune observation particulière n'a été rattachée à ce lot de production."}"
+                &ldquo;{lot.commentaire?.trim() || "Aucune observation particulière n'a été rattachée à ce lot de production."}&rdquo;
               </p>
             </div>
           </div>
@@ -148,7 +148,7 @@ export default function LotDetailsDrawer({ lot, open, onClose }: Props) {
             onClick={onClose}
             className="px-8 py-4 bg-[#1C2434] text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-[#00A09D] transition-all shadow-lg shadow-gray-200"
           >
-            Fermer l'inspecteur
+            Fermer l&apos;inspecteur
           </button>
         </div>
       </div>

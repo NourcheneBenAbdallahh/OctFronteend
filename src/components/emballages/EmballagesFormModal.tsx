@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { X, Save, Settings2, ChevronLeft, ChevronRight } from "lucide-react";
 import { updateEmballages, createEmballages } from "@/lib/emballages.api";
 import { listUnitesMesure } from "@/lib/unites-mesure.api";
@@ -169,6 +170,33 @@ export default function EmballagesFormModal({
     };
   }, []);
 
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtmlOverflow = html.style.overflow;
+    const prevBodyOverflow = body.style.overflow;
+    const prevBodyPaddingRight = body.style.paddingRight;
+    const scrollbarW = window.innerWidth - html.clientWidth;
+
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    if (scrollbarW > 0) {
+      body.style.paddingRight = `${scrollbarW}px`;
+    }
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      html.style.overflow = prevHtmlOverflow;
+      body.style.overflow = prevBodyOverflow;
+      body.style.paddingRight = prevBodyPaddingRight;
+    };
+  }, [onClose]);
+
   const goNext = () => {
     setSubmitError(null);
     const errs = validateStep1(form, !!editing);
@@ -245,16 +273,19 @@ export default function EmballagesFormModal({
 
   const unites = unitesMesure.length ? unitesMesure : UNIT_FALLBACK;
 
-  return (
-    <div className="pointer-events-auto fixed inset-0 z-[200]">
-      <div
-        className="fixed inset-0 z-0 bg-gray-900/40 backdrop-blur-sm"
-        onMouseDown={(e) => {
-          if (e.target === e.currentTarget) onClose();
-        }}
-        aria-hidden
+  const panel = (
+    <>
+      <button
+        type="button"
+        className="fixed inset-0 z-[969] cursor-default border-0 bg-gray-900/40 backdrop-blur-sm"
+        aria-label="Fermer le formulaire"
+        onClick={onClose}
       />
-      <div className="pointer-events-auto fixed inset-y-0 right-0 z-10 flex w-full max-w-2xl flex-col bg-white shadow-[-30px_0_60px_rgba(0,0,0,0.1)] rounded-l-[3rem]">
+      <aside
+        className="fixed right-0 top-0 z-[970] flex h-full max-h-[100dvh] min-h-0 w-full max-w-2xl flex-col overflow-hidden rounded-l-[3rem] bg-white shadow-[-30px_0_60px_rgba(0,0,0,0.1)] animate-in slide-in-from-right duration-300"
+        aria-modal="true"
+        role="dialog"
+      >
         <div className="shrink-0 p-12 pb-4 flex justify-between items-start">
           <div>
             <span className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.3em] block mb-2">Configuration</span>
@@ -481,9 +512,11 @@ export default function EmballagesFormModal({
             )}
           </div>
         </div>
-      </div>
-    </div>
+      </aside>
+    </>
   );
+
+  return createPortal(panel, document.body);
 }
 
 function InputField({

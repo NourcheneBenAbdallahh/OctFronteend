@@ -100,10 +100,7 @@ export function OptionSearchablePicker({
   }, []);
 
   useLayoutEffect(() => {
-    if (!open) {
-      setPop(null);
-      return;
-    }
+    if (!open) return;
     updatePopPos();
   }, [open, updatePopPos, filtered.length, q]);
 

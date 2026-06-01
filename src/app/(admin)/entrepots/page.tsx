@@ -57,6 +57,10 @@ export default function EntrepotsPage() {
   );
 }
 
+/** Hauteur utile sous AppHeader (padding layout annulé par -m-4 / -m-6). */
+const PAGE_SHELL_CLASS =
+  "flex min-h-0 flex-col overflow-hidden bg-[#F0F4F4] -mx-4 -mt-4 mb-0 h-[calc(100dvh-7.25rem)] max-lg:h-[calc(100dvh-8.5rem)] lg:h-[calc(100dvh-5.25rem)] md:-mx-6 md:-mt-6";
+
 function EntrepotsPageContent() {
   const searchParams = useSearchParams();
   const focusId = searchParams.get("focus");
@@ -148,19 +152,21 @@ function EntrepotsPageContent() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-[#F0F4F4]">
-      <div className="px-8 pt-4">
+    <div className={PAGE_SHELL_CLASS}>
+      <div className="shrink-0 px-8 pt-4">
         <AppFeedbackBanner feedback={feedback} onDismiss={clearFeedback} />
       </div>
-      <EntrepotsHeader
-        count={items.length}
-        onAdd={() => {
-          setEditingItem(null);
-          setIsModalOpen(true);
-        }}
-      />
+      <div className="shrink-0">
+        <EntrepotsHeader
+          count={items.length}
+          onAdd={() => {
+            setEditingItem(null);
+            setIsModalOpen(true);
+          }}
+        />
+      </div>
 
-      <div className="px-8 pb-6 flex flex-wrap items-center gap-4">
+      <div className="shrink-0 px-8 pb-4 flex flex-wrap items-center gap-4">
         <div className="relative flex-1 max-w-md group">
           <Search
             className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-[#00A09D] transition-colors"
@@ -201,41 +207,39 @@ function EntrepotsPageContent() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto custom-scrollbar px-2">
+      <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain px-2">
         {loading ? (
           <EntrepotSkeleton />
         ) : filteredItems.length > 0 ? (
-          <>
-            <EntrepotsListView
-              rows={paginatedItems}
-              focusedId={focusId}
-              onEdit={(it) => {
-                setEditingItem(it);
-                setIsModalOpen(true);
-              }}
-            />
-
-            {totalPages > 1 && (
-              <div className="mt-4 mb-6 flex justify-center items-center py-6 bg-white rounded-[2rem] border border-gray-50 shadow-sm animate-in fade-in zoom-in-95 duration-300">
-                <LocalPagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  onPageChange={setCurrentPage}
-                />
-              </div>
-            )}
-          </>
+          <EntrepotsListView
+            rows={paginatedItems}
+            focusedId={focusId}
+            onEdit={(it) => {
+              setEditingItem(it);
+              setIsModalOpen(true);
+            }}
+          />
         ) : (
-          <div className="flex flex-col items-center justify-center h-[50vh] text-center">
-            <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+          <div className="flex h-full min-h-[240px] flex-col items-center justify-center px-6 text-center">
+            <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-gray-100">
               <Filter className="text-gray-300" size={32} />
             </div>
-            <p className="text-gray-400 font-black uppercase text-[10px] tracking-widest">
+            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
               Aucun entrepôt ne correspond à vos critères
             </p>
           </div>
         )}
       </div>
+
+      {!loading && filteredItems.length > 0 && totalPages > 1 ? (
+        <div className="shrink-0 mx-2 mb-2 flex items-center justify-center rounded-[2rem] border border-gray-50 bg-white py-4 shadow-sm">
+          <LocalPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+          />
+        </div>
+      ) : null}
 
       <EntrepotsFormModal
         isOpen={isModalOpen}

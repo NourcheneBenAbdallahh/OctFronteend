@@ -345,24 +345,33 @@ const AppSidebar: React.FC = () => {
       onMouseEnter={() => !isExpanded && setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div className="flex shrink-0 items-center justify-center overflow-visible px-2 py-5 lg:py-6 transition-all duration-300">
-        <Link href="/bi" className="flex w-full items-center justify-center px-1">
-          <AppBrand compact={!(isExpanded || isHovered || isMobileOpen)} />
+      <div className="flex shrink-0 items-center overflow-visible border-b border-gray-100 px-3 py-5 transition-all duration-300 dark:border-gray-800 lg:py-6">
+        <Link
+          href="/bi"
+          className={`flex w-full min-w-0 items-center ${
+            isExpanded || isHovered || isMobileOpen ? "justify-start" : "justify-center"
+          }`}
+        >
+          <AppBrand
+            size="lg"
+            compact={!(isExpanded || isHovered || isMobileOpen)}
+            className="w-full"
+          />
         </Link>
       </div>
       <div className="flex flex-col overflow-y-auto duration-300 ease-linear no-scrollbar">
-        <nav className="mb-6" data-tour="sidebar-menu">
+        <nav className="mb-6 pt-5" data-tour="sidebar-menu">
           <div className="flex flex-col gap-4">
             <div>
               <h2
-                className={`mb-4 text-xs uppercase flex leading-[20px] text-gray-400 ${
+                className={`mb-4 text-xs uppercase tracking-[0.35em] flex leading-[20px] text-gray-400 ${
                   !isExpanded && !isHovered
                     ? "lg:justify-center"
                     : "justify-start"
                 }`}
               >
                 {isExpanded || isHovered || isMobileOpen ? (
-                  "Menu"
+                  "MENU"
                 ) : (
                   <HorizontaLDots />
                 )}

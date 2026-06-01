@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Bell, X } from "lucide-react";
@@ -26,11 +26,11 @@ export default function AlertToastStack() {
   const router = useRouter();
   const { subscribeNewAlert, markAsRead } = useLiveAlertsContext();
   const [toasts, setToasts] = useState<ToastItem[]>([]);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
 
   const dismissToast = useCallback((key: string) => {
     setToasts((prev) => prev.filter((toast) => toast.key !== key));

@@ -23,7 +23,12 @@ import autoTable from "jspdf-autotable";
 import { exportContratsCsv, type ContratUsageHistoryCsvRow } from "@/lib/contrats.csv";
 import { drawOctPdfHeader } from "@/lib/octPdfHeader";
 import { downloadBlob, fetchContratDocument, openBlobInNewTab } from "@/lib/contrats.document";
-import { matchesMontantHtRange } from "@/lib/contratAnalytics";
+import {
+  computeContratDashboardStats,
+  matchesContratInsightFilter,
+  matchesMontantHtRange,
+  type ContratInsightFilter,
+} from "@/lib/contratAnalytics";
 import { AppConfirmModal, AppFeedbackBanner } from "@/components/ui/feedback";
 import { getActionErrorMessage, useAppFeedback } from "@/hooks/useAppFeedback";
 
@@ -79,6 +84,7 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
   const [query, setQuery] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("TOUT");
+  const [insightFilter, setInsightFilter] = useState<ContratInsightFilter>("");
   const [fournisseurFilter, setFournisseurFilter] = useState<string>("");
   const [emballageFilter, setEmballageFilter] = useState<string>("");
   const [fournisseurSearch, setFournisseurSearch] = useState<string>("");
@@ -629,6 +635,7 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
       const matchesDateFinFrom = !endMin || (dateFin && dateFin >= endMin);
       const matchesDateFinTo = !endMax || (dateFin && dateFin <= endMax);
       const matchesMontant = matchesMontantHtRange(r.montant_ht, montantHtMin, montantHtMax);
+      const matchesInsight = matchesContratInsightFilter(r, insightFilter);
 
       return (
         matchesText &&
@@ -639,13 +646,15 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
         matchesDateDebutTo &&
         matchesDateFinFrom &&
         matchesDateFinTo &&
-        matchesMontant
+        matchesMontant &&
+        matchesInsight
       );
     });
   }, [
     rows,
     query,
     statusFilter,
+    insightFilter,
     fournisseurFilter,
     emballageFilter,
     dateDebutFrom,
@@ -689,18 +698,26 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
   useEffect(() => {
     setFocusPinned(false);
     setCurrentPage(1);
-  }, [query, statusFilter, fournisseurFilter, emballageFilter, dateDebutFrom, dateDebutTo, dateFinFrom, dateFinTo, montantHtMin, montantHtMax, sortKey, sortDirection]);
+  }, [query, statusFilter, insightFilter, fournisseurFilter, emballageFilter, dateDebutFrom, dateDebutTo, dateFinFrom, dateFinTo, montantHtMin, montantHtMax, sortKey, sortDirection]);
 
-  const stats = useMemo(() => {
-    const total = rows.length;
-    const totalV = rows.reduce((acc, c) => acc + (c.quantite_contractuelle || 0), 0);
-    const totalR = rows.reduce((acc, c) => acc + (c.quantite_realisee || 0), 0);
-    return {
-      total,
-      actifs: rows.filter(r => r.statut === "ACTIF").length,
-      realisation: totalV > 0 ? Math.round((totalR / totalV) * 100) : 0
-    };
-  }, [rows]);
+  const handleInsightFilterChange = (filter: ContratInsightFilter) => {
+    setInsightFilter(filter);
+    if (filter) {
+      setStatusFilter("TOUT");
+      setShowFilters(true);
+    }
+    setCurrentPage(1);
+    setFocusPinned(false);
+  };
+
+  const handleStatusFilterChange = (status: string) => {
+    setStatusFilter(status);
+    if (status !== "TOUT") setInsightFilter("");
+    setCurrentPage(1);
+    setFocusPinned(false);
+  };
+
+  const stats = useMemo(() => computeContratDashboardStats(rows), [rows]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -866,6 +883,8 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
         setQuery={setQuery}
         onOpenNew={() => { setEditing(null); setForm(emptyForm); setPendingDocumentFile(null); setIsOpen(true); }}
         stats={stats}
+        insightFilter={insightFilter}
+        onInsightFilterChange={handleInsightFilterChange}
       />
 
       <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-5 md:p-6 space-y-6">
@@ -887,6 +906,7 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
             type="button"
             onClick={() => {
               setStatusFilter("TOUT");
+              setInsightFilter("");
               setFournisseurFilter("");
               setEmballageFilter("");
               setDateDebutFrom("");
@@ -917,7 +937,7 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
             return (
               <button
                 key={status}
-                onClick={() => setStatusFilter(status)}
+                onClick={() => handleStatusFilterChange(status)}
                 className={`group flex items-center gap-3 px-5 py-3 rounded-2xl text-[10px] font-black tracking-widest transition-all whitespace-nowrap border ${
                   isActive
                     ? "bg-gray-900 text-white border-gray-900 shadow-xl shadow-gray-200 scale-105"

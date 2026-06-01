@@ -25,15 +25,17 @@ export const ContratForm = ({
 }: any) => {
   const [step, setStep] = useState(1);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
 
   const isLocked = Number(form.quantite_realisee) > 0;
 
-  useEffect(() => {
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen);
     if (isOpen) {
       setStep(1);
       setErrors({});
     }
-  }, [isOpen]);
+  }
 
   useEffect(() => {
     if (!isOpen) return;
@@ -245,7 +247,7 @@ export const ContratForm = ({
                   <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Statut</label>
                   {isLocked && (
                     <span className="flex items-center gap-1 text-[9px] font-bold text-amber-500 bg-amber-50 px-2 py-1 rounded-lg">
-                      <AlertCircle size={10} /> Modification restreinte : Engagement en cours d'exécution
+                      <AlertCircle size={10} /> Modification restreinte : Engagement en cours d&apos;exécution
                     </span>
                   )}
                 </div>

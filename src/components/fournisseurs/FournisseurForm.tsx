@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, ChangeEvent, DragEvent, FormEvent } from "react";
+import React, { useState, useEffect, ChangeEvent, DragEvent, FormEvent } from "react";
 import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -44,13 +44,35 @@ export const FournisseurForm = ({ isOpen, editing, form, setForm, onClose, onSub
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
 
-// AJOUTE CECI :
-React.useEffect(() => {
+useEffect(() => {
   if (isOpen) {
-    setStep(1); // On revient à la première étape à chaque ouverture
-    setErrors({}); // On vide aussi les anciennes erreurs visuelles
+    setStep(1);
+    setErrors({});
   }
 }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtmlOverflow = html.style.overflow;
+    const prevBodyOverflow = body.style.overflow;
+    const prevBodyPaddingRight = body.style.paddingRight;
+    const scrollbarW = window.innerWidth - html.clientWidth;
+
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    if (scrollbarW > 0) {
+      body.style.paddingRight = `${scrollbarW}px`;
+    }
+
+    return () => {
+      html.style.overflow = prevHtmlOverflow;
+      body.style.overflow = prevBodyOverflow;
+      body.style.paddingRight = prevBodyPaddingRight;
+    };
+  }, [isOpen]);
   const MapClickHandler = () => {
     useMapEvents({
       click: async (e) => {
@@ -110,7 +132,7 @@ React.useEffect(() => {
   const handleNext = () => { if (validate()) setStep(s => s + 1); };
 
   return (
-    <div className="no-scrollbar fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-[#002424]/40 backdrop-blur-md p-3 sm:items-center sm:p-4 animate-in fade-in duration-300">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden bg-[#002424]/40 backdrop-blur-md p-3 sm:p-4 animate-in fade-in duration-300">
       <div className="my-auto flex w-full max-w-2xl max-h-[min(100dvh-1.5rem,900px)] flex-col overflow-hidden rounded-2xl border border-[#00A09D]/10 bg-white shadow-2xl sm:rounded-[3rem] sm:max-h-[min(100dvh-2rem,900px)]">
         
         {/* HEADER */}
