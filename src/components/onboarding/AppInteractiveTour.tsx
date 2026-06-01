@@ -29,7 +29,7 @@ export default function AppInteractiveTour({ active, onDone }: Props) {
         markOnboardingDone(user.id);
         onDone();
       });
-    }, 400);
+    }, 150);
 
     return () => {
       window.clearTimeout(timer);

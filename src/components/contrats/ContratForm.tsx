@@ -4,7 +4,25 @@ import React, { useState, useEffect } from "react";
 import { X, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Check, AlertCircle } from "lucide-react";
 import { UniteMesureSearchablePicker } from "@/components/unites-mesure/UniteMesureSearchablePicker";
 
-export const ContratForm = ({ isOpen, editing, form, setForm, onClose, onSubmit, loading, fournisseurs, emballages, unitesMesure = [], onExtractFromFile, extracting }: any) => {
+import { getContratStatutNote } from "@/lib/contratAnalytics";
+import { GmailEmailLink } from "@/components/ui/GmailEmailLink";
+
+export const ContratForm = ({
+  isOpen,
+  editing,
+  form,
+  setForm,
+  onClose,
+  onSubmit,
+  loading,
+  fournisseurs,
+  emballages,
+  unitesMesure = [],
+  onExtractFromFile,
+  onDocumentFile,
+  extracting,
+  hasPendingDocument,
+}: any) => {
   const [step, setStep] = useState(1);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -15,6 +33,29 @@ export const ContratForm = ({ isOpen, editing, form, setForm, onClose, onSubmit,
       setStep(1);
       setErrors({});
     }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtmlOverflow = html.style.overflow;
+    const prevBodyOverflow = body.style.overflow;
+    const prevBodyPaddingRight = body.style.paddingRight;
+    const scrollbarW = window.innerWidth - html.clientWidth;
+
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    if (scrollbarW > 0) {
+      body.style.paddingRight = `${scrollbarW}px`;
+    }
+
+    return () => {
+      html.style.overflow = prevHtmlOverflow;
+      body.style.overflow = prevBodyOverflow;
+      body.style.paddingRight = prevBodyPaddingRight;
+    };
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -65,12 +106,15 @@ export const ContratForm = ({ isOpen, editing, form, setForm, onClose, onSubmit,
   };
 
   return (
-    <>
-      <div className="fixed inset-0 z-[100] bg-gray-900/40 backdrop-blur-sm animate-in fade-in duration-300" onClick={onClose} />
-      <div className="fixed inset-y-0 right-0 z-[101] w-full max-w-xl bg-white shadow-[-30px_0_60px_rgba(0,0,0,0.1)] animate-in slide-in-from-right duration-500 rounded-l-[3rem] flex flex-col">
-        
+    <div className="fixed inset-0 z-[100] overflow-hidden">
+      <div
+        className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm animate-in fade-in duration-300"
+        onClick={onClose}
+        aria-hidden
+      />
+      <div className="absolute inset-y-0 right-0 flex h-full max-h-[100dvh] w-full max-w-xl min-h-0 flex-col overflow-hidden rounded-l-[3rem] bg-white shadow-[-30px_0_60px_rgba(0,0,0,0.1)] animate-in slide-in-from-right duration-500">
         {/* HEADER */}
-        <div className="p-10 pb-6">
+        <div className="shrink-0 p-10 pb-6">
           <div className="flex justify-between items-start mb-8">
             <div>
               <span className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.3em] block mb-2 underline decoration-2 underline-offset-4">
@@ -91,7 +135,7 @@ export const ContratForm = ({ isOpen, editing, form, setForm, onClose, onSubmit,
         </div>
 
         {/* FORM CONTENT */}
-        <div className="flex-1 overflow-y-auto px-10 py-4 scrollbar-hide">
+        <div className="form-scroll min-h-0 flex-1 px-10 py-4">
           
           {step === 1 && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -128,14 +172,51 @@ export const ContratForm = ({ isOpen, editing, form, setForm, onClose, onSubmit,
                         const file = e.target.files?.[0];
                         if (!file) return;
                         onExtractFromFile(file);
+                        onDocumentFile?.(file);
                         e.currentTarget.value = "";
                       }}
                       className="block w-full text-xs font-semibold text-gray-700 file:mr-3 file:rounded-xl file:border-0 file:bg-[#1C2434] file:px-3 file:py-2 file:text-[10px] file:font-black file:uppercase file:tracking-wider file:text-white hover:file:bg-indigo-600"
                       disabled={extracting || loading}
                     />
                     <p className="mt-2 text-[10px] font-semibold text-indigo-700/80">
-                      {extracting ? "Extraction OCR en cours..." : "Le systeme detecte fournisseur, emballage et informations du contrat."}
+                      {extracting
+                        ? "Extraction OCR en cours..."
+                        : hasPendingDocument
+                          ? "Document prêt — il sera enregistré à la validation."
+                          : "Le fichier sera conservé comme document du contrat."}
                     </p>
+                  </div>
+                </div>
+              )}
+
+              {(editing || hasPendingDocument) && (
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">
+                    Document du contrat
+                  </label>
+                  <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4 space-y-2">
+                    {form.document_contrat && !hasPendingDocument && (
+                      <p className="text-[10px] font-bold text-emerald-700">
+                        Document existant enregistré.
+                      </p>
+                    )}
+                    <input
+                      type="file"
+                      accept=".pdf,image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        onDocumentFile?.(file);
+                        e.currentTarget.value = "";
+                      }}
+                      className="block w-full text-xs font-semibold text-gray-700 file:mr-3 file:rounded-xl file:border-0 file:bg-[#1C2434] file:px-3 file:py-2 file:text-[10px] file:font-black file:uppercase file:tracking-wider file:text-white hover:file:bg-indigo-600"
+                      disabled={loading}
+                    />
+                    {hasPendingDocument && (
+                      <p className="text-[10px] font-semibold text-indigo-700">
+                        Nouveau document sélectionné — enregistrez pour remplacer l&apos;ancien.
+                      </p>
+                    )}
                   </div>
                 </div>
               )}
@@ -144,6 +225,19 @@ export const ContratForm = ({ isOpen, editing, form, setForm, onClose, onSubmit,
                 <SelectField label="Fournisseur" value={form.fournisseur_id} options={fournisseurs} labelKey="raison_sociale" error={errors.fournisseur_id} onChange={(v:any) => setForm({...form, fournisseur_id: v})} disabled={isLocked} />
                 <SelectField label="Emballage" value={form.emballage_id} options={emballages} labelKey="name" error={errors.emballage_id} onChange={(v:any) => setForm({...form, emballage_id: v})} disabled={isLocked} />
               </div>
+              {form.fournisseur_id && (() => {
+                const f = fournisseurs?.find((x: { id: string | number }) => String(x.id) === String(form.fournisseur_id));
+                if (!f?.email) return null;
+                return (
+                  <p className="text-[11px] font-semibold text-gray-500 -mt-4">
+                    Contact :{" "}
+                    <GmailEmailLink
+                      email={f.email}
+                      subject={form.numero_contrat ? `Contrat ${form.numero_contrat}` : "Contrat OCT"}
+                    />
+                  </p>
+                );
+              })()}
 
               {/* CONTRÔLE DU STATUT */}
               <div className="pt-4 border-t border-gray-50">
@@ -171,6 +265,21 @@ export const ContratForm = ({ isOpen, editing, form, setForm, onClose, onSubmit,
                       {s}
                     </button>
                   ))}
+                </div>
+                <div className="mt-4 space-y-2">
+                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">
+                    Note sur le statut (optionnel)
+                  </label>
+                  <textarea
+                    value={form.note_statut ?? ""}
+                    onChange={(e) => setForm({ ...form, note_statut: e.target.value })}
+                    placeholder={getContratStatutNote(form.statut) || "Commentaire interne sur l'état du contrat…"}
+                    rows={3}
+                    className="w-full rounded-2xl border-2 border-gray-50 bg-gray-50 p-4 text-xs font-semibold outline-none transition-all focus:border-indigo-500/20 focus:bg-white"
+                  />
+                  <p className="text-[9px] font-semibold text-gray-400 ml-1">
+                    Suggestion : {getContratStatutNote(form.statut)}
+                  </p>
                 </div>
               </div>
             </div>
@@ -229,7 +338,7 @@ export const ContratForm = ({ isOpen, editing, form, setForm, onClose, onSubmit,
         </div>
 
         {/* FOOTER */}
-        <div className="p-10 border-t border-gray-50 bg-white flex items-center gap-4">
+        <div className="shrink-0 flex items-center gap-4 border-t border-gray-50 bg-white p-10">
           {step > 1 && (
             <button type="button" onClick={handlePrev} className="h-16 px-8 rounded-2xl border-2 border-gray-100 text-[11px] font-black uppercase tracking-widest text-gray-400 hover:bg-gray-50 transition-all flex items-center gap-2">
               <ChevronLeft size={16} /> Retour
@@ -247,7 +356,7 @@ export const ContratForm = ({ isOpen, editing, form, setForm, onClose, onSubmit,
           )}
         </div>
       </div>
-    </>
+    </div>
   );
 };
 
@@ -308,7 +417,7 @@ const SelectField = ({ label, value, options, onChange, labelKey, error, disable
               placeholder={`Rechercher ${label.toLowerCase()}...`}
               className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold outline-none focus:border-indigo-600"
             />
-            <div className="mt-2 max-h-44 overflow-y-auto space-y-1 pr-1">
+            <div className="no-scrollbar mt-2 max-h-44 overflow-y-auto overscroll-contain space-y-1 pr-1">
               <button
                 type="button"
                 onClick={() => {

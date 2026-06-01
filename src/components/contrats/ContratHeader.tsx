@@ -1,5 +1,5 @@
 import React from "react";
-import { Search, Filter, Plus, Package, CheckCircle2, ChevronRight } from "lucide-react";
+import { Search, Package, CheckCircle2 } from "lucide-react";
 
 interface Props {
   query: string;
@@ -36,7 +36,6 @@ export const ContratHeader = ({ query, setQuery, onOpenNew, stats }: Props) => (
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        <Filter size={18} className="text-gray-400 ml-3 cursor-pointer hover:text-indigo-600" />
       </div>
       <button 
         onClick={onOpenNew}

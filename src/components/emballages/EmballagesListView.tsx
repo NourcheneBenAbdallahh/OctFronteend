@@ -2,8 +2,9 @@ import React from "react";
 import { Edit3, Trash2, Maximize2, Weight, Layers } from "lucide-react";
 import { TableEmballages } from "@/types/emballage";
 import { ResponsiveTableWrap } from "@/components/ui/ResponsiveTableWrap";
+import { SortableTh, type TableSortHeaderProps } from "@/components/ui/SortableTableHeader";
 
-interface EmballagesListViewProps {
+interface EmballagesListViewProps extends TableSortHeaderProps {
   rows: TableEmballages[];
   onEdit: (item: TableEmballages) => void;
   onDelete: (id: string | number) => void;
@@ -17,16 +18,19 @@ export const EmballagesListView = ({
   onDelete,
   canManage = true,
   onOpenDetail,
+  sortKey,
+  sortDirection,
+  onSort,
 }: EmballagesListViewProps) => (
   <div className="overflow-hidden rounded-[2.5rem] border border-gray-100 bg-white shadow-sm">
     <ResponsiveTableWrap>
       <table className="w-full min-w-[720px] text-left border-collapse">
       <thead>
         <tr className="border-b border-gray-50 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
-          <th className="px-8 py-6">Code</th>
-          <th className="px-8 py-6">Désignation & Matière</th>
-          <th className="px-8 py-6">Specs Techniques</th>
-          <th className="px-8 py-6 text-center">Statut</th>
+          <SortableTh columnKey="code" sortKey={sortKey} sortDirection={sortDirection} onSort={onSort} className="px-8 py-6">Code</SortableTh>
+          <SortableTh columnKey="name" sortKey={sortKey} sortDirection={sortDirection} onSort={onSort} className="px-8 py-6">Désignation & Matière</SortableTh>
+          <SortableTh columnKey="poids" sortKey={sortKey} sortDirection={sortDirection} onSort={onSort} className="px-8 py-6">Specs Techniques</SortableTh>
+          <SortableTh columnKey="status" sortKey={sortKey} sortDirection={sortDirection} onSort={onSort} className="px-8 py-6" align="center">Statut</SortableTh>
           {canManage ? <th className="px-8 py-6 text-center">Actions</th> : null}
         </tr>
       </thead>

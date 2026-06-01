@@ -158,7 +158,7 @@ export function UniteMesureSearchablePicker({
         </div>
         <ul
           className={cn(
-            "unite-mesure-picker-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain p-1.5 [scrollbar-gutter:stable]",
+            "unite-mesure-picker-scroll min-h-0 flex-1 p-1.5",
             listMaxHeightClassName
           )}
         >

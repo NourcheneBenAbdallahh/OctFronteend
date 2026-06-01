@@ -1,8 +1,8 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState,useCallback } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
+import AppBrand from "@/components/common/AppBrand";
 import { useSidebar } from "../context/SidebarContext";
 import {
   BoxCubeIcon,
@@ -345,45 +345,11 @@ const AppSidebar: React.FC = () => {
       onMouseEnter={() => !isExpanded && setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-     <div
-  className={`py-10 flex items-center transition-all duration-300 ${
-    !isExpanded && !isHovered ? "justify-center" : "justify-start px-6"
-  }`}
->
-  <Link href="/" className="flex items-center justify-center w-full">
-    {isExpanded || isHovered || isMobileOpen ? (
-      <div className="relative w-full flex justify-start">
-        <Image
-          className="dark:hidden object-contain"
-          src="/images/logo/logoOCT.png"
-          alt="Logo"
-          width={160} // Taille augmentée pour la visibilité
-          height={45} 
-          style={{ width: "auto", height: "auto" }}
-          priority
-        />
-        {/* Si tu n'as pas encore de logo dark, tu peux utiliser un filtre CSS temporaire */}
-        <Image
-          className="hidden dark:block object-contain dark:brightness-200"
-          src="/images/logo/logoOCT.png" 
-          alt="Logo"
-          width={160}
-          height={45}
-          style={{ width: "auto", height: "auto" }}
-        />
+      <div className="flex shrink-0 items-center justify-center overflow-visible px-2 py-5 lg:py-6 transition-all duration-300">
+        <Link href="/bi" className="flex w-full items-center justify-center px-1">
+          <AppBrand compact={!(isExpanded || isHovered || isMobileOpen)} />
+        </Link>
       </div>
-    ) : (
-      /* Version réduite (Sidebar repliée) : On utilise l'icône seule */
-      <Image
-        src="/images/logo/logo-icon.svg"
-        alt="Logo Icon"
-        width={35}
-        height={35}
-        className="min-w-[35px]"
-      />
-    )}
-  </Link>
-</div>
       <div className="flex flex-col overflow-y-auto duration-300 ease-linear no-scrollbar">
         <nav className="mb-6" data-tour="sidebar-menu">
           <div className="flex flex-col gap-4">

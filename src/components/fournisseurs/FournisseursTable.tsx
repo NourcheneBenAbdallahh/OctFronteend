@@ -13,10 +13,23 @@ import { TableFournisseur, normalizeFournisseur } from "@/types/fournisseur";
 import { AppConfirmModal, AppFeedbackBanner } from "@/components/ui/feedback";
 import { getActionErrorMessage, useAppFeedback } from "@/hooks/useAppFeedback";
 import { tourPageAttrs } from "@/lib/tourPageAttrs";
+import { useTableSort } from "@/hooks/useTableSort";
+import type { SortColumn } from "@/lib/tableSort";
 
 const tour = tourPageAttrs("/fournisseurs");
 
 const ITEMS_PER_PAGE = 10;
+
+const FOURNISSEUR_SORT_COLUMNS: Record<string, SortColumn<TableFournisseur>> = {
+  raison_sociale: { accessor: (f) => f.raison_sociale, type: "string" },
+  representant: { accessor: (f) => f.representant_nom, type: "string" },
+  statut: { accessor: (f) => f.statut, type: "string" },
+  contact: { accessor: (f) => f.email ?? f.telephone, type: "string" },
+  localisation: {
+    accessor: (f) => f.adresse_geocodee ?? f.adresse ?? f.latitude,
+    type: "string",
+  },
+};
 
 // Pagination locale même design que ContratTable
 const LocalPagination = ({
@@ -74,6 +87,8 @@ export default function FournisseursTable({
     representant_nom: "",
     representant_role: "",
     statut: "ACTIF",
+    note_statut: "",
+    notes_evaluation: "",
     latitude: null,
     longitude: null,
     adresse_geocodee: "",
@@ -108,6 +123,8 @@ export default function FournisseursTable({
         adresse: form.adresse?.trim() || null,
         representant_nom: form.representant_nom?.trim() || null,
         representant_role: form.representant_role?.trim() || null,
+        note_statut: form.note_statut?.trim() || null,
+        notes_evaluation: form.notes_evaluation?.trim() || null,
         adresse_geocodee: form.adresse_geocodee?.trim() || null,
 
         latitude:
@@ -176,6 +193,8 @@ export default function FournisseursTable({
     });
   }
 
+  const { sortKey, sortDirection, toggleSort, sortRows } = useTableSort(FOURNISSEUR_SORT_COLUMNS);
+
   const filteredRows = useMemo(() => {
     const q = query.toLowerCase();
     return rows.filter(
@@ -185,16 +204,21 @@ export default function FournisseursTable({
     );
   }, [rows, query]);
 
-  const totalPages = Math.ceil(filteredRows.length / ITEMS_PER_PAGE);
+  const sortedRows = useMemo(
+    () => sortRows(filteredRows),
+    [filteredRows, sortRows]
+  );
+
+  const totalPages = Math.ceil(sortedRows.length / ITEMS_PER_PAGE);
 
   const paginatedRows = useMemo(() => {
     const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredRows.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredRows, currentPage]);
+    return sortedRows.slice(start, start + ITEMS_PER_PAGE);
+  }, [sortedRows, currentPage]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [query]);
+  }, [query, sortKey, sortDirection]);
 
   return (
     <div className="flex flex-col gap-6 min-h-[700px]">
@@ -213,6 +237,9 @@ export default function FournisseursTable({
       <div className="flex-1" {...tour.table}>
         <FournisseurListView
           rows={paginatedRows}
+          sortKey={sortKey}
+          sortDirection={sortDirection}
+          onSort={toggleSort}
           onEdit={(f) => {
             setEditing(f);
             setForm(f);

@@ -1,179 +1,44 @@
 "use client";
-import Image from "next/image";
+
 import Link from "next/link";
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import { useRouter } from "next/navigation";
+import React, { useMemo, useState } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
-import { getAlerts, getUnreadAlertsCount, markAlertAsRead, markAllAlertsAsRead, Alert, AlertSeverity } from "@/lib/notifications.api";
-import { useAuthStore } from "@/store/useAuthStore";
+import { useLiveAlertsContext } from "@/context/LiveAlertsContext";
+import type { Alert, AlertSeverity } from "@/lib/notifications.api";
+import { formatAlertType, getSafeAlertUrl } from "@/lib/notifications.helpers";
 
 export default function NotificationDropdown() {
-  const token = useAuthStore((state) => state.token);
-  const userId = useAuthStore((state) => state.user?.id);
-  const [isOpen, setIsOpen] = useState(false);
-  const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const prevUnreadCountRef = useRef(0);
+  const router = useRouter();
+  const {
+    alerts,
+    unreadCount,
+    loading,
+    isDropdownOpen,
+    setDropdownOpen,
+    markAsRead,
+    markAllAsRead,
+  } = useLiveAlertsContext();
 
   function toggleDropdown() {
-    setIsOpen(!isOpen);
+    setDropdownOpen(!isDropdownOpen);
   }
 
   function closeDropdown() {
-    setIsOpen(false);
+    setDropdownOpen(false);
   }
-
-  const handleClick = () => {
-    toggleDropdown();
-  };
-
-  // Charger les données des alertes
-  useEffect(() => {
-    // Recharger à chaque changement d'utilisateur/token
-    setAlerts([]);
-    setUnreadCount(0);
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-
-    const loadAlerts = async () => {
-      try {
-        const [alertsData, unreadData] = await Promise.all([
-          getAlerts(),
-          getUnreadAlertsCount()
-        ]);
-        setAlerts(alertsData);
-        setUnreadCount(unreadData);
-      } catch (error) {
-        console.error('Erreur lors du chargement des alertes:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadAlerts();
-    const pollMs = isOpen ? 5000 : 15000;
-    const timer = window.setInterval(loadAlerts, pollMs);
-
-    return () => window.clearInterval(timer);
-  }, [token, isOpen]);
-
-  useEffect(() => {
-    if (!token || !userId) return;
-    const hubUrl = process.env.NEXT_PUBLIC_MERCURE_HUB_URL;
-    if (!hubUrl) return;
-
-    const topic = `https://oct.tn/users/${userId}/alerts`;
-    const subscribeUrl = `${hubUrl}?topic=${encodeURIComponent(topic)}`;
-    const source = new EventSource(subscribeUrl);
-
-    source.onmessage = (event) => {
-      try {
-        const payload = JSON.parse(event.data) as Partial<Alert> & { id?: string | number };
-        if (!payload.id) return;
-        const incomingId = String(payload.id);
-        setAlerts((prev) => {
-          if (prev.some((a) => String(a.id) === incomingId)) {
-            return prev;
-          }
-          const incoming: Alert = {
-            id: incomingId,
-            type: (payload.type as Alert["type"]) ?? "LOW_STOCK",
-            title: payload.title ?? "Nouvelle alerte",
-            message: payload.message ?? "",
-            severity: (payload.severity as AlertSeverity) ?? "info",
-            status: (payload.status as Alert["status"]) ?? "unread",
-            entity_type: payload.entity_type ?? null,
-            entity_id: payload.entity_id ?? null,
-            action_url: payload.action_url ?? null,
-            is_active: true,
-            metadata: null,
-            read_at: null,
-            created_at: payload.created_at ?? new Date().toISOString(),
-            updated_at: payload.updated_at ?? payload.created_at ?? new Date().toISOString(),
-          };
-          return [incoming, ...prev];
-        });
-        setUnreadCount((prev) => prev + 1);
-      } catch {
-        // Ignore malformed mercure payloads.
-      }
-    };
-
-    source.onerror = () => {
-      // EventSource auto-reconnects by default.
-    };
-
-    return () => source.close();
-  }, [token, userId]);
-
-  useEffect(() => {
-    const previous = prevUnreadCountRef.current;
-    const hasNewUnread = unreadCount > previous;
-    const hasPendingUser = alerts.some(
-      (a) => a.type === "NEW_USER_PENDING" && a.status === "unread"
-    );
-
-    if (hasNewUnread && hasPendingUser) {
-      try {
-        const context = new (window.AudioContext || (window as any).webkitAudioContext)();
-        const oscillator = context.createOscillator();
-        const gain = context.createGain();
-        oscillator.type = "sine";
-        oscillator.frequency.value = 1046;
-        gain.gain.value = 0.03;
-        oscillator.connect(gain);
-        gain.connect(context.destination);
-        oscillator.start();
-        oscillator.stop(context.currentTime + 0.08);
-      } catch {
-        // Ignore audio API failures silently.
-      }
-    }
-
-    prevUnreadCountRef.current = unreadCount;
-  }, [unreadCount, alerts]);
-
-  const handleMarkAllAsRead = async () => {
-    try {
-      await markAllAlertsAsRead();
-      setUnreadCount(0);
-      setAlerts((prev) =>
-        prev.map((alert) => ({
-          ...alert,
-          status: "read",
-          read_at: alert.read_at ?? new Date().toISOString(),
-        }))
-      );
-    } catch (error) {
-      console.error("Erreur lors du marquage global comme lu:", error);
-    }
-  };
-
-  const handleMarkAsRead = async (alertId: string) => {
-    try {
-      await markAlertAsRead(alertId);
-      setAlerts(alerts.map(alert => 
-        alert.id === alertId 
-          ? { ...alert, status: 'read' as const, read_at: new Date().toISOString() }
-          : alert
-      ));
-      setUnreadCount(prev => Math.max(0, prev - 1));
-    } catch (error) {
-      console.error('Erreur lors du marquage comme lu:', error);
-    }
-  };
 
   const getSeverityColor = (severity: AlertSeverity) => {
     switch (severity) {
-      case 'critical': return 'bg-error-500';
-      case 'warning': return 'bg-warning-500';
-      case 'info': return 'bg-info-500';
-      default: return 'bg-gray-500';
+      case "critical":
+        return "bg-error-500";
+      case "warning":
+        return "bg-warning-500";
+      case "info":
+        return "bg-info-500";
+      default:
+        return "bg-gray-500";
     }
   };
 
@@ -182,36 +47,12 @@ export default function NotificationDropdown() {
     [alerts]
   );
 
-  const formatAlertType = (type: Alert["type"]) => {
-    if (type === "NEW_USER_PENDING") return "Nouveau compte";
-    return type.replace(/_/g, " ").toLowerCase();
-  };
-
-  const getSafeAlertUrl = (alert: Alert): string | null => {
-    const rawUrl = (alert.action_url || "").trim();
-    if (!rawUrl) return null;
-
-    // Legacy backend URLs used route-group names that are not public routes.
-    if (rawUrl.startsWith("/admin/(others-pages)/")) {
-      const legacy = rawUrl.replace("/admin/(others-pages)/", "/");
-      const [legacyPath, maybeId] = legacy.split("/").filter(Boolean);
-
-      if (!legacyPath) return "/notifications";
-      if (maybeId && /^\d+$/.test(maybeId)) {
-        return `/${legacyPath}?focus=${maybeId}`;
-      }
-      return `/${legacyPath}`;
-    }
-
-    return rawUrl;
-  };
-
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     if (diffMs < 0) {
-      return 'à l\'instant';
+      return "à l'instant";
     }
 
     const diffSecs = Math.floor(diffMs / 1000);
@@ -237,7 +78,7 @@ export default function NotificationDropdown() {
     <div className="relative" data-tour="header-notifications">
       <button
         className="relative dropdown-toggle flex items-center justify-center text-gray-500 transition-colors bg-white border border-gray-200 rounded-full hover:text-gray-700 h-11 w-11 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
-        onClick={handleClick}
+        onClick={toggleDropdown}
       >
         <span
           className={`absolute right-0 top-0.5 z-10 h-2 w-2 rounded-full bg-orange-400 ${
@@ -262,7 +103,7 @@ export default function NotificationDropdown() {
         </svg>
       </button>
       <Dropdown
-        isOpen={isOpen}
+        isOpen={isDropdownOpen}
         onClose={closeDropdown}
         className="absolute -right-[240px] mt-[17px] flex h-[480px] w-[350px] flex-col rounded-2xl border border-gray-200 bg-white p-3 shadow-theme-lg dark:border-gray-800 dark:bg-gray-dark sm:w-[361px] lg:right-0"
       >
@@ -278,7 +119,7 @@ export default function NotificationDropdown() {
           <div className="flex items-center gap-2">
             {unreadCount > 0 && (
               <button
-                onClick={handleMarkAllAsRead}
+                onClick={markAllAsRead}
                 className="text-[10px] font-semibold text-indigo-600 hover:text-indigo-700"
               >
                 Tout marquer lu
@@ -319,20 +160,24 @@ export default function NotificationDropdown() {
               <li key={alert.id}>
                 <DropdownItem
                   onItemClick={() => {
-                    if (alert.status === 'unread') {
-                      handleMarkAsRead(alert.id);
+                    if (alert.status === "unread") {
+                      void markAsRead(alert.id);
                     }
                     const targetUrl = getSafeAlertUrl(alert);
-                    if (targetUrl) window.location.href = targetUrl;
+                    if (targetUrl) router.push(targetUrl);
                     closeDropdown();
                   }}
                   className={`flex gap-3 rounded-lg border-b border-gray-100 p-3 px-4.5 py-3 hover:bg-gray-100 dark:border-gray-800 dark:hover:bg-white/5 ${
-                    alert.status === 'unread' ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                    alert.status === "unread" ? "bg-blue-50 dark:bg-blue-900/20" : ""
                   }`}
                 >
                   <span className="relative block w-full h-10 rounded-full z-1 max-w-10">
-                    <div className={`w-full h-full rounded-full ${getSeverityColor(alert.severity)} opacity-20`}></div>
-                    <span className={`absolute bottom-0 right-0 z-10 h-2.5 w-full max-w-2.5 rounded-full border-[1.5px] border-white ${getSeverityColor(alert.severity)} dark:border-gray-900`}></span>
+                    <div
+                      className={`w-full h-full rounded-full ${getSeverityColor(alert.severity)} opacity-20`}
+                    ></div>
+                    <span
+                      className={`absolute bottom-0 right-0 z-10 h-2.5 w-full max-w-2.5 rounded-full border-[1.5px] border-white ${getSeverityColor(alert.severity)} dark:border-gray-900`}
+                    ></span>
                   </span>
 
                   <span className="block flex-1">
@@ -360,7 +205,7 @@ export default function NotificationDropdown() {
                     </span>
                   </span>
 
-                  {alert.status === 'unread' && (
+                  {alert.status === "unread" && (
                     <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
                   )}
                 </DropdownItem>

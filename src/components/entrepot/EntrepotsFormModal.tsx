@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { Entrepot } from "@/lib/entrepot.api";
+import type { LocationMapValue } from "@/components/common/LocationMapPicker";
 import {
   X,
   MapPin,
@@ -12,6 +14,15 @@ import {
   Box,
   Sparkles,
 } from "lucide-react";
+
+const LocationMapPicker = dynamic(
+  () => import("@/components/common/LocationMapPicker"),
+  { ssr: false, loading: () => (
+    <div className="flex h-[220px] items-center justify-center rounded-[1.5rem] border-2 border-dashed border-gray-200 bg-gray-50 text-[10px] font-black uppercase tracking-widest text-gray-400">
+      Chargement de la carte…
+    </div>
+  ) }
+);
 
 interface Props {
   isOpen: boolean;
@@ -24,6 +35,8 @@ interface Props {
 type FormState = {
   nom: string;
   adresse: string;
+  latitude: number | null;
+  longitude: number | null;
   capacite_totale: number;
   capacite_disponible: number;
   statut: string;
@@ -35,6 +48,8 @@ type AdjustMode = "percent" | "units";
 const EMPTY_FORM: FormState = {
   nom: "",
   adresse: "",
+  latitude: null,
+  longitude: null,
   capacite_totale: 0,
   capacite_disponible: 0,
   statut: "ACTIF",
@@ -47,6 +62,14 @@ function toFormState(editing: Entrepot | null): FormState {
   return {
     nom: editing.nom ?? "",
     adresse: editing.adresse ?? "",
+    latitude:
+      editing.latitude != null && !Number.isNaN(Number(editing.latitude))
+        ? Number(editing.latitude)
+        : null,
+    longitude:
+      editing.longitude != null && !Number.isNaN(Number(editing.longitude))
+        ? Number(editing.longitude)
+        : null,
     capacite_totale: Number(editing.capacite_totale ?? 0),
     capacite_disponible: Number(editing.capacite_disponible ?? 0),
     statut: editing.statut ?? "ACTIF",
@@ -57,6 +80,9 @@ function validateIdentite(form: FormState): Record<string, string> {
   const errors: Record<string, string> = {};
   if (form.nom.trim().length < 2) errors.nom = "Nom trop court (min. 2 car.)";
   if (form.adresse.trim().length < 5) errors.adresse = "Adresse incomplète";
+  if (form.latitude === null || form.longitude === null) {
+    errors.localisation = "Positionnez le dépôt sur la carte ou via la recherche";
+  }
   return errors;
 }
 
@@ -166,6 +192,35 @@ export default function EntrepotsFormModal({
     setAdjustMode("percent");
   }, [isOpen, editing]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtmlOverflow = html.style.overflow;
+    const prevBodyOverflow = body.style.overflow;
+    const prevBodyPaddingRight = body.style.paddingRight;
+    const scrollbarW = window.innerWidth - html.clientWidth;
+
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    if (scrollbarW > 0) {
+      body.style.paddingRight = `${scrollbarW}px`;
+    }
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      html.style.overflow = prevHtmlOverflow;
+      body.style.overflow = prevBodyOverflow;
+      body.style.paddingRight = prevBodyPaddingRight;
+    };
+  }, [isOpen, onClose]);
+
   const occupiedUnits = useMemo(() => {
     return Math.max(0, form.capacite_totale - form.capacite_disponible);
   }, [form.capacite_totale, form.capacite_disponible]);
@@ -263,6 +318,8 @@ export default function EntrepotsFormModal({
       await onSave({
         nom: form.nom.trim(),
         adresse: form.adresse.trim(),
+        latitude: form.latitude,
+        longitude: form.longitude,
         capacite_totale: form.capacite_totale,
         capacite_disponible: form.capacite_disponible,
         statut: form.statut,
@@ -278,7 +335,12 @@ export default function EntrepotsFormModal({
   const isActive = form.statut === "ACTIF";
 
   return (
-    <div className="pointer-events-auto fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-6">
+    <div
+      className="pointer-events-auto fixed inset-0 z-[200] flex items-center justify-center overflow-hidden p-3 sm:p-6"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="entrepot-form-title"
+    >
       <style jsx>{`
         @keyframes scanline {
           0% { transform: translateY(-100%); }
@@ -328,12 +390,12 @@ export default function EntrepotsFormModal({
 
       {/* Carte principale */}
       <div
-        className={`relative z-10 flex w-full max-w-5xl flex-col overflow-hidden rounded-[2rem] border border-gray-100 bg-white shadow-2xl lg:max-h-[90vh] lg:flex-row ${
+        className={`relative z-10 flex max-h-[calc(100dvh-1.5rem)] w-full max-w-5xl flex-col overflow-hidden rounded-[2rem] border border-gray-100 bg-white shadow-2xl sm:max-h-[calc(100dvh-3rem)] lg:max-h-[min(90dvh,calc(100dvh-3rem))] lg:flex-row ${
           pulse ? "ring-2 ring-[#00A09D]/40" : ""
         }`}
       >
         {/* ——— Panneau visuel (gauche) ——— */}
-        <div className="scanline relative flex min-h-[280px] flex-col justify-between overflow-hidden bg-gradient-to-br from-[#E0F2F2] via-[#F0F4F4] to-white p-6 sm:p-8 lg:w-[44%] lg:min-h-0">
+        <div className="scanline relative flex max-h-[36vh] shrink-0 flex-col justify-between overflow-hidden bg-gradient-to-br from-[#E0F2F2] via-[#F0F4F4] to-white p-5 sm:max-h-[40vh] sm:p-6 lg:max-h-none lg:min-h-0 lg:w-[44%] lg:shrink-0 lg:p-8">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(0,160,157,0.12),transparent_55%)]" />
 
           <div className="relative z-10">
@@ -356,7 +418,10 @@ export default function EntrepotsFormModal({
               </span>
             </div>
 
-            <h2 className="text-3xl font-black uppercase leading-[0.95] tracking-tighter text-[#1C2434] sm:text-4xl">
+            <h2
+              id="entrepot-form-title"
+              className="text-3xl font-black uppercase leading-[0.95] tracking-tighter text-[#1C2434] sm:text-4xl"
+            >
               {displayName}
             </h2>
             <p className="mt-2 flex items-start gap-1.5 text-[11px] font-bold uppercase tracking-wide text-gray-500">
@@ -369,7 +434,7 @@ export default function EntrepotsFormModal({
 
           {/* Grille 3D */}
           <div
-            className="relative z-10 my-6 flex flex-1 items-center justify-center py-4"
+            className="relative z-10 my-3 flex flex-1 items-center justify-center py-2 sm:my-6 sm:py-4"
             style={{ animation: "float 6s ease-in-out infinite" }}
           >
             <WarehouseGrid
@@ -421,7 +486,7 @@ export default function EntrepotsFormModal({
         </div>
 
         {/* ——— Panneau formulaire (droite) ——— */}
-        <div className="flex flex-1 flex-col bg-white lg:min-h-0">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
           {/* Nav zones */}
           <div className="flex shrink-0 items-center gap-1 border-b border-gray-100 p-4 sm:p-5">
             {(
@@ -457,7 +522,7 @@ export default function EntrepotsFormModal({
             </button>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto p-5 sm:p-8">
+          <div className="form-scroll min-h-0 flex-1 p-5 sm:p-8">
             {zone === "identite" && (
               <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
                 <div>
@@ -485,36 +550,42 @@ export default function EntrepotsFormModal({
                   <label className="mb-2 block text-[9px] font-black uppercase tracking-[0.3em] text-gray-400">
                     Coordonnées GPS / Adresse
                   </label>
-                  <div className="relative overflow-hidden rounded-[1.5rem] border-2 border-dashed border-gray-200 bg-gradient-to-br from-gray-50 to-white p-1 focus-within:border-[#00A09D]">
-                    <div className="pointer-events-none absolute inset-0 opacity-[0.07]">
-                      <svg className="h-full w-full" xmlns="http://www.w3.org/2000/svg">
-                        <defs>
-                          <pattern id="dots" width="16" height="16" patternUnits="userSpaceOnUse">
-                            <circle cx="2" cy="2" r="1" fill="#00A09D" />
-                          </pattern>
-                        </defs>
-                        <rect width="100%" height="100%" fill="url(#dots)" />
-                      </svg>
-                    </div>
-                    <textarea
-                      rows={3}
-                      value={form.adresse}
-                      onChange={(e) => {
-                        setForm((f) => ({ ...f, adresse: e.target.value }));
-                        if (fieldErrors.adresse) setFieldErrors((er) => ({ ...er, adresse: "" }));
-                      }}
-                      placeholder="12 Zone Industrielle, Casablanca…"
-                      className={`relative w-full resize-none bg-transparent px-5 py-4 text-sm font-bold text-gray-800 outline-none ${
-                        fieldErrors.adresse ? "text-red-700" : ""
-                      }`}
-                    />
-                    <MapPin
-                      className="absolute bottom-4 right-4 text-[#00A09D]/30"
-                      size={32}
-                    />
-                  </div>
-                  {fieldErrors.adresse && (
-                    <p className="mt-2 text-xs font-bold text-red-500">{fieldErrors.adresse}</p>
+                  <LocationMapPicker
+                    value={{
+                      adresse: form.adresse,
+                      latitude: form.latitude,
+                      longitude: form.longitude,
+                    }}
+                    onChange={(loc: LocationMapValue) => {
+                      setForm((f) => ({
+                        ...f,
+                        adresse: loc.adresse,
+                        latitude: loc.latitude,
+                        longitude: loc.longitude,
+                      }));
+                      if (fieldErrors.adresse || fieldErrors.localisation) {
+                        setFieldErrors((er) => ({
+                          ...er,
+                          adresse: "",
+                          localisation: "",
+                        }));
+                      }
+                    }}
+                    adresseError={fieldErrors.adresse || fieldErrors.localisation}
+                    onClearAdresseError={() => {
+                      if (fieldErrors.adresse || fieldErrors.localisation) {
+                        setFieldErrors((er) => ({
+                          ...er,
+                          adresse: "",
+                          localisation: "",
+                        }));
+                      }
+                    }}
+                  />
+                  {(fieldErrors.adresse || fieldErrors.localisation) && (
+                    <p className="mt-2 text-xs font-bold text-red-500">
+                      {fieldErrors.adresse || fieldErrors.localisation}
+                    </p>
                   )}
                 </div>
 

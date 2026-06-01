@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { APP_NAME, APP_SHORT_NAME, LOGO_PATH } from "@/lib/branding";
 
 type AuthBrandAsideProps = {
   tagline?: React.ReactNode;
@@ -29,16 +30,23 @@ export default function AuthBrandAside({
         <div className="absolute inset-0 bg-gradient-to-tr from-[#00A09D] via-[#00A09D]/70 to-transparent" />
       </div>
       <div className="relative z-20">
-        <div className="flex items-center gap-4 mb-14">
-          <div className="bg-white p-3 rounded-[22px] shadow-2xl">
-            <div className="w-12 h-12 bg-[#00A09D] rounded-[15px] flex items-center justify-center font-[1000] text-3xl italic text-white shadow-inner">
-              S
-            </div>
+        <div className="mb-14 flex flex-col gap-4">
+          <div className="inline-flex w-fit rounded-2xl bg-white p-4 shadow-2xl">
+            <Image
+              src={LOGO_PATH}
+              alt={APP_NAME}
+              width={120}
+              height={120}
+              className="h-20 w-auto object-contain"
+              priority
+            />
           </div>
           <div className="flex flex-col text-white">
-            <span className="text-3xl font-[1000] tracking-tighter leading-none uppercase">OCT</span>
+            <span className="text-3xl font-[1000] uppercase leading-none tracking-tighter">
+              {APP_SHORT_NAME}
+            </span>
             <span className="text-[10px] font-black uppercase tracking-[0.5em] text-emerald-200/90">
-              Gestion des emballages
+              {APP_NAME}
             </span>
           </div>
         </div>

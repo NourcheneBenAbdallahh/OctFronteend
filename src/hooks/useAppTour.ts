@@ -31,7 +31,7 @@ function isVisible(el: Element): boolean {
   return rect.width > 0 && rect.height > 0;
 }
 
-function waitForElement(selector: string, timeoutMs = 2500): Promise<Element | null> {
+function waitForElement(selector: string, timeoutMs = 900): Promise<Element | null> {
   const tryFind = () => {
     const el = document.querySelector(selector);
     return el && isVisible(el) ? el : null;
@@ -65,15 +65,15 @@ function waitForElement(selector: string, timeoutMs = 2500): Promise<Element | n
 }
 
 async function resolveStepElement(step: AppTourStep): Promise<Element | null> {
-  const primary = await waitForElement(step.element, 2000);
+  const primary = await waitForElement(step.element, 700);
   if (primary) return primary;
   if (step.fallbackElement) {
-    return waitForElement(step.fallbackElement, 1200);
+    return waitForElement(step.fallbackElement, 500);
   }
   return null;
 }
 
-async function waitForPathname(path: string, timeoutMs = 4000): Promise<void> {
+async function waitForPathname(path: string, timeoutMs = 1800): Promise<void> {
   if (window.location.pathname === path) return;
 
   const deadline = Date.now() + timeoutMs;
@@ -90,7 +90,7 @@ async function ensureRoute(
   if (!route || window.location.pathname === route) return;
   router.push(route);
   await waitForPathname(route);
-  await sleep(40);
+  await sleep(16);
 }
 
 async function prepareSidebarNav(path: string | undefined): Promise<void> {
@@ -104,8 +104,8 @@ async function prepareSidebarNav(path: string | undefined): Promise<void> {
     new CustomEvent("oct-tour-prepare-nav", { detail: { path } })
   );
 
-  const opened = await waitForElement(navSelector, 500);
-  if (opened) await sleep(40);
+  const opened = await waitForElement(navSelector, 350);
+  if (opened) await sleep(16);
 }
 
 async function prepareStep(

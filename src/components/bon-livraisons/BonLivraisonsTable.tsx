@@ -31,6 +31,9 @@ import {
   fetchBonLivraisonDocument,
 } from "@/lib/bon-livraisons.document";
 import { UniteMesureSearchablePicker } from "@/components/unites-mesure/UniteMesureSearchablePicker";
+import { SortableTh } from "@/components/ui/SortableTableHeader";
+import { useTableSort } from "@/hooks/useTableSort";
+import type { SortColumn } from "@/lib/tableSort";
 import {
   convertQuantityBetweenUnites,
   formatQuantitePrincipale,
@@ -400,6 +403,22 @@ export default function BonLivraisonsTable({
     });
   }, [rows, query, statusFilter]);
 
+  const blSortColumns = useMemo<Record<string, SortColumn<TableBonLivraison>>>(
+    () => ({
+      numero_bl: { accessor: (bl) => bl.numero_bl, type: "string" },
+      commande: { accessor: (bl) => bl.numero_commande, type: "string" },
+      quantite: { accessor: (bl) => bl.quantite_recue, type: "number" },
+      statut: { accessor: (bl) => bl.statut, type: "string" },
+    }),
+    []
+  );
+
+  const { sortKey, sortDirection, toggleSort, sortRows } = useTableSort(blSortColumns);
+  const sortedRows = useMemo(
+    () => sortRows(filteredRows),
+    [filteredRows, sortRows]
+  );
+
   const getFriendlyErrorMessage = (err: any): string => {
     const raw = String(err?.message || "");
     const concise = raw.split("\nDetails:")[0].trim();
@@ -419,15 +438,15 @@ export default function BonLivraisonsTable({
     return concise || "Une erreur est survenue.";
   };
 
-  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PER_PAGE));
+  const totalPages = Math.max(1, Math.ceil(sortedRows.length / PER_PAGE));
   const paginatedRows = useMemo(() => {
     const start = (currentPage - 1) * PER_PAGE;
-    return filteredRows.slice(start, start + PER_PAGE);
-  }, [filteredRows, currentPage]);
+    return sortedRows.slice(start, start + PER_PAGE);
+  }, [sortedRows, currentPage]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [query, statusFilter]);
+  }, [query, statusFilter, sortKey, sortDirection]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -561,7 +580,7 @@ export default function BonLivraisonsTable({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50/50 p-4 lg:p-8 font-sans">
+    <div className="min-w-0 font-sans">
     <AppFeedbackBanner feedback={feedback} onDismiss={clearFeedback} />
     <AppConfirmModal confirm={confirm} onClose={closeConfirm} />
     {/* HEADER SECTION */}
@@ -656,7 +675,7 @@ export default function BonLivraisonsTable({
         </div>
       </div>
     </div>
-    <div className="flex gap-3 mb-8 overflow-x-auto pb-4 scrollbar-hide items-center">
+    <div className="flex gap-3 mb-8 overflow-x-auto pb-4 filter-bar-scroll items-center">
       <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-2">Filtrer par :</div>
       {(["TOUS", "VALIDE", "ANNULE"] as const).map((status) => {
         const isActive = statusFilter === status;
@@ -691,10 +710,10 @@ export default function BonLivraisonsTable({
         <table className="w-full min-w-[900px] text-left border-collapse">
           <thead>
             <tr className="bg-gray-50/50">
-              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400">Référence BL</th>
-              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400 text-center">Commande</th>
-              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400 text-center">Quantité Reçue</th>
-              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400 text-center">Justificatif</th>
+              <SortableTh columnKey="numero_bl" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400">Référence BL</SortableTh>
+              <SortableTh columnKey="commande" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400" align="center">Commande</SortableTh>
+              <SortableTh columnKey="quantite" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400" align="center">Quantité Reçue</SortableTh>
+              <SortableTh columnKey="statut" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400" align="center">Justificatif</SortableTh>
               {!readOnly ? (
                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400 text-right">Actions</th>
               ) : null}
@@ -836,7 +855,7 @@ export default function BonLivraisonsTable({
               <button onClick={() => setIsDrawerOpen(false)} className="h-12 w-12 flex items-center justify-center bg-gray-50 hover:bg-gray-100 rounded-2xl text-gray-400 transition-colors"><X /></button>
             </div>
 
-            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-10 py-6 space-y-6 scrollbar-hide">
+            <form onSubmit={handleSubmit} className="form-scroll flex-1 space-y-6 px-10 py-6">
               {errorMessage && (
                 <div className="p-4 bg-red-50 border border-red-100 text-red-600 text-[11px] font-black flex items-center gap-3 rounded-2xl uppercase tracking-wider">
                   <AlertCircle className="h-4 w-4" /> {errorMessage}

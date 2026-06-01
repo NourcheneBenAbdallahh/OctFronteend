@@ -46,8 +46,52 @@ function mergeGraphqlValidation(errors: GraphQLErrorItem[]): Record<string, stri
   return single;
 }
 
+const DUPLICATE_PATTERN =
+  /already been taken|has already been|unique|duplicate|déjà été pris|déjà été utilisé|déjà pris|existe déjà/i;
+
+function inferDuplicateField(message: string, fieldHint?: string): string {
+  const hint = (fieldHint ?? "").toLowerCase();
+  if (hint) return hint;
+
+  const m = message.toLowerCase();
+  if (/\b(email|e-mail|courriel|mail)\b/.test(m)) return "email";
+  if (/\b(code)\b/.test(m)) return "code";
+  if (/\b(name|nom)\b/.test(m)) return "name";
+  if (/matricule/.test(m)) return "matricule_fiscale";
+  if (/numero_contrat|numéro de contrat|contract number/.test(m)) return "numero_contrat";
+  if (/telephone|téléphone|phone/.test(m)) return "telephone";
+
+  return "";
+}
+
+/** Message utilisateur pour une contrainte d’unicité (doublon). */
+export function friendlyDuplicateMessage(message: string, fieldHint?: string): string {
+  const field = inferDuplicateField(message, fieldHint);
+
+  if (field.includes("email") || /\b(email|e-mail|courriel)\b/i.test(message)) {
+    return "Cette adresse e-mail existe déjà.";
+  }
+  if (field === "code" || /\bcode\b/i.test(message)) {
+    return "Ce code existe déjà.";
+  }
+  if (field === "name" || /\bname\b/i.test(message)) {
+    return "Ce nom existe déjà.";
+  }
+  if (field.includes("matricule")) {
+    return "Ce matricule fiscal existe déjà.";
+  }
+  if (field.includes("numero_contrat") || field.includes("contrat")) {
+    return "Ce numéro de contrat existe déjà.";
+  }
+  if (field.includes("telephone") || field.includes("phone")) {
+    return "Ce numéro de téléphone existe déjà.";
+  }
+
+  return "Cette valeur existe déjà.";
+}
+
 /** Transforme un message serveur (anglais / technique) en phrase compréhensible pour l’utilisateur final. */
-export function friendlyGraphqlMessage(raw: string): string {
+export function friendlyGraphqlMessage(raw: string, fieldHint?: string): string {
   const m = (raw ?? "").trim();
   if (!m) return "Une erreur est survenue. Réessayez dans un instant.";
   if (/unauthenticated|not authenticated/i.test(m)) {
@@ -81,8 +125,8 @@ export function friendlyGraphqlMessage(raw: string): string {
   if (/capacity_unit|selected capacity unit/i.test(m)) {
     return "L’unité de capacité choisie n’est pas valide. Sélectionnez une unité dans la liste.";
   }
-  if (/already been taken|unique|duplicate/i.test(m)) {
-    return "Cette valeur existe déjà (doublon). Modifiez le code ou le nom.";
+  if (DUPLICATE_PATTERN.test(m)) {
+    return friendlyDuplicateMessage(m, fieldHint);
   }
   if (/must be (at least|greater|numeric|a number)/i.test(m)) {
     return "Certaines valeurs numériques ne sont pas valides.";
@@ -102,8 +146,8 @@ export function friendlyGraphqlMessage(raw: string): string {
 function buildGraphqlUserError(errors: GraphQLErrorItem[]): GraphqlRequestError {
   const validationByField = mergeGraphqlValidation(errors);
   const firstTechnical = errors[0]?.message ?? "Erreur GraphQL.";
-  const fromFields = Object.values(validationByField)
-    .map((s) => friendlyGraphqlMessage(s))
+  const fromFields = Object.entries(validationByField)
+    .map(([field, s]) => friendlyGraphqlMessage(s, field))
     .filter(Boolean);
   const summary =
     fromFields.length > 0

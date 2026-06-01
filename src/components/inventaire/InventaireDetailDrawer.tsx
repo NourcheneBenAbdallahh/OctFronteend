@@ -50,7 +50,7 @@ export default function InventaireDetailDrawer({ item, open, onClose, onRegulari
         </div>
 
         {/* CONTENU DU RAPPORT */}
-        <div className="flex-1 overflow-y-auto px-10 py-10 space-y-10">
+        <div className="form-scroll flex-1 space-y-10 px-10 py-10">
           
           {/* GRILLE DES CHIFFRES CLÉS */}
           <div className="grid grid-cols-2 gap-4">

@@ -2,7 +2,7 @@ import { Suspense } from 'react';
 import ClientNotifications from './ClientNotifications';
 
 export const metadata = {
-  title: 'Notifications - OCT Admin Dashboard',
+  title: 'Notifications',
   description: 'Manage system alerts and notifications',
 };
 

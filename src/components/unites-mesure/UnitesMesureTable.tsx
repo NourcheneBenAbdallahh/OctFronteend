@@ -10,8 +10,19 @@ import { getActionErrorMessage, useAppFeedback } from "@/hooks/useAppFeedback";
 import { UnitesMesureHeader } from "./UnitesMesureHeader";
 import { UnitesMesureListView } from "./UnitesMesureListView";
 import UnitesMesureFormModal from "./UnitesMesureFormModal";
+import { useTableSort } from "@/hooks/useTableSort";
+import type { SortColumn } from "@/lib/tableSort";
 
 const PAGE_SIZE = 10;
+
+const UNITE_SORT_COLUMNS: Record<string, SortColumn<UniteMesure>> = {
+  code: { accessor: (r) => r.code, type: "string" },
+  label: { accessor: (r) => r.label, type: "string" },
+  dimension: { accessor: (r) => r.dimension, type: "string" },
+  facteur_kg: { accessor: (r) => r.facteur_vers_kg, type: "number" },
+  facteur_l: { accessor: (r) => r.facteur_vers_l, type: "number" },
+  sort_order: { accessor: (r) => r.sort_order, type: "number" },
+};
 
 interface Props {
   data: UniteMesure[];
@@ -39,9 +50,11 @@ export default function UnitesMesureTable({ data, onRefresh }: Props) {
     setRows(data);
   }, [data]);
 
+  const { sortKey, sortDirection, toggleSort, sortRows } = useTableSort(UNITE_SORT_COLUMNS);
+
   useEffect(() => {
     setPage(1);
-  }, [query]);
+  }, [query, sortKey, sortDirection]);
 
   const filteredRows = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -54,11 +67,13 @@ export default function UnitesMesureTable({ data, onRefresh }: Props) {
     );
   }, [rows, query]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
+  const sortedRows = useMemo(() => sortRows(filteredRows), [filteredRows, sortRows]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedRows.length / PAGE_SIZE));
   const paginatedRows = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE;
-    return filteredRows.slice(start, start + PAGE_SIZE);
-  }, [filteredRows, page]);
+    return sortedRows.slice(start, start + PAGE_SIZE);
+  }, [sortedRows, page]);
 
   const requestDelete = (id: string | number) => {
     const item = rows.find((r) => String(r.id) === String(id));
@@ -98,6 +113,9 @@ export default function UnitesMesureTable({ data, onRefresh }: Props) {
           <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
             <UnitesMesureListView
               rows={paginatedRows}
+              sortKey={sortKey}
+              sortDirection={sortDirection}
+              onSort={toggleSort}
               onEdit={(item) => {
                 setEditing(item);
                 setIsOpen(true);

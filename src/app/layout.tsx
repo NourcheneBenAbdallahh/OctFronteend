@@ -3,8 +3,24 @@ import './globals.css';
 import "flatpickr/dist/flatpickr.css";
 import { SidebarProvider } from '@/context/SidebarContext';
 import { ThemeProvider } from '@/context/ThemeContext';
+import type { Metadata } from "next";
+import { APP_NAME, FAVICON_PATH } from "@/lib/branding";
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+  title: {
+    default: APP_NAME,
+    template: `%s | ${APP_NAME}`,
+  },
+  description: "Application OCT de gestion d'emballages.",
+  applicationName: APP_NAME,
+  icons: {
+    icon: FAVICON_PATH,
+    shortcut: FAVICON_PATH,
+    apple: FAVICON_PATH,
+  },
+};
 
 const outfit = Outfit({
   subsets: ["latin"],

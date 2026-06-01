@@ -2,6 +2,7 @@
 import React, { useState, FormEvent } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { APP_NAME, APP_SHORT_NAME, LOGO_PATH } from "@/lib/branding";
 import { EyeCloseIcon, EyeIcon } from "@/icons"; 
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
@@ -184,13 +185,20 @@ export default function SignUpForm() {
         </div>
         
         <div className="relative z-20">
-          <div className="flex items-center gap-4 mb-14">
-            <div className="bg-white p-3 rounded-[22px] shadow-2xl">
-              <div className="w-12 h-12 bg-[#00A09D] rounded-[15px] flex items-center justify-center font-[1000] text-3xl italic text-white shadow-inner">S</div>
+          <div className="mb-14 flex flex-col gap-4">
+            <div className="inline-flex w-fit rounded-2xl bg-white p-4 shadow-2xl">
+              <Image
+                src={LOGO_PATH}
+                alt={APP_NAME}
+                width={120}
+                height={120}
+                className="h-20 w-auto object-contain"
+                priority
+              />
             </div>
             <div className="flex flex-col text-white">
-              <span className="text-3xl font-[1000] tracking-tighter uppercase leading-none text-white">OCT</span>
-              <span className="text-[10px] font-black uppercase tracking-[0.4em] text-emerald-200/80 italic">Smart Solution</span>
+              <span className="text-3xl font-[1000] uppercase leading-none tracking-tighter text-white">{APP_SHORT_NAME}</span>
+              <span className="text-[10px] font-black uppercase tracking-[0.4em] text-emerald-200/80">{APP_NAME}</span>
             </div>
           </div>
           <h2 className="text-7xl font-[1000] leading-[0.95] text-white tracking-tighter mb-8 uppercase">

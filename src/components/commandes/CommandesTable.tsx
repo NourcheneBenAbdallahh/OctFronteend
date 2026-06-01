@@ -52,7 +52,10 @@ import type { UniteMesure } from "@/types/unite-mesure";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AppConfirmModal, AppFeedbackBanner } from "@/components/ui/feedback";
 import { ResponsiveTableWrap } from "@/components/ui/ResponsiveTableWrap";
+import { SortableTh } from "@/components/ui/SortableTableHeader";
 import { getActionErrorMessage, useAppFeedback } from "@/hooks/useAppFeedback";
+import { useTableSort } from "@/hooks/useTableSort";
+import type { SortColumn } from "@/lib/tableSort";
 import {
   X,
   Plus,
@@ -601,6 +604,27 @@ const filteredRows = useMemo(
   () => filterCommandesByQuery(rows, query, fournisseursMap),
   [rows, query, fournisseursMap]
 );
+
+  const commandeSortColumns = useMemo<Record<string, SortColumn<TableCommande>>>(
+    () => ({
+      reference: { accessor: (c) => c.numero_commande, type: "string" },
+      date: { accessor: (c) => c.date_commande, type: "date" },
+      logistique: {
+        accessor: (c) => fournisseursMap.get(String(c.fournisseur_id)),
+        type: "string",
+      },
+      quantite: { accessor: (c) => c.quantite, type: "number" },
+      statut: { accessor: (c) => c.statut, type: "string" },
+    }),
+    [fournisseursMap]
+  );
+
+  const { sortKey, sortDirection, toggleSort, sortRows } = useTableSort(commandeSortColumns);
+  const sortedRows = useMemo(
+    () => sortRows(filteredRows),
+    [filteredRows, sortRows]
+  );
+
   return (
     <div className="min-h-screen bg-gray-50/50 p-4 lg:p-8 font-sans">
       <AppFeedbackBanner feedback={feedback} onDismiss={clearFeedback} />
@@ -681,7 +705,7 @@ const filteredRows = useMemo(
 </div>
 
 {/* FILTRES RAPIDES AVEC BADGES */}
-<div className="flex gap-3 mb-8 overflow-x-auto pb-4 scrollbar-hide items-center">
+<div className="flex gap-3 mb-8 overflow-x-auto pb-4 filter-bar-scroll items-center">
   <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-2">Filtrer par :</div>
   {['TOUT', 'EN_ATTENTE', 'VALIDEE', 'PARTIELLEMENT_RECEPTIONNEE', 'RECEPTIONNEE'].map((s) => {
     const isActive = s === 'TOUT' ? query === '' : query === s;
@@ -717,16 +741,16 @@ const filteredRows = useMemo(
             <thead>
               <tr className="border-b border-gray-50 bg-gray-50/30 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
                 <th className="px-8 py-6 w-10"></th>
-                <th className="px-6 py-6">Référence</th>
-                <th className="px-6 py-6">Logistique</th>
-                <th className="px-6 py-6 text-center">Quantité</th>
+                <SortableTh columnKey="reference" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-6">Référence</SortableTh>
+                <SortableTh columnKey="logistique" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-6">Logistique</SortableTh>
+                <SortableTh columnKey="quantite" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-6" align="center">Quantité</SortableTh>
                 <th className="px-6 py-6">Créé par</th>
-                <th className="px-6 py-6">Statut</th>
+                <SortableTh columnKey="statut" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-6">Statut</SortableTh>
                 <th className="px-6 py-6 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {filteredRows.map((item) => (
+              {sortedRows.map((item) => (
                 <React.Fragment key={item.id}>
                   <tr 
                     id={`commande-row-${item.id}`}
@@ -877,7 +901,7 @@ const filteredRows = useMemo(
                   if (drawerStep === 3) void handleSubmit(e);
                 }}
               >
-                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-8 py-5 scrollbar-hide sm:px-10 sm:py-6">
+                <div className="form-scroll min-h-0 flex-1 px-8 py-5 sm:px-10 sm:py-6">
                   <div
                     className={
                       drawerStep === 1 ? "space-y-5" : drawerStep === 2 ? "space-y-6" : "space-y-5"

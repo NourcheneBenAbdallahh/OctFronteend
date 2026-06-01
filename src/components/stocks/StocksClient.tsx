@@ -22,12 +22,22 @@ import {
   paginateRows,
   stockTotalPages,
 } from "@/lib/stock.filters";
+import { useTableSort } from "@/hooks/useTableSort";
+import type { SortColumn } from "@/lib/tableSort";
 import { AppConfirmModal, AppFeedbackBanner } from "@/components/ui/feedback";
 import { getActionErrorMessage, useAppFeedback } from "@/hooks/useAppFeedback";
 
 interface Props {
   initialStocks: Stock[];
 }
+
+const STOCK_SORT_COLUMNS: Record<string, SortColumn<Stock>> = {
+  sens: { accessor: (s) => s.sens, type: "string" },
+  lot: { accessor: (s) => s.lot?.code_lot, type: "string" },
+  entrepot: { accessor: (s) => s.entrepot?.nom ?? s.entrepot?.name, type: "string" },
+  quantite: { accessor: (s) => s.quantite, type: "number" },
+  date: { accessor: (s) => s.date_stock, type: "date" },
+};
 
 const LocalPagination = ({
   currentPage,
@@ -115,27 +125,34 @@ export default function StocksClient({ initialStocks }: Props) {
     setCurrentPage(1);
   };
 
+  const { sortKey, sortDirection, toggleSort, sortRows } = useTableSort(STOCK_SORT_COLUMNS);
+
   const filteredRows = useMemo(
     () => applyStockFilters(rows, filters),
     [rows, filters]
   );
 
+  const sortedRows = useMemo(() => {
+    if (sortKey) return sortRows(filteredRows);
+    return filteredRows;
+  }, [filteredRows, sortKey, sortRows]);
+
   const focusTargetPage = useMemo(() => {
     if (!focusId || displayViewMode !== "table") return null;
-    const targetIndex = filteredRows.findIndex(
+    const targetIndex = sortedRows.findIndex(
       (row) => String(row.id) === String(focusId)
     );
     if (targetIndex === -1) return null;
     return Math.floor(targetIndex / itemsPerPage) + 1;
-  }, [focusId, filteredRows, itemsPerPage, displayViewMode]);
+  }, [focusId, sortedRows, itemsPerPage, displayViewMode]);
 
   const activePage =
     focusPinned && focusTargetPage !== null ? focusTargetPage : currentPage;
-  const totalPages = stockTotalPages(filteredRows.length, itemsPerPage);
+  const totalPages = stockTotalPages(sortedRows.length, itemsPerPage);
 
   const paginatedRows = useMemo(
-    () => paginateRows(filteredRows, activePage, itemsPerPage),
-    [filteredRows, activePage, itemsPerPage]
+    () => paginateRows(sortedRows, activePage, itemsPerPage),
+    [sortedRows, activePage, itemsPerPage]
   );
 
   useEffect(() => {
@@ -146,7 +163,7 @@ export default function StocksClient({ initialStocks }: Props) {
       el?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 180);
     return () => window.clearTimeout(timer);
-  }, [focusId, focusTargetPage, filteredRows]);
+  }, [focusId, focusTargetPage, sortedRows]);
 
   const stats: StocksStatsType = useMemo(
     () => computeStocksStats(rows),
@@ -245,6 +262,9 @@ export default function StocksClient({ initialStocks }: Props) {
           <StocksTableView
             rows={paginatedRows}
             focusedId={focusId}
+            sortKey={sortKey}
+            sortDirection={sortDirection}
+            onSort={toggleSort}
             onView={handleView}
             onDelete={handleDelete}
           />

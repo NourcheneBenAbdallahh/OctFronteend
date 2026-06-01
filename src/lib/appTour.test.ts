@@ -8,7 +8,7 @@ import {
 
 describe("appTour", () => {
   it("pathToTourSlug normalise les chemins", () => {
-    expect(pathToTourSlug("/")).toBe("dashboard");
+    expect(pathToTourSlug("/")).toBe("bi");
     expect(pathToTourSlug("/fournisseurs")).toBe("fournisseurs");
     expect(pathToTourSlug("/stock-inventaire")).toBe("stock-inventaire");
   });
@@ -21,12 +21,11 @@ describe("appTour", () => {
     const admin = buildAppTourSteps("ADMIN");
     expect(admin[0].id).toBe("welcome");
     expect(admin[admin.length - 1].id).toBe("finish");
-    expect(admin.some((s) => s.id === "page-dashboard")).toBe(false);
     expect(admin.some((s) => s.id === "nav-bi")).toBe(true);
-    expect(admin.some((s) => s.id === "table-bi")).toBe(true);
     expect(admin.some((s) => s.id === "nav-fournisseurs")).toBe(true);
-    expect(admin.some((s) => s.id === "table-fournisseurs")).toBe(true);
-    expect(admin.some((s) => s.id === "search-fournisseurs")).toBe(true);
+    expect(admin.some((s) => s.id === "table-fournisseurs")).toBe(false);
+    expect(admin.some((s) => s.id === "search-fournisseurs")).toBe(false);
+    expect(admin.some((s) => s.id === "actions-fournisseurs")).toBe(false);
   });
 
   it("buildAppTourSteps respecte le rôle FINANCE", () => {

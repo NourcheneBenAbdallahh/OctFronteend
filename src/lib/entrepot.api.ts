@@ -1,8 +1,11 @@
 import { graphqlRequest, type GraphqlRequestOptions } from "./graphqlClient";
 
 export type Entrepot = {
-  id: string;nom: string;
+  id: string;
+  nom: string;
   adresse: string;
+  latitude?: number | null;
+  longitude?: number | null;
   capacite_totale?: number | null;
   capacite_disponible?: number | null;
   statut: string;
@@ -15,6 +18,8 @@ export async function fetchEntrepots(opts?: GraphqlRequestOptions) {
         id
         nom
         adresse
+        latitude
+        longitude
         capacite_totale
         capacite_disponible
         statut
@@ -26,8 +31,11 @@ export async function fetchEntrepots(opts?: GraphqlRequestOptions) {
   return res.entrepots;
 }
 
-export async function createEntrepot(input: {nom: string;
+export async function createEntrepot(input: {
+  nom: string;
   adresse: string;
+  latitude?: number | null;
+  longitude?: number | null;
   capacite_totale?: number;
   capacite_disponible?: number;
   statut?: string;
@@ -49,7 +57,9 @@ export async function updateEntrepot(input: {
   id: string;
   nom?: string;
   adresse?: string;
-capacite_totale?: number | null;     
+  latitude?: number | null;
+  longitude?: number | null;
+  capacite_totale?: number | null;
   capacite_disponible?: number | null;
   statut?: string;
 }) {

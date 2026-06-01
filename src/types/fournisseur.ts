@@ -10,7 +10,9 @@ export type Fournisseur = {
   representant_nom?: string | null;
   representant_role?: string | null;
   statut: "ACTIF" | "INACTIF";
-  
+  note_statut?: string | null;
+  notes_evaluation?: string | null;
+
   latitude?: number | null;
   longitude?: number | null;
   adresse_geocodee?: string | null;
@@ -41,5 +43,7 @@ export function normalizeFournisseur(f: Fournisseur): TableFournisseur {
     adresse_geocodee: f.adresse_geocodee ?? null,
     geocoded_at: f.geocoded_at ?? null,
     email: f.email ?? null,
+    note_statut: f.note_statut ?? null,
+    notes_evaluation: f.notes_evaluation ?? null,
   };
 }

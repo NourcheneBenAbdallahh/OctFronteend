@@ -29,4 +29,13 @@ describe("sanitizeFournisseurInput", () => {
     const out = sanitizeFournisseurInput({ raison_sociale: "ACME" });
     expect(out).toEqual({ raison_sociale: "ACME" });
   });
+
+  it("sanitise les notes fournisseur", () => {
+    const out = sanitizeFournisseurInput({
+      note_statut: "  Fin de collaboration  ",
+      notes_evaluation: "  Bon délais  ",
+    });
+    expect(out.note_statut).toBe("Fin de collaboration");
+    expect(out.notes_evaluation).toBe("Bon délais");
+  });
 });

@@ -22,14 +22,6 @@ export const APP_MODULE_GROUPS: AppModuleGroup[] = [
     title: "Pilotage & analyse",
     modules: [
       {
-        id: "dashboard",
-        title: "Tableau de bord",
-        description:
-          "Vue d’ensemble des indicateurs clés : stocks, alertes, activité récente et raccourcis vers vos modules.",
-        path: "/",
-        roles: ["ADMIN", "STOCK"],
-      },
-      {
         id: "bi",
         title: "Tableau BI",
         description:

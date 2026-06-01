@@ -18,7 +18,10 @@ import Pagination from "@/components/tables/Pagination";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AppConfirmModal, AppFeedbackBanner } from "@/components/ui/feedback";
 import { ResponsiveTableWrap } from "@/components/ui/ResponsiveTableWrap";
+import { SortableTh } from "@/components/ui/SortableTableHeader";
 import { getActionErrorMessage, useAppFeedback } from "@/hooks/useAppFeedback";
+import { useTableSort } from "@/hooks/useTableSort";
+import type { SortColumn } from "@/lib/tableSort";
 
 // Helper functions
 const formatDate = (date: string | Date) => {
@@ -184,6 +187,25 @@ const filteredRows = useMemo(() => {
     r.contrat?.numero_contrat?.toLowerCase().includes(query.toLowerCase())
   );
 }, [rows, query]);
+
+  const factureSortColumns = useMemo<Record<string, SortColumn<TableFacture>>>(
+    () => ({
+      numero: { accessor: (f) => f.numero_facture, type: "string" },
+      date: { accessor: (f) => f.date_facture, type: "date" },
+      fournisseur: { accessor: (f) => f.fournisseur?.raison_sociale, type: "string" },
+      contrat: { accessor: (f) => f.contrat?.numero_contrat, type: "string" },
+      montant_ht: { accessor: (f) => f.montant_ht, type: "number" },
+      montant_ttc: { accessor: (f) => f.montant_ttc, type: "number" },
+      statut: { accessor: (f) => f.statut, type: "string" },
+    }),
+    []
+  );
+
+  const { sortKey, sortDirection, toggleSort, sortRows } = useTableSort(factureSortColumns);
+  const sortedRows = useMemo(
+    () => sortRows(filteredRows),
+    [filteredRows, sortRows]
+  );
 
   const fournisseurOptions = useMemo(() => {
     const map = new Map<string, string>();
@@ -618,42 +640,36 @@ const filteredRows = useMemo(() => {
                     title="Tout sélectionner sur cette vue"
                   />
                 </th>
-                <th className="px-6 py-4 text-left text-[10px] font-black uppercase text-gray-500 tracking-wider">
-                  <FileText className="h-3 w-3" />
-                  N° Facture
-                </th>
-                <th className="px-6 py-4 text-left text-[10px] font-black uppercase text-gray-500 tracking-wider">
-                  <Calendar className="h-3 w-3" />
-                  Date
-                </th>
-                <th className="px-6 py-4 text-left text-[10px] font-black uppercase text-gray-500 tracking-wider">
+                <SortableTh columnKey="numero" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-4 text-left text-[10px] font-black uppercase text-gray-500 tracking-wider">
+                  <span className="inline-flex items-center gap-1"><FileText className="h-3 w-3" />N° Facture</span>
+                </SortableTh>
+                <SortableTh columnKey="date" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-4 text-left text-[10px] font-black uppercase text-gray-500 tracking-wider">
+                  <span className="inline-flex items-center gap-1"><Calendar className="h-3 w-3" />Date</span>
+                </SortableTh>
+                <SortableTh columnKey="fournisseur" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-4 text-left text-[10px] font-black uppercase text-gray-500 tracking-wider">
                   Fournisseur
-                </th>
-                <th className="px-6 py-4 text-left text-[10px] font-black uppercase text-gray-500 tracking-wider">
+                </SortableTh>
+                <SortableTh columnKey="contrat" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-4 text-left text-[10px] font-black uppercase text-gray-500 tracking-wider">
                   Contrat
-                </th>
-                <th className="px-6 py-4 text-left text-[10px] font-black uppercase text-gray-500 tracking-wider">
-                  <Banknote className="h-3 w-3" />
-                  Montant HT
-                </th>
-                <th 
-                className="px-6 py-4 text-left text-[10px] font-black uppercase text-gray-500 tracking-wider">
-                  <TrendingUp className="h-3 w-3" />
-                  Montant TTC
-                </th>
+                </SortableTh>
+                <SortableTh columnKey="montant_ht" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-4 text-left text-[10px] font-black uppercase text-gray-500 tracking-wider">
+                  <span className="inline-flex items-center gap-1"><Banknote className="h-3 w-3" />Montant HT</span>
+                </SortableTh>
+                <SortableTh columnKey="montant_ttc" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-4 text-left text-[10px] font-black uppercase text-gray-500 tracking-wider">
+                  <span className="inline-flex items-center gap-1"><TrendingUp className="h-3 w-3" />Montant TTC</span>
+                </SortableTh>
                 <th className="px-6 py-4 text-left text-[10px] font-black uppercase text-gray-500 tracking-wider">
                   <User className="h-3 w-3" />
                   Validé par
                 </th>
-                <th className="px-6 py-4 text-left text-[10px] font-black uppercase text-gray-500 tracking-wider">
-                  <AlertCircle className="h-3 w-3" />
-                  Statut
-                </th>
+                <SortableTh columnKey="statut" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-4 text-left text-[10px] font-black uppercase text-gray-500 tracking-wider">
+                  <span className="inline-flex items-center gap-1"><AlertCircle className="h-3 w-3" />Statut</span>
+                </SortableTh>
                 <th className="px-6 py-4 text-right text-[10px] font-black uppercase text-gray-500 tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredRows.map((item) => (
+              {sortedRows.map((item) => (
                 <React.Fragment key={item.id}>
                   <tr className="hover:bg-gray-50 transition-all duration-300 cursor-pointer group" onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}>
                     <td
@@ -963,7 +979,7 @@ const filteredRows = useMemo(() => {
               {editing ? "Modifier Facture" : "Nouvelle Facture Groupée"}
             </h2>
 
-            <form onSubmit={handleSubmit} className="space-y-6 flex-1 overflow-y-auto pr-2 custom-scrollbar">
+            <form onSubmit={handleSubmit} className="form-scroll flex-1 space-y-6 pr-2">
               {errorMessage && <div className="p-4 bg-red-50 text-red-600 rounded-2xl text-[10px] font-black border border-red-100 uppercase">{errorMessage}</div>}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1023,7 +1039,7 @@ const filteredRows = useMemo(() => {
                 </div>
 
                 {blDropdownOpen && (
-                  <div className="absolute z-30 w-full mt-2 bg-white border border-gray-100 rounded-2xl shadow-2xl max-h-56 overflow-y-auto p-2">
+                  <div className="no-scrollbar absolute z-30 mt-2 max-h-56 w-full overflow-y-auto rounded-2xl border border-gray-100 bg-white p-2 shadow-2xl">
                     {filteredBL.length > 0 ? filteredBL.map(bl => (
                       <button key={bl.id} type="button" onClick={() => toggleBL(String(bl.id))} className={`w-full p-3 rounded-xl text-left text-xs font-black mb-1 flex justify-between items-center transition-colors ${form.bon_livraison_ids.includes(String(bl.id)) ? 'bg-indigo-50 text-indigo-600' : 'hover:bg-gray-50'}`}>
                         <span>

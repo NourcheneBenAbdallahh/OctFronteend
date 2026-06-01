@@ -15,8 +15,23 @@ import { EmballageConfirmDeleteModal } from "./EmballagesPageAlerts";
 import { AppFeedbackBanner } from "@/components/ui/feedback";
 import { useAppFeedback } from "@/hooks/useAppFeedback";
 import { tourPageAttrs } from "@/lib/tourPageAttrs";
+import { useTableSort } from "@/hooks/useTableSort";
+import type { SortColumn } from "@/lib/tableSort";
+import {
+  EMPTY_EMBALLAGES_FILTERS,
+  filterEmballageRows,
+  countActiveEmballageFilters,
+  type EmballagesFiltersState,
+} from "./emballagesFilters";
 
 const tour = tourPageAttrs("/emballages");
+
+const EMBALLAGE_SORT_COLUMNS: Record<string, SortColumn<TableEmballages>> = {
+  code: { accessor: (r) => r.code, type: "string" },
+  name: { accessor: (r) => r.name, type: "string" },
+  poids: { accessor: (r) => r.poids, type: "number" },
+  status: { accessor: (r) => r.status, type: "string" },
+};
 
 interface Props {
   data: TableEmballages[];
@@ -68,7 +83,7 @@ export default function EmballagesTable({
   const [rows, setRows] = useState<TableEmballages[]>(data);
   const [isOpen, setIsOpen] = useState(false);
   const [editing, setEditing] = useState<TableEmballages | null>(null);
-  const [query, setQuery] = useState("");
+  const [filters, setFilters] = useState<EmballagesFiltersState>(EMPTY_EMBALLAGES_FILTERS);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [detailItem, setDetailItem] = useState<TableEmballages | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TableEmballages | null>(null);
@@ -81,14 +96,17 @@ export default function EmballagesTable({
     setRows(data);
   }, [data]);
 
-  const filteredRows = useMemo(() => {
-    return rows.filter(
-      (r) =>
-        r.name.toLowerCase().includes(query.toLowerCase()) ||
-        r.code.toLowerCase().includes(query.toLowerCase()) ||
-        r.material?.toLowerCase().includes(query.toLowerCase())
-    );
-  }, [rows, query]);
+  const { sortKey, sortDirection, toggleSort, sortRows } = useTableSort(EMBALLAGE_SORT_COLUMNS);
+
+  const filteredRows = useMemo(
+    () => filterEmballageRows(rows, filters),
+    [rows, filters]
+  );
+
+  const hasLocalFilters =
+    filters.search.trim().length > 0 || countActiveEmballageFilters(filters) > 0;
+
+  const sortedRows = useMemo(() => sortRows(filteredRows), [filteredRows, sortRows]);
 
   const totalPages = Math.ceil(total / limit);
 
@@ -124,9 +142,11 @@ export default function EmballagesTable({
   return (
     <div className="flex flex-col min-h-[600px]">
       <EmballagesHeader
-        query={query}
-        setQuery={setQuery}
+        filters={filters}
+        onFiltersChange={setFilters}
+        rows={rows}
         total={total}
+        filteredCount={filteredRows.length}
         canManage={canManage}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
@@ -145,7 +165,10 @@ export default function EmballagesTable({
           <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
             {viewMode === "list" ? (
               <EmballagesListView
-                rows={filteredRows}
+                rows={sortedRows}
+                sortKey={sortKey}
+                sortDirection={sortDirection}
+                onSort={toggleSort}
                 canManage={canManage}
                 onOpenDetail={setDetailItem}
                 onEdit={(item: TableEmballages) => {
@@ -158,7 +181,7 @@ export default function EmballagesTable({
               />
             ) : (
               <EmballagesGridView
-                rows={filteredRows}
+                rows={sortedRows}
                 canManage={canManage}
                 onOpenDetail={setDetailItem}
                 onEdit={(item: TableEmballages) => {
@@ -188,7 +211,7 @@ export default function EmballagesTable({
         )}
       </div>
 
-      {totalPages > 1 && !query && (
+      {totalPages > 1 && !hasLocalFilters && (
         <div className="mt-4 flex justify-center items-center py-6 bg-white rounded-[2rem] border border-gray-50 shadow-sm animate-in fade-in zoom-in-95 duration-300">
           <LocalPagination
             currentPage={page}

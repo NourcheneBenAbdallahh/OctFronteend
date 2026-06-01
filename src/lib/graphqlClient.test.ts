@@ -22,8 +22,19 @@ describe("friendlyGraphqlMessage", () => {
     expect(friendlyGraphqlMessage("Failed to fetch")).toContain("backend");
   });
 
-  it("traduit doublon", () => {
-    expect(friendlyGraphqlMessage("The code has already been taken")).toContain("doublon");
+  it("traduit doublon code", () => {
+    expect(friendlyGraphqlMessage("The code has already been taken")).toBe(
+      "Ce code existe déjà."
+    );
+  });
+
+  it("traduit doublon email", () => {
+    expect(friendlyGraphqlMessage("The email has already been taken.")).toBe(
+      "Cette adresse e-mail existe déjà."
+    );
+    expect(
+      friendlyGraphqlMessage("validation.unique", "input.email")
+    ).toBe("Cette adresse e-mail existe déjà.");
   });
 
   it("masque les erreurs techniques longues", () => {

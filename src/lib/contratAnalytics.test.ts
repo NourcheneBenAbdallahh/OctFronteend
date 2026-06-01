@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getContratStatus, getProgressColor } from "./contratAnalytics";
+import { getContratStatus, getProgressColor, getContratStatutNote, matchesMontantHtRange } from "./contratAnalytics";
 
 describe("contratAnalytics", () => {
   it("getContratStatus détecte dépassement", () => {
@@ -32,5 +32,16 @@ describe("contratAnalytics", () => {
     expect(getProgressColor(100)).toContain("red");
     expect(getProgressColor(85)).toContain("orange");
     expect(getProgressColor(50)).toContain("indigo");
+  });
+
+  it("getContratStatutNote utilise la note personnalisée ou la suggestion", () => {
+    expect(getContratStatutNote("ACTIF", "Note interne")).toBe("Note interne");
+    expect(getContratStatutNote("SUSPENDU")).toContain("suspendu");
+  });
+
+  it("matchesMontantHtRange filtre par plage HT", () => {
+    expect(matchesMontantHtRange(50000, "10000", "100000")).toBe(true);
+    expect(matchesMontantHtRange(5000, "10000", "")).toBe(false);
+    expect(matchesMontantHtRange(500000, "", "100000")).toBe(false);
   });
 });

@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { ContratHeader } from "./ContratHeader";
 import { ContratListView } from "./ContratListView";
 import { ContratForm } from "./ContratForm";
-import { listContrats, createContrat, updateContrat, deleteContrat, extractContratFromFile } from "@/lib/contrats.api";
+import { listContrats, createContrat, updateContrat, deleteContrat, extractContratFromFile, uploadContratDocument } from "@/lib/contrats.api";
 import { graphqlRequest } from "@/lib/graphqlClient";
 import { useAuthStore } from "@/store/useAuthStore";
 import { listFournisseurs } from "@/lib/fournisseurs.api";
@@ -16,9 +16,14 @@ import type { UniteMesure } from "@/types/unite-mesure";
 import { TableFournisseur } from "@/types/fournisseur";
 import { useSearchParams } from "next/navigation";
 import { Calendar, RotateCcw, Filter, ChevronDown, ChevronUp, Download, FileSpreadsheet } from "lucide-react";
+import { useTableSort } from "@/hooks/useTableSort";
+import type { SortColumn } from "@/lib/tableSort";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { exportContratsCsv, type ContratUsageHistoryCsvRow } from "@/lib/contrats.csv";
+import { drawOctPdfHeader } from "@/lib/octPdfHeader";
+import { downloadBlob, fetchContratDocument, openBlobInNewTab } from "@/lib/contrats.document";
+import { matchesMontantHtRange } from "@/lib/contratAnalytics";
 import { AppConfirmModal, AppFeedbackBanner } from "@/components/ui/feedback";
 import { getActionErrorMessage, useAppFeedback } from "@/hooks/useAppFeedback";
 
@@ -53,6 +58,15 @@ const LocalPagination = ({
   </div>
 );
 
+const CONTRAT_SORT_COLUMNS: Record<string, SortColumn<TableContrat>> = {
+  numero: { accessor: (c) => c.numero_contrat, type: "string" },
+  fournisseur: { accessor: (c) => c.fournisseur?.raison_sociale, type: "string" },
+  montant_ht: { accessor: (c) => c.montant_ht, type: "number" },
+  quantite: { accessor: (c) => c.quantite_contractuelle, type: "number" },
+  progression: { accessor: (c) => c.quantite_realisee, type: "number" },
+  statut: { accessor: (c) => c.statut, type: "string" },
+};
+
 export default function ContratTable({ data }: { data?: TableContrat[] }) {
   const searchParams = useSearchParams();
   const focusId = searchParams.get("focus");
@@ -75,6 +89,9 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
   const [dateDebutTo, setDateDebutTo] = useState<string>("");
   const [dateFinFrom, setDateFinFrom] = useState<string>("");
   const [dateFinTo, setDateFinTo] = useState<string>("");
+  const [montantHtMin, setMontantHtMin] = useState<string>("");
+  const [montantHtMax, setMontantHtMax] = useState<string>("");
+  const [pendingDocumentFile, setPendingDocumentFile] = useState<File | null>(null);
   const [exportPeriodType, setExportPeriodType] = useState<"year" | "month">("year");
   const [exportYear, setExportYear] = useState<string>("");
   const [exportMonth, setExportMonth] = useState<string>("");
@@ -112,7 +129,14 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
+  const [focusPinned, setFocusPinned] = useState(Boolean(focusId));
+  const [prevFocusId, setPrevFocusId] = useState(focusId);
   const itemsPerPage = 6;
+
+  if (focusId !== prevFocusId) {
+    setPrevFocusId(focusId);
+    setFocusPinned(Boolean(focusId));
+  }
 
   const [fournisseurs, setFournisseurs] = useState<TableFournisseur[]>([]);
   const [emballages, setEmballages] = useState<TableEmballages[]>([]);
@@ -129,6 +153,7 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
     quantite_realisee: 0,
     montant_cautionnement: undefined,
     statut: "ACTIF",
+    note_statut: "",
     fournisseur_id: "",
     emballage_id: "",
   };
@@ -331,6 +356,7 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
       const matchFournisseur = !exportFournisseurId || String(r.fournisseur_id) === exportFournisseurId;
       const matchEmballage = !exportEmballageId || String(r.emballage_id) === exportEmballageId;
       const matchStatut = !exportStatut || r.statut === exportStatut;
+      const matchesMontant = matchesMontantHtRange(r.montant_ht, montantHtMin, montantHtMax);
 
       const matchesAdvancedEntityParams =
         matchContrat && matchFournisseur && matchEmballage && matchStatut;
@@ -344,6 +370,7 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
         matchesDateDebutTo &&
         matchesDateFinFrom &&
         matchesDateFinTo &&
+        matchesMontant &&
         matchYear &&
         matchMonth &&
         matchesAdvancedEntityParams
@@ -359,6 +386,8 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
     dateDebutTo,
     dateFinFrom,
     dateFinTo,
+    montantHtMin,
+    montantHtMax,
     exportYear,
     exportMonth,
     exportPeriodType,
@@ -424,18 +453,15 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
     const doc = new jsPDF({ orientation: "landscape" });
     const period = exportPeriodType === "month" && exportMonth ? `${monthLabel(exportMonth)} ${exportYear || ""}` : (exportYear || "Toutes periodes");
 
+    let y = await drawOctPdfHeader(doc, "Etat des contrats", 12);
     doc.setFontSize(10);
-    doc.text("Office du Commerce de la Tunisie", 14, 12);
-    doc.text("Direction d'Exploitation et Suivi des Sous-Traitants", 14, 18);
-    doc.text("Sous Direction de Gestion du Stock et Suivi des Sous-Traitants", 14, 24);
-    doc.setFontSize(14);
-    doc.text("Etat des contrats", 14, 34);
-    doc.setFontSize(10);
-    doc.text(`Date export: ${new Date().toLocaleString("fr-FR")}`, 14, 41);
-    doc.text(`Periode: ${period}`, 14, 47);
+    doc.setTextColor(60, 60, 60);
+    doc.text(`Date export: ${new Date().toLocaleString("fr-FR")}`, 14, y);
+    y += 6;
+    doc.text(`Periode: ${period}`, 14, y);
 
     autoTable(doc, {
-      startY: 52,
+      startY: y + 4,
       head: [["Indicateur", "Valeur"]],
       body: [
         ["Nombre contrats", String(exportStats.totalContrats)],
@@ -568,6 +594,8 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
     }
   };
 
+  const { sortKey, sortDirection, toggleSort, sortRows } = useTableSort(CONTRAT_SORT_COLUMNS);
+
   const filteredRows = useMemo(() => {
     const q = query.trim().toLowerCase();
     const toDate = (value?: string | null) => {
@@ -600,6 +628,7 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
       const matchesDateDebutTo = !startMax || (dateDebut && dateDebut <= startMax);
       const matchesDateFinFrom = !endMin || (dateFin && dateFin >= endMin);
       const matchesDateFinTo = !endMax || (dateFin && dateFin <= endMax);
+      const matchesMontant = matchesMontantHtRange(r.montant_ht, montantHtMin, montantHtMax);
 
       return (
         matchesText &&
@@ -609,7 +638,8 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
         matchesDateDebutFrom &&
         matchesDateDebutTo &&
         matchesDateFinFrom &&
-        matchesDateFinTo
+        matchesDateFinTo &&
+        matchesMontant
       );
     });
   }, [
@@ -622,37 +652,44 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
     dateDebutTo,
     dateFinFrom,
     dateFinTo,
+    montantHtMin,
+    montantHtMax,
   ]);
 
-  const totalPages = Math.ceil(filteredRows.length / itemsPerPage);
+  const sortedRows = useMemo(() => sortRows(filteredRows), [filteredRows, sortRows]);
+
+  const totalPages = Math.ceil(sortedRows.length / itemsPerPage);
+
+  const focusTargetPage = useMemo(() => {
+    if (!focusId) return null;
+    const targetIndex = sortedRows.findIndex((row) => String(row.id) === String(focusId));
+    if (targetIndex === -1) return null;
+    return Math.floor(targetIndex / itemsPerPage) + 1;
+  }, [focusId, sortedRows, itemsPerPage]);
+
+  const activePage =
+    focusPinned && focusTargetPage !== null ? focusTargetPage : currentPage;
 
   const paginatedRows = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return filteredRows.slice(start, start + itemsPerPage);
-  }, [filteredRows, currentPage]);
+    const start = (activePage - 1) * itemsPerPage;
+    return sortedRows.slice(start, start + itemsPerPage);
+  }, [sortedRows, activePage, itemsPerPage]);
 
   useEffect(() => {
-    if (!focusId) return;
-    const targetIndex = filteredRows.findIndex((row) => String(row.id) === String(focusId));
-    if (targetIndex === -1) return;
-
-    const targetPage = Math.floor(targetIndex / itemsPerPage) + 1;
-    if (targetPage !== currentPage) {
-      setCurrentPage(targetPage);
-      return;
-    }
+    if (!focusId || focusTargetPage === null) return;
 
     const timer = window.setTimeout(() => {
       const el = document.getElementById(`contrat-row-${focusId}`);
       el?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 180);
     return () => window.clearTimeout(timer);
-  }, [focusId, filteredRows, currentPage]);
+  }, [focusId, focusTargetPage, sortedRows, activePage]);
 
   // Reset la page si on recherche
   useEffect(() => {
+    setFocusPinned(false);
     setCurrentPage(1);
-  }, [query, statusFilter, fournisseurFilter, emballageFilter, dateDebutFrom, dateDebutTo, dateFinFrom, dateFinTo]);
+  }, [query, statusFilter, fournisseurFilter, emballageFilter, dateDebutFrom, dateDebutTo, dateFinFrom, dateFinTo, montantHtMin, montantHtMax, sortKey, sortDirection]);
 
   const stats = useMemo(() => {
     const total = rows.length;
@@ -694,7 +731,6 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
 
       let updated: TableContrat;
       if (editing) {
-        // On envoie l'ID séparément, et le payload sans l'ID dedans
         const res = await updateContrat(editing.id, payload);
         updated = normalizeContrat(res.updateContrat);
       } else {
@@ -702,7 +738,12 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
         updated = normalizeContrat(res.createContrat);
       }
 
-      // Re-lier les objets pour l'affichage local dans la table
+      if (pendingDocumentFile) {
+        const uploadRes = await uploadContratDocument(updated.id, pendingDocumentFile);
+        updated = normalizeContrat(uploadRes.uploadContratDocument);
+        setPendingDocumentFile(null);
+      }
+
       updated.fournisseur = fournisseurs.find(f => String(f.id) === String(payload.fournisseur_id));
       updated.emballage = emballages.find(em => String(em.id) === String(payload.emballage_id));
 
@@ -720,6 +761,7 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
   };
 
   const handleExtractFromFile = async (file: File) => {
+    setPendingDocumentFile(file);
     setExtracting(true);
     try {
       const res = await extractContratFromFile(file);
@@ -797,6 +839,24 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
     });
   };
 
+  const handleViewDocument = async (contrat: TableContrat) => {
+    try {
+      const { blob } = await fetchContratDocument(contrat.id, "inline", token || undefined);
+      openBlobInNewTab(blob);
+    } catch (err) {
+      showError(getActionErrorMessage(err, "Impossible d'ouvrir le document."));
+    }
+  };
+
+  const handleDownloadDocument = async (contrat: TableContrat) => {
+    try {
+      const { blob, filename } = await fetchContratDocument(contrat.id, "attachment", token || undefined);
+      downloadBlob(blob, filename);
+    } catch (err) {
+      showError(getActionErrorMessage(err, "Impossible de télécharger le document."));
+    }
+  };
+
   return (
     <div className="flex flex-col gap-6 min-h-[700px]">
       <AppFeedbackBanner feedback={feedback} onDismiss={clearFeedback} />
@@ -804,7 +864,7 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
       <ContratHeader
         query={query}
         setQuery={setQuery}
-        onOpenNew={() => { setEditing(null); setForm(emptyForm); setIsOpen(true); }}
+        onOpenNew={() => { setEditing(null); setForm(emptyForm); setPendingDocumentFile(null); setIsOpen(true); }}
         stats={stats}
       />
 
@@ -833,6 +893,8 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
               setDateDebutTo("");
               setDateFinFrom("");
               setDateFinTo("");
+              setMontantHtMin("");
+              setMontantHtMax("");
               setFournisseurSearch("");
               setEmballageSearch("");
               setShowFournisseurDropdown(false);
@@ -848,7 +910,7 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
 
         {showFilters && (
         <>
-        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide items-center animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="flex gap-3 overflow-x-auto pb-2 filter-bar-scroll items-center animate-in fade-in slide-in-from-top-2 duration-200">
           {["TOUT", "ACTIF", "EXPIRE", "SUSPENDU"].map((status) => {
             const isActive = statusFilter === status;
             const count = status === "TOUT" ? rows.length : statusCounts[status] || 0;
@@ -902,7 +964,7 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
                         placeholder="Rechercher fournisseur..."
                         className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold outline-none focus:ring-2 focus:ring-indigo-600/10 focus:border-indigo-600 transition-all"
                       />
-                      <div className="mt-2 max-h-48 overflow-y-auto space-y-1 pr-1">
+                      <div className="mt-2 max-h-48 no-scrollbar overflow-y-auto overscroll-contain space-y-1 pr-1">
                         <button
                           type="button"
                           onClick={() => {
@@ -959,7 +1021,7 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
                         placeholder="Rechercher emballage..."
                         className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold outline-none focus:ring-2 focus:ring-indigo-600/10 focus:border-indigo-600 transition-all"
                       />
-                      <div className="mt-2 max-h-48 overflow-y-auto space-y-1 pr-1">
+                      <div className="mt-2 max-h-48 no-scrollbar overflow-y-auto overscroll-contain space-y-1 pr-1">
                         <button
                           type="button"
                           onClick={() => {
@@ -1048,6 +1110,32 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
                 />
               </div>
             </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Montant HT min (DT)</label>
+              <input
+                type="number"
+                min="0"
+                step="0.001"
+                value={montantHtMin}
+                onChange={(e) => setMontantHtMin(e.target.value)}
+                placeholder="Ex. 10000"
+                className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:ring-4 focus:ring-indigo-600/5 focus:border-indigo-600 transition-all shadow-sm"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Montant HT max (DT)</label>
+              <input
+                type="number"
+                min="0"
+                step="0.001"
+                value={montantHtMax}
+                onChange={(e) => setMontantHtMax(e.target.value)}
+                placeholder="Ex. 500000"
+                className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:ring-4 focus:ring-indigo-600/5 focus:border-indigo-600 transition-all shadow-sm"
+              />
+            </div>
           </div>
         </div>
         </>
@@ -1095,7 +1183,7 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
               </button>
               {showExportPeriodDropdown && (
                 <div className="absolute z-30 mt-2 w-full rounded-2xl border border-gray-200 bg-white shadow-xl p-2">
-                  <div className="max-h-36 overflow-y-auto space-y-1 pr-1">
+                  <div className="max-h-36 no-scrollbar overflow-y-auto overscroll-contain space-y-1 pr-1">
                     <button
                       type="button"
                       onClick={() => { setExportPeriodType("year"); setShowExportPeriodDropdown(false); }}
@@ -1140,7 +1228,7 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
                     placeholder="Rechercher annee..."
                     className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold outline-none focus:border-indigo-600"
                   />
-                  <div className="mt-2 max-h-44 overflow-y-auto space-y-1 pr-1">
+                  <div className="mt-2 max-h-44 no-scrollbar overflow-y-auto overscroll-contain space-y-1 pr-1">
                     <button
                       type="button"
                       onClick={() => { setExportYear(""); setShowExportYearDropdown(false); }}
@@ -1189,7 +1277,7 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
                     placeholder="Rechercher mois..."
                     className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold outline-none focus:border-indigo-600"
                   />
-                  <div className="mt-2 max-h-44 overflow-y-auto space-y-1 pr-1">
+                  <div className="mt-2 max-h-44 no-scrollbar overflow-y-auto overscroll-contain space-y-1 pr-1">
                     <button
                       type="button"
                       onClick={() => { setExportMonth(""); setShowExportMonthDropdown(false); }}
@@ -1238,7 +1326,7 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
                     placeholder="Rechercher contrat..."
                     className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold outline-none focus:border-indigo-600"
                   />
-                  <div className="mt-2 max-h-44 overflow-y-auto space-y-1 pr-1">
+                  <div className="mt-2 max-h-44 no-scrollbar overflow-y-auto overscroll-contain space-y-1 pr-1">
                     <button
                       type="button"
                       onClick={() => { setExportContratId(""); setShowExportContratDropdown(false); }}
@@ -1287,7 +1375,7 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
                     placeholder="Rechercher fournisseur..."
                     className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold outline-none focus:border-indigo-600"
                   />
-                  <div className="mt-2 max-h-44 overflow-y-auto space-y-1 pr-1">
+                  <div className="mt-2 max-h-44 no-scrollbar overflow-y-auto overscroll-contain space-y-1 pr-1">
                     <button
                       type="button"
                       onClick={() => { setExportFournisseurId(""); setShowExportFournisseurDropdown(false); }}
@@ -1336,7 +1424,7 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
                     placeholder="Rechercher emballage..."
                     className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold outline-none focus:border-indigo-600"
                   />
-                  <div className="mt-2 max-h-44 overflow-y-auto space-y-1 pr-1">
+                  <div className="mt-2 max-h-44 no-scrollbar overflow-y-auto overscroll-contain space-y-1 pr-1">
                     <button
                       type="button"
                       onClick={() => { setExportEmballageId(""); setShowExportEmballageDropdown(false); }}
@@ -1385,7 +1473,7 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
                     placeholder="Rechercher statut..."
                     className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold outline-none focus:border-indigo-600"
                   />
-                  <div className="mt-2 max-h-40 overflow-y-auto space-y-1 pr-1">
+                  <div className="mt-2 max-h-40 no-scrollbar overflow-y-auto overscroll-contain space-y-1 pr-1">
                     <button
                       type="button"
                       onClick={() => { setExportStatut(""); setShowExportStatutDropdown(false); }}
@@ -1438,10 +1526,15 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
         <ContratListView
           rows={paginatedRows}
           focusedId={focusId}
+          sortKey={sortKey}
+          sortDirection={sortDirection}
+          onSort={toggleSort}
           userNamesById={userNamesById}
           uniteLabelByCode={uniteLabelByCode}
-          onEdit={(c) => { setEditing(c); setForm(c); setIsOpen(true); }}
+          onEdit={(c) => { setEditing(c); setForm(c); setPendingDocumentFile(null); setIsOpen(true); }}
           onDelete={requestDeleteContrat}
+          onViewDocument={handleViewDocument}
+          onDownloadDocument={handleDownloadDocument}
         />
       </div>
 
@@ -1449,9 +1542,12 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
       {totalPages > 1 && (
         <div className="mt-4 flex justify-center items-center py-6 bg-white rounded-[2rem] border border-gray-50 shadow-sm animate-in fade-in zoom-in-95 duration-300">
           <LocalPagination 
-            currentPage={currentPage}
+            currentPage={activePage}
             totalPages={totalPages}
-            onPageChange={setCurrentPage}
+            onPageChange={(page) => {
+              setFocusPinned(false);
+              setCurrentPage(page);
+            }}
           />
         </div>
       )}
@@ -1461,11 +1557,13 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
         editing={!!editing}
         form={form}
         setForm={setForm}
-        onClose={() => setIsOpen(false)}
+        onClose={() => { setIsOpen(false); setPendingDocumentFile(null); }}
         onSubmit={handleSubmit}
         loading={loading}
         extracting={extracting}
         onExtractFromFile={handleExtractFromFile}
+        onDocumentFile={setPendingDocumentFile}
+        hasPendingDocument={!!pendingDocumentFile}
         fournisseurs={fournisseurs}
         emballages={emballages}
         unitesMesure={unitesMesure}

@@ -46,10 +46,10 @@ export function shouldBypassRouteAccess(pathname: string): boolean {
 /** Page d’accueil par rôle si l’URL actuelle n’est pas autorisée (hors ADMIN). */
 export function defaultHomePath(role: string | undefined | null): string {
   const r = toAccessRole(role);
-  if (!r || r === "ADMIN") return "/";
+  if (!r || r === "ADMIN" || r === "STOCK") return "/bi";
   if (r === "LOGISTIQUE") return "/commandes";
   if (r === "FINANCE") return "/factures";
-  return "/";
+  return "/bi";
 }
 
 export function canAccessPath(
@@ -77,10 +77,6 @@ export function canAccessPath(
   }
   if (path === "/calendar" || path.startsWith("/calendar/")) {
     return true;
-  }
-
-  if (path === "/" || path === "") {
-    return r === "STOCK";
   }
 
   if (path === "/bi" || path.startsWith("/bi/")) {

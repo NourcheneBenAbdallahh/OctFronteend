@@ -15,12 +15,22 @@ import { AppFeedbackBanner } from "@/components/ui/feedback";
 import { useAppFeedback } from "@/hooks/useAppFeedback";
 import { HelpCircle, FileDown } from "lucide-react";
 import { ResponsiveTableWrap } from "@/components/ui/ResponsiveTableWrap";
+import { SortableTh } from "@/components/ui/SortableTableHeader";
+import { useTableSort } from "@/hooks/useTableSort";
+import type { SortColumn } from "@/lib/tableSort";
+import type { PredictionPoint } from "@/lib/prediction";
 
 interface Emballage {
   id: string;
   name: string;
   capacity_unit: string | null;
 }
+
+const PREDICTION_SORT_COLUMNS: Record<string, SortColumn<PredictionPoint>> = {
+  date: { accessor: (p) => p.date, type: "date" },
+  quantite: { accessor: (p) => p.quantite_predite, type: "number" },
+  borne: { accessor: (p) => p.borne_basse, type: "number" },
+};
 
 export default function ForecastingPage() {
   const token = useAuthStore((state) => state.token);
@@ -36,6 +46,12 @@ export default function ForecastingPage() {
   const displayUnit = useMemo(() => {
     return selectedEmballage?.capacity_unit?.trim() || "unités";
   }, [selectedEmballage]);
+
+  const { sortKey, sortDirection, toggleSort, sortRows } = useTableSort(PREDICTION_SORT_COLUMNS);
+  const sortedPredictions = useMemo(
+    () => (data?.predictions ? sortRows(data.predictions) : []),
+    [data?.predictions, sortRows]
+  );
 
   useEffect(() => {
     if (!token) return;
@@ -265,17 +281,17 @@ export default function ForecastingPage() {
                   Fourchette = scénario prudent (bas) et optimiste (haut).
                 </p>
               </div>
-              <ResponsiveTableWrap showScrollHint={data.predictions.length > 0}>
+              <ResponsiveTableWrap showScrollHint={sortedPredictions.length > 0}>
               <table className="w-full min-w-[640px] text-sm">
                 <thead>
                   <tr className="border-b border-gray-100 text-left text-xs font-bold uppercase text-gray-400">
-                    <th className="px-6 py-4">Date</th>
-                    <th className="px-6 py-4">Sorties prévues</th>
-                    <th className="px-6 py-4 text-center">Fourchette possible</th>
+                    <SortableTh columnKey="date" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-4">Date</SortableTh>
+                    <SortableTh columnKey="quantite" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-4">Sorties prévues</SortableTh>
+                    <SortableTh columnKey="borne" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-4" align="center">Fourchette possible</SortableTh>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {data.predictions.map((p, idx) => (
+                  {sortedPredictions.map((p, idx) => (
                     <tr key={idx} className="hover:bg-gray-50/50">
                       <td className="px-6 py-4 font-medium text-gray-700">
                         {new Date(p.date).toLocaleDateString("fr-FR", {

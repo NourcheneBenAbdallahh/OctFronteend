@@ -32,7 +32,8 @@ describe("defaultHomePath", () => {
   it("redirige selon le rôle", () => {
     expect(defaultHomePath("LOGISTIQUE")).toBe("/commandes");
     expect(defaultHomePath("FINANCE")).toBe("/factures");
-    expect(defaultHomePath("STOCK")).toBe("/");
+    expect(defaultHomePath("STOCK")).toBe("/bi");
+    expect(defaultHomePath("ADMIN")).toBe("/bi");
   });
 });
 
@@ -48,8 +49,8 @@ describe("canAccessPath", () => {
     expect(canAccessPath("/commandes", "FINANCE")).toBe(false);
   });
 
-  it("restreint STOCK au dashboard et aux routes stock", () => {
-    expect(canAccessPath("/", "STOCK")).toBe(true);
+  it("restreint STOCK au BI et aux routes stock", () => {
+    expect(canAccessPath("/bi", "STOCK")).toBe(true);
     expect(canAccessPath("/stock", "STOCK")).toBe(true);
     expect(canAccessPath("/stock-inventaire", "STOCK")).toBe(true);
     expect(canAccessPath("/commandes", "STOCK")).toBe(false);

@@ -1,9 +1,9 @@
 "use client";
-import Image from "next/image";
 import Link from "next/link";
 import React, { useState } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
+import UserPhotoAvatar from "../ui/UserPhotoAvatar";
 import { useAuthStore } from "@/store/useAuthStore"; // Import du store
 import { useRouter } from "next/navigation";
 
@@ -36,17 +36,12 @@ export default function UserDropdown() {
         className="flex items-center text-gray-700 dark:text-gray-400 dropdown-toggle"
       >
         <span className="mr-3 overflow-hidden rounded-full h-11 w-11 bg-gray-100 flex items-center justify-center">
-          {/* Si tu n'as pas encore d'image d'avatar en DB, on peut mettre une initiale */}
-          {user?.photo ? (
-            <Image
-              width={44}
-              height={44}
-              src={user.photo}
-              alt={user.name}
-            />
-          ) : (
-            <span className="font-bold text-[#00A09D]">{user?.name?.charAt(0)}</span>
-          )}
+          <UserPhotoAvatar
+            photo={user?.photo}
+            name={user?.name}
+            size={44}
+            className="h-11 w-11 rounded-full"
+          />
         </span>
 
         {/* Affichage du prénom uniquement ou nom complet */}

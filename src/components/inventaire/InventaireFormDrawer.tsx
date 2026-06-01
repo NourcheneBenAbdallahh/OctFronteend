@@ -147,6 +147,29 @@ export default function InventaireFormDrawer({
     void loadTheorique();
   }, [open, isEdit, loadTheorique]);
 
+  useEffect(() => {
+    if (!open) return;
+
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtmlOverflow = html.style.overflow;
+    const prevBodyOverflow = body.style.overflow;
+    const prevBodyPaddingRight = body.style.paddingRight;
+    const scrollbarW = window.innerWidth - html.clientWidth;
+
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    if (scrollbarW > 0) {
+      body.style.paddingRight = `${scrollbarW}px`;
+    }
+
+    return () => {
+      html.style.overflow = prevHtmlOverflow;
+      body.style.overflow = prevBodyOverflow;
+      body.style.paddingRight = prevBodyPaddingRight;
+    };
+  }, [open]);
+
   if (!open) return null;
 
   const usePeriode = !!(form.periode_debut && form.periode_fin);
@@ -199,7 +222,7 @@ export default function InventaireFormDrawer({
     <div className="fixed inset-0 z-[100] overflow-hidden">
       <div className="absolute inset-0 bg-[#1C2434]/40 backdrop-blur-sm" onClick={onClose} />
 
-      <div className="absolute right-0 top-0 h-full w-full max-w-xl bg-white shadow-2xl flex flex-col">
+      <div className="absolute right-0 top-0 flex h-full w-full max-w-xl min-h-0 flex-col overflow-hidden bg-white shadow-2xl">
         <div className="px-8 pt-10 pb-6 border-b border-gray-100 flex items-start justify-between shrink-0">
           <div>
             <span className="inline-block px-3 py-1 rounded-full bg-[#00A09D]/10 text-[#00A09D] text-[10px] font-[1000] uppercase tracking-widest mb-2">
@@ -229,7 +252,10 @@ export default function InventaireFormDrawer({
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-8 py-8 space-y-8">
+        <form
+          onSubmit={handleSubmit}
+          className="form-scroll min-h-0 flex-1 space-y-8 px-8 py-8"
+        >
           {(step === 1 || isEdit) && (
             <>
               <div className="space-y-4">
@@ -245,6 +271,7 @@ export default function InventaireFormDrawer({
                   searchPlaceholder="Rechercher un entrepôt…"
                   selectedOptionClassName="bg-[#00A09D]/10 text-[#007a78]"
                   dropdownZClassName="z-[1100]"
+                  listMaxHeightClassName="max-h-[min(10.5rem,34vh)] sm:max-h-40"
                 />
               </div>
 
@@ -261,6 +288,7 @@ export default function InventaireFormDrawer({
                   searchPlaceholder="Rechercher un emballage…"
                   selectedOptionClassName="bg-[#00A09D]/10 text-[#007a78]"
                   dropdownZClassName="z-[1100]"
+                  listMaxHeightClassName="max-h-[min(10.5rem,34vh)] sm:max-h-40"
                 />
               </div>
 

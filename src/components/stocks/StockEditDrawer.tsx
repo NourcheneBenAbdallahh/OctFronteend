@@ -98,7 +98,7 @@ export default function StockEditDrawer({ stock, open, onClose, onSubmit }: Prop
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+        <form onSubmit={handleSubmit} className="form-scroll flex-1 space-y-4 px-6 py-5">
           <Input label="Entrepôt ID" value={form.entrepot_id} onChange={(v) => setForm((p) => ({ ...p, entrepot_id: v }))} />
           <Input label="Emballage ID" value={form.emballage_id} onChange={(v) => setForm((p) => ({ ...p, emballage_id: v }))} />
           <Input label="Lot ID" value={form.lot_id} onChange={(v) => setForm((p) => ({ ...p, lot_id: v }))} />

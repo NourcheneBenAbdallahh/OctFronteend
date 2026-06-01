@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import {
   formatDate,
   formatEmballageLabel,
@@ -10,6 +11,19 @@ import { MouvementStock } from "@/types/mouvement";
 import { StatusBadge, TypeBadge } from "./mouvement-ui";
 import { CheckCircle2, History, Loader2, Trash2, User } from "lucide-react";
 import { ResponsiveTableWrap } from "@/components/ui/ResponsiveTableWrap";
+import { SortableTh } from "@/components/ui/SortableTableHeader";
+import { useTableSort } from "@/hooks/useTableSort";
+import type { SortColumn } from "@/lib/tableSort";
+
+const MOUVEMENT_SORT_COLUMNS: Record<string, SortColumn<MouvementStock>> = {
+  code: { accessor: (m) => m.code_mouvement ?? m.id, type: "string" },
+  type: { accessor: (m) => m.type_mouvement, type: "string" },
+  statut: { accessor: (m) => m.statut, type: "string" },
+  produit: { accessor: (m) => m.emballage?.name ?? m.emballage?.code, type: "string" },
+  entrepot: { accessor: (m) => m.entrepotSource?.nom, type: "string" },
+  quantite: { accessor: (m) => m.quantite, type: "number" },
+  user: { accessor: (m) => m.user?.name, type: "string" },
+};
 
 const LocalPagination = ({
   currentPage,
@@ -65,6 +79,12 @@ export default function MouvementsTable({
   totalItems: number;
   onPageChange: (page: number) => void;
 }) {
+  const { sortKey, sortDirection, toggleSort, sortRows } = useTableSort(MOUVEMENT_SORT_COLUMNS);
+  const sortedItems = useMemo(
+    () => sortRows(items ?? []),
+    [items, sortRows]
+  );
+
   return (
     <div className="flex flex-col gap-4">
       <div className="overflow-hidden rounded-[35px] border border-gray-100 bg-white shadow-sm">
@@ -89,13 +109,13 @@ export default function MouvementsTable({
           <table className="w-full min-w-[1100px] border-collapse">
             <thead>
               <tr className="border-b border-gray-50 bg-gray-50/30 text-left text-[10px] font-black uppercase tracking-[0.2em] text-[#1C2434]/60">
-                <th className="px-8 py-5">Code & Date_Mvt</th>
-                <th className="px-6 py-5">Type</th>
-                <th className="px-6 py-5">Statut</th>
-                <th className="px-6 py-5">Produit / Lot</th>
-                <th className="px-6 py-5">Entrepots</th>
-                <th className="px-6 py-5 text-center">Quantité</th>
-                <th className="px-6 py-5 text-center">Créé Par</th>
+                <SortableTh columnKey="code" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-8 py-5">Code & Date_Mvt</SortableTh>
+                <SortableTh columnKey="type" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-5">Type</SortableTh>
+                <SortableTh columnKey="statut" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-5">Statut</SortableTh>
+                <SortableTh columnKey="produit" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-5">Produit / Lot</SortableTh>
+                <SortableTh columnKey="entrepot" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-5">Entrepots</SortableTh>
+                <SortableTh columnKey="quantite" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-5" align="center">Quantité</SortableTh>
+                <SortableTh columnKey="user" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-5" align="center">Créé Par</SortableTh>
                 <th className="px-6 py-5 text-right">Actions</th>
               </tr>
             </thead>
@@ -112,7 +132,7 @@ export default function MouvementsTable({
                     </div>
                   </td>
                 </tr>
-              ) : !items || items.length === 0 ? (
+              ) : !sortedItems || sortedItems.length === 0 ? (
                 <tr>
                   <td
                     colSpan={8}
@@ -122,7 +142,7 @@ export default function MouvementsTable({
                   </td>
                 </tr>
               ) : (
-                items.map((m) => (
+                sortedItems.map((m) => (
                   <tr key={m.id} className="group transition-all hover:bg-gray-50/50">
                     <td className="px-8 py-6">
                       <div className="font-mono text-sm font-black text-[#1C2434]">

@@ -50,7 +50,9 @@ export function OptionSearchablePicker({
   listMaxHeightClassName = "",
   dropdownZClassName = "z-[1200]",
   /** Classes pour l’option sélectionnée (ex. indigo pour commande, teal ailleurs) */
-  selectedOptionClassName = "bg-indigo-600/10 text-indigo-800",
+  selectedOptionClassName,
+  accentVariant = "indigo",
+  triggerClassName,
 }: {
   value: string;
   onChange: (id: string) => void;
@@ -63,7 +65,21 @@ export function OptionSearchablePicker({
   listMaxHeightClassName?: string;
   dropdownZClassName?: string;
   selectedOptionClassName?: string;
+  accentVariant?: "indigo" | "teal";
+  triggerClassName?: string;
 }) {
+  const isTeal = accentVariant === "teal";
+  const resolvedSelectedClassName =
+    selectedOptionClassName ??
+    (isTeal
+      ? "bg-[#00A09D]/10 text-[#007a78] dark:text-[#00A09D]"
+      : "bg-indigo-600/10 text-indigo-800");
+  const optionHoverClassName = isTeal ? "hover:bg-[#00A09D]/8" : "hover:bg-indigo-50/60";
+  const scrollListClassName = isTeal ? "unite-mesure-picker-scroll" : "role-picker-scroll";
+  const searchFocusClassName = isTeal
+    ? "focus:border-[#00A09D] focus:ring-2 focus:ring-[#00A09D]/15"
+    : "focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/15";
+  const chevronOpenClassName = isTeal ? "text-[#00A09D]" : "text-indigo-600";
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [pop, setPop] = useState<ViewportAnchoredDropdown | null>(null);
@@ -118,8 +134,10 @@ export function OptionSearchablePicker({
 
   const selected = rows.find((o) => o.id === value);
 
-  const triggerClass =
-    "rounded-2xl border-2 border-gray-100 bg-gray-50/90 p-4 text-sm font-black text-gray-900 outline-none transition-all hover:border-indigo-200 hover:bg-white focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/15 shadow-sm";
+  const defaultTriggerClass = isTeal
+    ? "rounded-[20px] border-2 border-transparent bg-[#F8FAFA] p-4 text-sm font-bold text-gray-800 shadow-none outline-none transition-all hover:bg-white focus:border-[#00A09D] focus:bg-white focus:ring-3 focus:ring-[#00A09D]/10 dark:bg-white/5 dark:text-white/90 dark:hover:bg-white/10 dark:focus:border-[#00A09D]"
+    : "rounded-2xl border-2 border-gray-100 bg-gray-50/90 p-4 text-sm font-black text-gray-900 outline-none transition-all hover:border-indigo-200 hover:bg-white focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/15 shadow-sm";
+  const triggerClass = cn(defaultTriggerClass, triggerClassName);
 
   const dropdown =
     open &&
@@ -138,6 +156,7 @@ export function OptionSearchablePicker({
           ...(pop.placement === "below" ? { top: pop.top } : { bottom: pop.bottom }),
         }}
         role="listbox"
+        onWheel={(e) => e.stopPropagation()}
       >
         <div className="shrink-0 border-b border-gray-100 bg-gradient-to-b from-gray-50 to-white p-2.5">
           <div className="relative">
@@ -150,14 +169,18 @@ export function OptionSearchablePicker({
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder={searchPlaceholder}
-              className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-9 pr-3 text-sm font-semibold text-[#1C2434] outline-none placeholder:text-gray-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/15"
+              className={cn(
+                "w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-9 pr-3 text-sm font-semibold text-[#1C2434] outline-none placeholder:text-gray-400",
+                searchFocusClassName
+              )}
               autoFocus
             />
           </div>
         </div>
         <ul
           className={cn(
-            "unite-mesure-picker-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain p-1.5 [scrollbar-gutter:stable]",
+            scrollListClassName,
+            "unite-mesure-picker-scroll min-h-0 flex-1 p-1.5",
             listMaxHeightClassName
           )}
         >
@@ -184,8 +207,8 @@ export function OptionSearchablePicker({
                   className={cn(
                     "w-full rounded-xl px-3 py-2.5 text-left text-sm font-bold transition-colors",
                     value === o.id
-                      ? selectedOptionClassName
-                      : "text-[#1C2434] hover:bg-indigo-50/60"
+                      ? resolvedSelectedClassName
+                      : cn("text-[#1C2434]", optionHoverClassName)
                   )}
                 >
                   <span className="line-clamp-2 break-words">{o.label}</span>
@@ -229,7 +252,7 @@ export function OptionSearchablePicker({
         <ChevronDown
           className={cn(
             "h-5 w-5 shrink-0 text-gray-400 transition-transform",
-            open && "rotate-180 text-indigo-600"
+            open && cn("rotate-180", chevronOpenClassName)
           )}
           aria-hidden
         />

@@ -1,6 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { SortableTh } from '@/components/ui/SortableTableHeader';
+import { useTableSort } from '@/hooks/useTableSort';
+import type { SortColumn } from '@/lib/tableSort';
 import PageBreadcrumb from '@/components/common/PageBreadCrumb';
 import { getAlerts, getUnreadAlertsCount, markAlertAsRead, markAllAlertsAsRead, archiveAlert, Alert, AlertSeverity, AlertStatus } from '@/lib/notifications.api';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -38,6 +41,14 @@ const typeLabels: Record<string, string> = {
 };
 
 interface ClientNotificationsProps {}
+
+const ALERT_SORT_COLUMNS: Record<string, SortColumn<Alert>> = {
+  severity: { accessor: (a) => a.severity, type: 'string' },
+  type: { accessor: (a) => a.type, type: 'string' },
+  title: { accessor: (a) => a.title, type: 'string' },
+  status: { accessor: (a) => a.status, type: 'string' },
+  date: { accessor: (a) => a.created_at, type: 'date' },
+};
 
 function formatRelativeDate(dateString: string): string {
   const date = new Date(dateString);
@@ -141,12 +152,19 @@ export default function ClientNotifications({}: ClientNotificationsProps) {
     }
   };
 
-  const totalPages = Math.max(1, Math.ceil(alerts.length / itemsPerPage));
+  const { sortKey, sortDirection, toggleSort, sortRows } = useTableSort(ALERT_SORT_COLUMNS);
+  const sortedAlerts = useMemo(() => sortRows(alerts), [alerts, sortRows]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedAlerts.length / itemsPerPage));
   const start = (currentPage - 1) * itemsPerPage;
-  const paginatedAlerts = alerts.slice(start, start + itemsPerPage);
+  const paginatedAlerts = sortedAlerts.slice(start, start + itemsPerPage);
   const readCount = alerts.filter((a) => a.status === 'read').length;
   const archivedCount = alerts.filter((a) => a.status === 'archived').length;
   const criticalCount = alerts.filter((a) => a.severity === 'critical').length;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [sortKey, sortDirection]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -226,11 +244,11 @@ export default function ClientNotifications({}: ClientNotificationsProps) {
                 <table className='w-full min-w-[900px]'>
                   <thead className='border-b border-gray-200 bg-gray-50/80 text-xs font-black uppercase tracking-wider text-gray-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-400'>
                     <tr>
-                      <th className='px-6 py-4 text-left'>Severite</th>
-                      <th className='px-6 py-4 text-left'>Type</th>
-                      <th className='px-6 py-4 text-left'>Titre</th>
-                      <th className='px-6 py-4 text-left'>Statut</th>
-                      <th className='px-6 py-4 text-left'>Date</th>
+                      <SortableTh columnKey="severity" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-gray-500">Severite</SortableTh>
+                      <SortableTh columnKey="type" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-gray-500">Type</SortableTh>
+                      <SortableTh columnKey="title" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-gray-500">Titre</SortableTh>
+                      <SortableTh columnKey="status" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-gray-500">Statut</SortableTh>
+                      <SortableTh columnKey="date" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-gray-500">Date</SortableTh>
                       <th className='px-6 py-4 text-right'>Actions</th>
                     </tr>
                   </thead>
