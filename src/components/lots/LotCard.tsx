@@ -5,7 +5,6 @@ import {
   MessageSquareText,
   Package,
   User2,
-  Pencil,
   Trash2,
   Eye,
 } from "lucide-react";
@@ -15,7 +14,6 @@ interface Props {
   lot: Lot;
   compact?: boolean;
   onView?: (lot: Lot) => void;
-  onEdit?: (lot: Lot) => void;
   onDelete?: (lot: Lot) => void;
 }
 
@@ -30,7 +28,7 @@ function formatDate(date?: string | null) {
   });
 }
 
-export default function LotCard({ lot, compact = false, onView, onEdit, onDelete }: Props) {
+export default function LotCard({ lot, compact = false, onView, onDelete }: Props) {
   return (
     <div className="group relative bg-white border-2 border-gray-50 rounded-[40px] p-8 flex flex-col h-full transition-all duration-500 hover:border-[#DDF2F1] hover:shadow-[20px_20px_60px_rgba(0,160,157,0.05)]">
       
@@ -113,12 +111,6 @@ export default function LotCard({ lot, compact = false, onView, onEdit, onDelete
             className="w-10 h-10 shrink-0 flex items-center justify-center rounded-full bg-white border border-gray-200 text-gray-400 hover:text-[#00A09D] hover:border-[#00A09D] transition-all"
           >
             <Eye size={18} />
-          </button>
-          <button 
-            onClick={() => onEdit?.(lot)}
-            className="w-10 h-10 shrink-0 flex items-center justify-center rounded-full bg-white border border-gray-200 text-gray-400 hover:text-[#1C2434] hover:border-[#1C2434] transition-all"
-          >
-            <Pencil size={18} />
           </button>
           <button 
             onClick={() => onDelete?.(lot)}

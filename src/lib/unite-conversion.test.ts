@@ -36,8 +36,8 @@ const unites: UniteMesure[] = [
 ];
 
 describe("normalizeUnitCode", () => {
-  it("trim et uppercase", () => {
-    expect(normalizeUnitCode(" kg ")).toBe("KG");
+  it("conserve la casse et trim", () => {
+    expect(normalizeUnitCode(" Kg ")).toBe("Kg");
     expect(normalizeUnitCode(null)).toBe("");
   });
 });
@@ -45,7 +45,7 @@ describe("normalizeUnitCode", () => {
 describe("formatUnitCodeShort", () => {
   it("retourne un tiret si vide", () => {
     expect(formatUnitCodeShort("")).toBe("—");
-    expect(formatUnitCodeShort("l")).toBe("L");
+    expect(formatUnitCodeShort("l")).toBe("l");
   });
 });
 

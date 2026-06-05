@@ -7,74 +7,77 @@ interface Props {
   stats: StocksStatsType;
 }
 
-const StatCard = ({
-  title,
-  value,
-  icon,
-  colorClass,
-  iconBg,
-}: {
-  title: string;
-  value: string;
-  icon: React.ReactNode;
-  colorClass: string;
-  iconBg: string;
-}) => (
-  /* Style Pilule : rounded-2xl, border léger, padding ajusté */
-  <div className="bg-white border border-gray-100 rounded-2xl p-3 pr-8 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
-    {/* Cercle d'icône parfait à gauche */}
-    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${iconBg} ${colorClass}`}>
-      {icon}
-    </div>
-    
-    <div className="flex flex-col">
-      {/* Label en haut : petit, noir, uppercase, espacé */}
-      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-        {title}
-      </span>
-      {/* Valeur : Grande, noire, grasse */}
-      <span className="text-2xl font-black text-[#1C2434]">
-        {value}
-      </span>
-    </div>
-  </div>
-);
+const STAT_CARDS = [
+  {
+    id: "mouvements",
+    label: "Mouvements",
+    hint: "Total des enregistrements",
+    icon: <Boxes className="h-6 w-6" />,
+    iconClass: "bg-indigo-50 text-indigo-600",
+    valueClass: "text-gray-900",
+    idleClass: "border-gray-100 hover:border-indigo-200 hover:bg-indigo-50/40",
+    getValue: (s: StocksStatsType) => String(s.totalMouvements),
+  },
+  {
+    id: "entrees",
+    label: "Entrées",
+    hint: "Quantités entrées en stock",
+    icon: <ArrowDownToLine className="h-6 w-6" />,
+    iconClass: "bg-emerald-50 text-emerald-600",
+    valueClass: "text-emerald-600",
+    idleClass: "border-gray-100 hover:border-emerald-200 hover:bg-emerald-50/40",
+    getValue: (s: StocksStatsType) => s.totalEntrees.toLocaleString("fr-FR"),
+  },
+  {
+    id: "sorties",
+    label: "Sorties",
+    hint: "Quantités sorties du stock",
+    icon: <ArrowUpFromLine className="h-6 w-6" />,
+    iconClass: "bg-orange-50 text-orange-600",
+    valueClass: "text-orange-600",
+    idleClass: "border-gray-100 hover:border-orange-200 hover:bg-orange-50/40",
+    getValue: (s: StocksStatsType) => s.totalSorties.toLocaleString("fr-FR"),
+  },
+  {
+    id: "today",
+    label: "Aujourd'hui",
+    hint: "Mouvements du jour",
+    icon: <CalendarDays className="h-6 w-6" />,
+    iconClass: "bg-sky-50 text-sky-600",
+    valueClass: "text-gray-900",
+    idleClass: "border-gray-100 hover:border-sky-200 hover:bg-sky-50/40",
+    getValue: (s: StocksStatsType) => String(s.mouvementsToday),
+  },
+] as const;
 
 export default function StocksStats({ stats }: Props) {
   return (
-    /* Flexbox au lieu de Grid pour un alignement plus naturel comme sur ta capture */
-    <div className="flex flex-wrap items-center gap-4 mb-8">
-      <StatCard
-        title="Mouvements"
-        value={String(stats.totalMouvements)}
-        icon={<Boxes size={22} />}
-        colorClass="text-indigo-600"
-        iconBg="bg-indigo-50"
-      />
-      
-      <StatCard
-        title="Entrées"
-        value={stats.totalEntrees.toLocaleString("fr-FR")}
-        icon={<ArrowDownToLine size={22} />}
-        colorClass="text-emerald-600"
-        iconBg="bg-emerald-50"
-      />
-
-      <StatCard
-        title="Sorties"
-        value={stats.totalSorties.toLocaleString("fr-FR")}
-        icon={<ArrowUpFromLine size={22} />}
-        colorClass="text-orange-600"
-        iconBg="bg-orange-50"
-      />
-
-      <StatCard
-        title="Aujourd'hui"
-        value={String(stats.mouvementsToday)}
-        icon={<CalendarDays size={22} />}
-        colorClass="text-sky-600"
-        iconBg="bg-sky-50"
-      />
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+      {STAT_CARDS.map((card) => (
+        <div
+          key={card.id}
+          className={`rounded-[2rem] border bg-white p-6 text-left shadow-sm transition-all ${card.idleClass}`}
+        >
+          <div className="flex items-start gap-4">
+            <div
+              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${card.iconClass}`}
+            >
+              {card.icon}
+            </div>
+            <div className="min-w-0">
+              <span className="block text-[10px] font-black uppercase tracking-widest leading-none text-gray-400 mb-1">
+                {card.label}
+              </span>
+              <span className={`text-2xl font-black leading-none ${card.valueClass}`}>
+                {card.getValue(stats)}
+              </span>
+              <span className="mt-1.5 block text-[10px] font-bold uppercase leading-snug text-gray-400">
+                {card.hint}
+              </span>
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

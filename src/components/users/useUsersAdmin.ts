@@ -56,7 +56,9 @@ export function useUsersAdmin(perPage: number) {
     setSuccess(null);
     try {
       const result = await actionFn();
-      setSuccess(successMsg);
+      if (successMsg) {
+        setSuccess(successMsg);
+      }
       if (refreshAfter) {
         // Rechargement non bloquant pour garder une UI réactive.
         void loadUsers();

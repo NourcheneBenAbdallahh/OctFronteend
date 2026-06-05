@@ -41,7 +41,7 @@ export const EmballagesHeader = ({
 
           </h1>
 
-         <nav className="flex items-center text-[10px] font-black uppercase tracking-widest text-gray-400 gap-2 mb-2">
+         <nav className="mt-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
           <span>Logistique</span> <ChevronRight size={10} /> <span>Catalogue Emballages</span>
         </nav>
       </div>

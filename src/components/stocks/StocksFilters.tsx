@@ -1,19 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Search,
-  Package,
+  Filter,
+  ChevronDown,
+  ChevronUp,
+  RotateCcw,
   Warehouse,
+  Package,
   User,
   ArrowDownUp,
+  ArrowDownToLine,
+  ArrowUpFromLine,
   CalendarDays,
-  RotateCcw,
-  ChevronDown,
-  Filter,
-  ChevronUp
 } from "lucide-react";
 import type { Stock, StockFiltersState } from "@/types/stock";
+import { FilterBarSelect } from "@/components/ui/FilterBarSelect";
 
 interface Props {
   rows: Stock[];
@@ -21,129 +24,258 @@ interface Props {
   onChange: (filters: StockFiltersState) => void;
 }
 
-export default function StocksFilters({ rows, filters, onChange }: Props) {
-  const [showFilters, setShowFilters] = useState(false); // État pour masquer/afficher
+const EMPTY_FILTERS: StockFiltersState = {
+  search: "",
+  entrepot: "",
+  emballage: "",
+  sens: "",
+  user: "",
+  sort: "recent",
+  dateFrom: "",
+  dateTo: "",
+};
 
-  // --- Logique de données (Identique à ton code) ---
-  const entrepots = Array.from(new Map(rows.filter((r) => r.entrepot).map((r) => [String(r.entrepot?.id), { id: String(r.entrepot?.id), label: r.entrepot?.nom || r.entrepot?.name || `Entrepôt #${r.entrepot_id}` }])).values());
-  const emballages = Array.from(new Map(rows.filter((r) => r.emballage).map((r) => [String(r.emballage?.id), { id: String(r.emballage?.id), label: r.emballage?.name || r.emballage?.code || `Emballage #${r.emballage_id}` }])).values());
-  const users = Array.from(new Map(rows.filter((r) => r.user).map((r) => [String(r.user?.id), { id: String(r.user?.id), label: r.user?.name || r.user?.email || `User #${r.user_id}` }])).values());
+const SORT_OPTIONS = [
+  { value: "recent", label: "Plus récent" },
+  { value: "oldest", label: "Plus ancien" },
+  { value: "quantite_desc", label: "Qté décroissante" },
+  { value: "quantite_asc", label: "Qté croissante" },
+] as const;
+
+function countActiveFilters(filters: StockFiltersState) {
+  let count = 0;
+  if (filters.entrepot) count += 1;
+  if (filters.emballage) count += 1;
+  if (filters.sens) count += 1;
+  if (filters.user) count += 1;
+  if (filters.sort !== "recent") count += 1;
+  if (filters.dateFrom) count += 1;
+  if (filters.dateTo) count += 1;
+  return count;
+}
+
+export default function StocksFilters({ rows, filters, onChange }: Props) {
+  const [showFilters, setShowFilters] = useState(false);
+  const barRef = useRef<HTMLDivElement>(null);
+  const activeCount = countActiveFilters(filters);
+
+  const entrepots = useMemo(
+    () =>
+      Array.from(
+        new Map(
+          rows
+            .filter((r) => r.entrepot)
+            .map((r) => [
+              String(r.entrepot?.id),
+              {
+                value: String(r.entrepot?.id),
+                label: r.entrepot?.nom || r.entrepot?.name || `Entrepôt #${r.entrepot_id}`,
+              },
+            ])
+        ).values()
+      ),
+    [rows]
+  );
+
+  const emballages = useMemo(
+    () =>
+      Array.from(
+        new Map(
+          rows
+            .filter((r) => r.emballage)
+            .map((r) => [
+              String(r.emballage?.id),
+              {
+                value: String(r.emballage?.id),
+                label: r.emballage?.name || r.emballage?.code || `Emballage #${r.emballage_id}`,
+              },
+            ])
+        ).values()
+      ),
+    [rows]
+  );
+
+  const users = useMemo(
+    () =>
+      Array.from(
+        new Map(
+          rows
+            .filter((r) => r.user)
+            .map((r) => [
+              String(r.user?.id),
+              {
+                value: String(r.user?.id),
+                label: r.user?.name || r.user?.email || `User #${r.user_id}`,
+              },
+            ])
+        ).values()
+      ),
+    [rows]
+  );
+
+  useEffect(() => {
+    if (!showFilters) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (barRef.current && !barRef.current.contains(e.target as Node)) {
+        setShowFilters(false);
+      }
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [showFilters]);
 
   return (
-    <div className="flex flex-col gap-4 mb-10">
-      
-      {/* LIGNE PRINCIPALE : RECHERCHE + BOUTON FILTRE */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 group">
-          <Search size={20} className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-[#00A09D] transition-colors" />
-          <input
-            value={filters.search}
-            onChange={(e) => onChange({ ...filters, search: e.target.value })}
-            placeholder="Rechercher par lot, entrepôt, utilisateur..."
-            className="w-full h-[56px] bg-white border border-gray-100 rounded-full pl-16 pr-6 text-[15px] font-medium outline-none focus:border-[#00A09D] focus:ring-4 focus:ring-[#00A09D]/5 shadow-sm transition-all"
-          />
-        </div>
-
-        {/* LE BOUTON AFFICHER/MASQUER */}
+    <div ref={barRef} className="flex flex-col gap-3">
+      <div className="relative flex min-h-[52px] flex-1 items-center rounded-2xl border border-gray-100 bg-white px-4 py-3 shadow-sm ring-indigo-500/10 transition-all focus-within:ring-2">
+        <Search size={18} className="mr-3 shrink-0 text-gray-300" />
+        <input
+          value={filters.search}
+          onChange={(e) => onChange({ ...filters, search: e.target.value })}
+          placeholder="Rechercher par lot, entrepôt, emballage ou utilisateur…"
+          className="min-w-0 flex-1 outline-none text-sm font-medium placeholder:text-gray-300"
+        />
         <button
-          onClick={() => setShowFilters(!showFilters)}
-          className={`h-[56px] px-6 flex items-center gap-3 rounded-full border transition-all font-black text-[11px] uppercase tracking-widest shadow-sm ${
-            showFilters 
-            ? "bg-[#1C2434] border-[#1C2434] text-white" 
-            : "bg-white border-gray-100 text-gray-500 hover:bg-gray-50"
+          type="button"
+          onClick={() => setShowFilters((v) => !v)}
+          aria-expanded={showFilters}
+          aria-label={showFilters ? "Masquer les filtres" : "Afficher les filtres"}
+          className={`relative ml-3 flex shrink-0 items-center gap-1.5 rounded-xl px-2.5 py-1.5 transition-all ${
+            showFilters || activeCount > 0
+              ? "bg-[#1C2434] text-white"
+              : "text-gray-400 hover:bg-gray-50 hover:text-indigo-600"
           }`}
         >
           <Filter size={18} />
-          {showFilters ? "Masquer" : "Filtres"}
-          {showFilters ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-        </button>
-
-        <button
-          onClick={() => onChange({ search: "", entrepot: "", emballage: "", sens: "", user: "", sort: "recent", dateFrom: "", dateTo: "" })}
-          className="h-[56px] w-[56px] flex items-center justify-center rounded-full bg-white border border-gray-100 text-gray-400 hover:text-red-500 hover:shadow-md transition-all shadow-sm"
-        >
-          <RotateCcw size={20} />
+          {activeCount > 0 ? (
+            <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#00A09D] px-1 text-[9px] font-black text-white">
+              {activeCount}
+            </span>
+          ) : showFilters ? (
+            <ChevronUp size={14} />
+          ) : (
+            <ChevronDown size={14} />
+          )}
         </button>
       </div>
 
-      {/* ZONE DES FILTRES (CONDITIONNELLE AVEC ANIMATION) */}
       {showFilters && (
-        <div className="flex flex-wrap items-center gap-3 p-6 bg-gray-50/50 rounded-[32px] border border-gray-100 animate-in fade-in slide-in-from-top-4 duration-300">
-          
-          {/* Tri */}
-          <div className="relative">
-            <ArrowDownUp size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#00A09D]" />
-            <select
-              value={filters.sort}
-              onChange={(e) => onChange({ ...filters, sort: e.target.value as any })}
-              className="appearance-none h-11 pl-10 pr-10 rounded-full border border-white bg-white text-[10px] font-black uppercase tracking-widest text-gray-500 outline-none focus:border-[#00A09D] shadow-sm"
-            >
-              <option value="recent">Plus récent</option>
-              <option value="oldest">Plus ancien</option>
-              <option value="quantite_desc">Qté décroissante</option>
-              <option value="quantite_asc">Qté croissante</option>
-            </select>
-            <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none" />
-          </div>
-
-          {/* Sens */}
-          <div className="relative">
-            <select
-              value={filters.sens}
-              onChange={(e) => onChange({ ...filters, sens: e.target.value as any })}
-              className="appearance-none h-11 pl-5 pr-10 rounded-full border border-white bg-white text-[10px] font-black uppercase tracking-widest text-gray-500 outline-none focus:border-[#00A09D] shadow-sm"
-            >
-              <option value="">Tous les sens</option>
-              <option value="entree">Entrée</option>
-              <option value="sortie">Sortie</option>
-            </select>
-            <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none" />
-          </div>
-
-          {/* Entrepôt */}
-          <div className="relative">
-            <Warehouse size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#00A09D]" />
-            <select
-              value={filters.entrepot}
-              onChange={(e) => onChange({ ...filters, entrepot: e.target.value })}
-              className="appearance-none h-11 pl-10 pr-10 rounded-full border border-white bg-white text-[10px] font-black uppercase tracking-widest text-gray-500 outline-none focus:border-[#00A09D] shadow-sm"
-            >
-              <option value="">Entrepôts</option>
-              {entrepots.map((e) => ( <option key={e.id} value={e.id}>{e.label}</option> ))}
-            </select>
-            <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none" />
-          </div>
-
-          {/* Utilisateur */}
-          <div className="relative">
-            <User size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#00A09D]" />
-            <select
-              value={filters.user}
-              onChange={(e) => onChange({ ...filters, user: e.target.value })}
-              className="appearance-none h-11 pl-10 pr-10 rounded-full border border-white bg-white text-[10px] font-black uppercase tracking-widest text-gray-500 outline-none focus:border-[#00A09D] shadow-sm"
-            >
-              <option value="">Utilisateurs</option>
-              {users.map((u) => ( <option key={u.id} value={u.id}>{u.label}</option> ))}
-            </select>
-            <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none" />
-          </div>
-
-          {/* Dates */}
-          <div className="flex items-center bg-white border border-white rounded-full h-11 px-5 shadow-sm">
-            <CalendarDays size={14} className="text-[#00A09D] mr-3" />
-            <input
-              type="date"
-              value={filters.dateFrom || ""}
-              onChange={(e) => onChange({ ...filters, dateFrom: e.target.value })}
-              className="text-[10px] font-bold text-gray-500 bg-transparent outline-none w-28"
+        <div className="rounded-[1.75rem] border border-gray-100 bg-gradient-to-br from-[#F0F4F4]/80 to-white p-3 shadow-sm animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="relative w-full min-w-0">
+            <div
+              className="pointer-events-none absolute inset-y-0 left-0 z-10 hidden w-6 bg-gradient-to-r from-[#F0F4F4] to-transparent lg:block"
+              aria-hidden
             />
-            <div className="w-[1px] h-4 bg-gray-100 mx-3" />
-            <input
-              type="date"
-              value={filters.dateTo || ""}
-              onChange={(e) => onChange({ ...filters, dateTo: e.target.value })}
-              className="text-[10px] font-bold text-gray-500 bg-transparent outline-none w-28"
+            <div
+              className="pointer-events-none absolute inset-y-0 right-0 z-10 hidden w-8 bg-gradient-to-l from-white to-transparent lg:block"
+              aria-hidden
             />
+
+            <div className="flex w-full min-w-0 flex-wrap items-center gap-2.5 px-1 pb-2 lg:flex-nowrap lg:overflow-x-auto lg:overscroll-x-contain filter-bar-scroll">
+              <span className="shrink-0 rounded-full bg-[#1C2434] px-4 py-2.5 text-[9px] font-black uppercase tracking-[0.2em] text-white shadow-sm">
+                Filtrer les stocks
+              </span>
+
+              <div className="hidden h-8 w-px shrink-0 bg-gray-200/80 lg:block" aria-hidden />
+
+              {(
+                [
+                  { id: "" as const, label: "Tous", icon: null },
+                  { id: "entree" as const, label: "Entrées", icon: ArrowDownToLine },
+                  { id: "sortie" as const, label: "Sorties", icon: ArrowUpFromLine },
+                ] as const
+              ).map(({ id, label, icon: Icon }) => (
+                <button
+                  key={id || "all"}
+                  type="button"
+                  onClick={() => onChange({ ...filters, sens: id })}
+                  className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-4 py-2.5 text-[10px] font-black uppercase tracking-wider transition-all ${
+                    filters.sens === id
+                      ? id === "sortie"
+                        ? "bg-orange-500 text-white shadow-md shadow-orange-500/20"
+                        : id === "entree"
+                          ? "bg-[#00A09D] text-white shadow-md shadow-[#00A09D]/25"
+                          : "bg-[#1C2434] text-white shadow-md"
+                      : "border border-gray-100 bg-white text-gray-500 hover:border-[#00A09D]/40 hover:text-[#00A09D]"
+                  }`}
+                >
+                  {Icon ? <Icon size={14} className="shrink-0" /> : null}
+                  {label}
+                </button>
+              ))}
+
+              <div className="hidden h-8 w-px shrink-0 bg-gray-200/80 lg:block" aria-hidden />
+
+              <FilterBarSelect
+                value={filters.sort}
+                onChange={(sort) =>
+                  onChange({ ...filters, sort: sort as StockFiltersState["sort"] })
+                }
+                placeholder="Tri par défaut"
+                ariaLabel="Trier les mouvements de stock"
+                icon={<ArrowDownUp size={14} />}
+                options={SORT_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+              />
+
+              <FilterBarSelect
+                value={filters.entrepot}
+                onChange={(entrepot) => onChange({ ...filters, entrepot })}
+                placeholder="Tous les entrepôts"
+                ariaLabel="Filtrer par entrepôt"
+                icon={<Warehouse size={14} />}
+                options={entrepots}
+              />
+
+              <FilterBarSelect
+                value={filters.emballage}
+                onChange={(emballage) => onChange({ ...filters, emballage })}
+                placeholder="Tous les emballages"
+                ariaLabel="Filtrer par emballage"
+                icon={<Package size={14} />}
+                options={emballages}
+              />
+
+              <FilterBarSelect
+                value={filters.user}
+                onChange={(user) => onChange({ ...filters, user })}
+                placeholder="Tous les utilisateurs"
+                ariaLabel="Filtrer par utilisateur"
+                icon={<User size={14} />}
+                options={users}
+              />
+
+              <div className="flex h-11 shrink-0 items-center gap-2 rounded-full border border-gray-100 bg-white px-4 shadow-sm">
+                <CalendarDays size={14} className="shrink-0 text-[#00A09D]" aria-hidden />
+                <input
+                  type="date"
+                  value={filters.dateFrom || ""}
+                  onChange={(e) => onChange({ ...filters, dateFrom: e.target.value })}
+                  aria-label="Date de début"
+                  className="w-[7.5rem] bg-transparent text-[10px] font-bold text-gray-500 outline-none"
+                />
+                <span className="text-gray-200" aria-hidden>
+                  —
+                </span>
+                <input
+                  type="date"
+                  value={filters.dateTo || ""}
+                  onChange={(e) => onChange({ ...filters, dateTo: e.target.value })}
+                  aria-label="Date de fin"
+                  className="w-[7.5rem] bg-transparent text-[10px] font-bold text-gray-500 outline-none"
+                />
+              </div>
+
+              <div className="hidden h-8 w-px shrink-0 bg-gray-200/80 lg:block" aria-hidden />
+
+              <button
+                type="button"
+                onClick={() => onChange(EMPTY_FILTERS)}
+                disabled={!filters.search && activeCount === 0}
+                className="flex h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-gray-100 bg-white px-4 text-[10px] font-black uppercase tracking-widest text-gray-500 shadow-sm transition-all hover:border-red-200 hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <RotateCcw size={15} />
+                Réinitialiser
+              </button>
+            </div>
           </div>
         </div>
       )}

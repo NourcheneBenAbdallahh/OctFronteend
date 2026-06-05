@@ -15,7 +15,6 @@ interface Props {
   onPageChange?: (page: number) => void;
   
   onView?: (lot: Lot) => void;
-  onEdit?: (lot: Lot) => void;
   onDelete?: (lot: Lot) => void;
 }
 
@@ -24,7 +23,6 @@ export default function LotsTimelineView({
   pagination,    // On les récupère ici
   onPageChange,  // Et ici
   onView,
-  onEdit,
   onDelete,
 }: Props) {
   if (!groups.length) {
@@ -82,7 +80,6 @@ export default function LotsTimelineView({
                   <LotCard
                     lot={lot}
                     onView={onView}
-                    onEdit={onEdit}
                     onDelete={onDelete}
                   />
                 </div>

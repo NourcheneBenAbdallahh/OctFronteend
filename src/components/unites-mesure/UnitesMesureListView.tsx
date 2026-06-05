@@ -4,12 +4,23 @@ import type { UniteMesure } from "@/types/unite-mesure";
 import { ResponsiveTableWrap } from "@/components/ui/ResponsiveTableWrap";
 import { SortableTh, type TableSortHeaderProps } from "@/components/ui/SortableTableHeader";
 
+const DIMENSION_LABELS: Record<string, string> = {
+  masse: "Masse",
+  volume: "Volume",
+  nombre: "Nombre",
+  surface: "Surface",
+};
+
 function dimClass(d: string) {
   const x = d.toLowerCase();
   if (x === "masse") return "bg-amber-50 text-amber-700 border-amber-100";
   if (x === "volume") return "bg-sky-50 text-sky-700 border-sky-100";
   if (x === "surface") return "bg-violet-50 text-violet-700 border-violet-100";
   return "bg-gray-50 text-gray-700 border-gray-100";
+}
+
+function dimensionLabel(d: string) {
+  return DIMENSION_LABELS[d.toLowerCase()] ?? d;
 }
 
 function fmtFactor(v: number | null | undefined) {
@@ -47,7 +58,7 @@ export const UnitesMesureListView = ({
         {rows.map((row) => (
           <tr key={row.id} className="hover:bg-gray-50/50 group transition-all">
             <td className="px-8 py-6">
-              <span className="text-sm font-black text-gray-900 tracking-tighter uppercase">{row.code}</span>
+              <span className="text-sm font-black text-gray-900 tracking-tight font-mono">{row.code}</span>
             </td>
             <td className="px-8 py-6">
               <div className="font-black text-gray-800 text-sm">{row.label}</div>
@@ -58,7 +69,7 @@ export const UnitesMesureListView = ({
                   row.dimension
                 )}`}
               >
-                {row.dimension}
+                {dimensionLabel(row.dimension)}
               </span>
             </td>
             <td className="px-8 py-6 text-sm font-bold text-gray-800">{fmtFactor(row.facteur_vers_kg)}</td>

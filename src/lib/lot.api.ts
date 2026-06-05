@@ -24,6 +24,40 @@ export type PaginatedLots = {
   hasMorePages: boolean;
 };
 
+export async function getLotById(
+  id: string | number,
+  opts?: GraphqlRequestOptions
+): Promise<Lot | null> {
+  const query = `
+    query GetLot($id: ID!) {
+      lot(id: $id) {
+        id
+        code_lot
+        quantite
+        date_mvt
+        commentaire
+        emballage_id
+        user_id
+        created_at
+        updated_at
+        emballage {
+          id
+          name
+          code
+        }
+        user {
+          id
+          name
+          email
+        }
+      }
+    }
+  `;
+
+  const data = await graphqlRequest<{ lot: Lot | null }>(query, { id }, opts);
+  return data.lot ?? null;
+}
+
 export async function getLots(
   page = 1,
   first = 12,

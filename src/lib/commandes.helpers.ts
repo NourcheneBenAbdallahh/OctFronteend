@@ -96,18 +96,107 @@ export function computeTauxReceptionPct(
   return Math.round((received / rows.length) * 100);
 }
 
-/** Filtre par statut (clic badge) ou recherche texte (n° commande / fournisseur). */
+/** Filtres rapides des cartes (pas des statuts métier). */
+export const COMMANDE_QUICK_FILTER_KEYS = [
+  "ACTIVES",
+  "EN_RETARD",
+  "PROCHAINES_7J",
+] as const;
+
+export type CommandeQuickFilterKey = (typeof COMMANDE_QUICK_FILTER_KEYS)[number];
+
+export function isCommandeActive(statut: string): boolean {
+  return statut !== "RECEPTIONNEE" && statut !== "ANNULEE";
+}
+
+export function isCommandeLivraisonProchaine7J(
+  dateLivraisonPrevue: string,
+  statut: string,
+  referenceDate: Date = new Date()
+): boolean {
+  if (!isCommandeActive(statut)) {
+    return false;
+  }
+  const jours = computeJoursRestants(dateLivraisonPrevue, referenceDate);
+  return jours >= 0 && jours <= 7;
+}
+
+/** Indicateurs tableau de bord commandes (quantités + volumes actionnables). */
+export function computeCommandeDashboardStats(
+  rows: Array<{
+    statut: string;
+    quantite?: number | string | null;
+    quantite_recue_total?: number | string | null;
+    reste?: number | string | null;
+    date_livraison_prevue: string;
+  }>,
+  referenceDate: Date = new Date()
+) {
+  const totalCommande = rows.reduce((acc, c) => acc + Number(c.quantite || 0), 0);
+  const totalRecu = rows.reduce(
+    (acc, c) => acc + Number(c.quantite_recue_total ?? 0),
+    0
+  );
+  const reliquat = computeReliquatTotal(rows);
+  const commandesOuvertes = rows.filter(
+    (c) => Number(c.reste ?? 0) > 0 && c.statut !== "ANNULEE"
+  ).length;
+  const actives = rows.filter((c) => isCommandeActive(c.statut)).length;
+  const enRetard = countCommandesEnRetard(rows, referenceDate);
+  const partielles = rows.filter((c) => c.statut === "PARTIELLEMENT_RECEPTIONNEE").length;
+  const livraisons7j = rows.filter((c) =>
+    isCommandeLivraisonProchaine7J(c.date_livraison_prevue, c.statut, referenceDate)
+  ).length;
+  const couverture =
+    totalCommande > 0 ? Math.round((totalRecu / totalCommande) * 100) : 0;
+
+  return {
+    totalCommande,
+    totalRecu,
+    reliquat,
+    commandesOuvertes,
+    actives,
+    enRetard,
+    partielles,
+    livraisons7j,
+    couverture,
+  };
+}
+
+/** Filtre par statut (clic badge), carte rapide ou recherche texte. */
 export function filterCommandesByQuery<T extends {
   statut: string;
   numero_commande?: string;
   fournisseur_id: string | number;
+  date_livraison_prevue?: string;
 }>(
   rows: T[],
   query: string,
-  fournisseursMap: Map<string, string>
+  fournisseursMap: Map<string, string>,
+  referenceDate: Date = new Date()
 ): T[] {
   const q = query.trim().toUpperCase();
   if (!q) return rows;
+
+  if (q === "ACTIVES") {
+    return rows.filter((r) => isCommandeActive(r.statut));
+  }
+
+  if (q === "EN_RETARD") {
+    return rows.filter((r) =>
+      r.date_livraison_prevue
+        ? isCommandeEnRetardWidget(r.date_livraison_prevue, r.statut, referenceDate)
+        : false
+    );
+  }
+
+  if (q === "PROCHAINES_7J") {
+    return rows.filter((r) =>
+      r.date_livraison_prevue
+        ? isCommandeLivraisonProchaine7J(r.date_livraison_prevue, r.statut, referenceDate)
+        : false
+    );
+  }
 
   if (COMMANDE_FILTER_STATUTS.includes(q as CommandeStatut)) {
     return rows.filter((r) => r.statut === q);

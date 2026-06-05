@@ -42,7 +42,7 @@ export default async function CommandesPage({ searchParams }: PageProps) {
     contratsResult,
     unitesMesureResult,
   ] = await Promise.all([
-    listCommandes(currentPage, 10, auth),
+    listCommandes(currentPage, 25, auth),
     listEmballages(1, 100, auth),
     fetchEntrepots(auth),
     listFournisseurs(auth),

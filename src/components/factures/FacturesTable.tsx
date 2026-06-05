@@ -19,6 +19,8 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AppConfirmModal, AppFeedbackBanner } from "@/components/ui/feedback";
 import { ResponsiveTableWrap } from "@/components/ui/ResponsiveTableWrap";
 import { SortableTh } from "@/components/ui/SortableTableHeader";
+import { OptionSearchablePicker } from "@/components/ui/OptionSearchablePicker";
+import { formatNumber } from "@/lib/utils";
 import { getActionErrorMessage, useAppFeedback } from "@/hooks/useAppFeedback";
 import { useTableSort } from "@/hooks/useTableSort";
 import type { SortColumn } from "@/lib/tableSort";
@@ -229,6 +231,16 @@ const filteredRows = useMemo(() => {
     });
     return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
   }, [bonsLivraison, form.fournisseur_id]);
+
+  const fournisseurPickerOptions = useMemo(
+    () => fournisseurOptions.map((f) => ({ id: f.id, label: f.name })),
+    [fournisseurOptions]
+  );
+
+  const contratPickerOptions = useMemo(
+    () => contratOptions.map((c) => ({ id: c.id, label: c.name })),
+    [contratOptions]
+  );
 
   const selectedCount = useMemo(() => {
     const ids = new Set(filteredRows.map((r) => String(r.id)));
@@ -809,91 +821,110 @@ const filteredRows = useMemo(() => {
                     </td>
                   </tr>
                   {expandedId === item.id && (
-                    <tr className="bg-gray-50 animate-in fade-in duration-500">
-                      <td colSpan={10} className="p-8">
-                        <div className="space-y-6">
-                          {/* Header des détails */}
-                          <div className="flex items-center gap-3 mb-6">
-                            <div className="w-8 h-8 bg-gradient-to-r from-indigo-600 to-cyan-500 rounded-xl flex items-center justify-center">
-                              <ChevronDown className="h-4 w-4 text-white" />
+                    <tr className="bg-gray-50/80">
+                      <td colSpan={10} className="border-t border-gray-100 px-6 py-10 sm:px-12 sm:py-14">
+                        <div className="mx-auto max-w-6xl space-y-10 animate-in fade-in duration-300">
+                          <div className="flex flex-wrap items-center gap-5">
+                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-md shadow-indigo-200/60">
+                              <FileText className="h-5 w-5" aria-hidden />
                             </div>
-                            <h4 className="text-lg font-black text-gray-900">Détails de la facture #{item.numero_facture}</h4>
-                            <div className="ml-auto">
-                              <span className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-medium">
-                                {item.bon_livraisons?.length || 0} Bon{item.bon_livraisons?.length > 1 ? 's' : ''} de livraison
-                              </span>
+                            <div className="min-w-0">
+                              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
+                                Détail facture
+                              </p>
+                              <h4 className="mt-1 text-xl font-black tracking-tight text-gray-900 sm:text-2xl">
+                                #{item.numero_facture}
+                              </h4>
                             </div>
+                            <span className="ml-auto rounded-full border border-indigo-100 bg-white px-4 py-2 text-[10px] font-bold uppercase tracking-wide text-indigo-700 shadow-sm">
+                              {item.bon_livraisons?.length || 0} bon
+                              {(item.bon_livraisons?.length || 0) > 1 ? "s" : ""} de livraison
+                            </span>
                           </div>
-                          
-                          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            {/* Détails des BL */}
-                            <div className="lg:col-span-2">
-                              <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden">
-                                <div className="bg-gray-100 px-6 py-4 border-b border-gray-200">
-                                  <h5 className="text-sm font-black text-gray-700 uppercase tracking-wider flex items-center gap-2">
-                                    <Truck className="h-4 w-4 text-indigo-600" />
-                                    Détails des réceptions
-                                  </h5>
-                                </div>
-                                <div className="p-6 space-y-4">
-                                  {item.bon_livraisons?.map((bl: any, index: number) => (
-                                    <div key={bl.id} className="group">
-                                      <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-indigo-50 transition-all duration-300">
-                                        <div className="flex items-center gap-3">
-                                          <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
-                                            <Truck className="h-5 w-5 text-indigo-600" />
+
+                          <div className="grid grid-cols-1 gap-10 lg:grid-cols-5 lg:gap-12">
+                            <div className="space-y-5 lg:col-span-3">
+                              <p className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
+                                <Truck className="h-3.5 w-3.5 text-indigo-500" aria-hidden />
+                                Réceptions liées
+                              </p>
+                              <div className="overflow-hidden rounded-[2rem] border border-gray-100 bg-white shadow-sm">
+                                {item.bon_livraisons?.length ? (
+                                  <ul className="divide-y divide-gray-50">
+                                    {item.bon_livraisons.map((bl: { id: Id; numero_bl: string; date_reception: string; quantite_recue: number }) => (
+                                      <li
+                                        key={bl.id}
+                                        className="flex flex-col gap-4 px-6 py-6 transition-colors hover:bg-gray-50/80 sm:flex-row sm:items-center sm:justify-between sm:px-8 sm:py-7"
+                                      >
+                                        <div className="flex min-w-0 items-center gap-4">
+                                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
+                                            <Truck className="h-5 w-5" aria-hidden />
                                           </div>
-                                          <div>
-                                            <p className="font-black text-gray-900">{bl.numero_bl}</p>
-                                            <p className="text-xs text-gray-500 font-medium">{formatDate(bl.date_reception)}</p>
+                                          <div className="min-w-0">
+                                            <p className="truncate font-bold text-gray-900">{bl.numero_bl}</p>
+                                            <p className="mt-1 flex items-center gap-1.5 text-xs font-medium text-gray-500">
+                                              <Calendar className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                                              Réception le {formatDate(bl.date_reception)}
+                                            </p>
                                           </div>
                                         </div>
-                                        <div className="text-right">
-                                          <p className="font-black text-indigo-600 text-lg">{bl.quantite_recue}</p>
-                                          <p className="text-xs text-indigo-500 font-medium">Unités</p>
+                                        <div className="shrink-0 rounded-2xl border border-indigo-100 bg-indigo-50/60 px-5 py-3 text-right sm:min-w-[8.5rem]">
+                                          <p className="text-[10px] font-bold uppercase tracking-wide text-indigo-500">
+                                            Quantité reçue
+                                          </p>
+                                          <p className="mt-0.5 font-mono text-lg font-black tabular-nums text-indigo-900">
+                                            {formatNumber(bl.quantite_recue)}
+                                          </p>
                                         </div>
-                                      </div>
-                                      {index < (item.bon_livraisons?.length || 0) - 1 && (
-                                        <div className="border-l-2 border-gray-200 ml-5 h-4"></div>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                ) : (
+                                  <p className="px-8 py-12 text-center text-sm font-medium text-gray-400">
+                                    Aucun bon de livraison associé.
+                                  </p>
+                                )}
                               </div>
                             </div>
-                            
-                            {/* Résumé financier */}
-                            <div className="space-y-4">
-                              <div className="bg-gradient-to-br from-indigo-600 to-cyan-500 rounded-2xl shadow-xl overflow-hidden">
-                                <div className="p-6 space-y-6">
-                                  <div className="flex items-center justify-between">
-                                    <h5 className="text-sm font-black text-white/80 uppercase tracking-wider">Résumé financier</h5>
-                                    <TrendingUp className="h-5 w-5 text-white/60" />
+
+                            <div className="space-y-5 lg:col-span-2">
+                              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
+                                Synthèse financière
+                              </p>
+                              <div className="space-y-4 rounded-[2rem] border border-gray-100 bg-white p-6 shadow-sm sm:p-8">
+                                <div className="flex items-center justify-between gap-4 border-b border-gray-50 pb-5">
+                                  <span className="text-xs font-bold uppercase tracking-wide text-gray-500">
+                                    Montant HT
+                                  </span>
+                                  <span className="font-mono text-base font-bold tabular-nums text-gray-900 sm:text-lg">
+                                    {formatMoney(item.montant_ht)} DT
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between gap-4 border-b border-gray-50 pb-5">
+                                  <span className="text-xs font-bold uppercase tracking-wide text-gray-500">
+                                    TVA (19 %)
+                                  </span>
+                                  <span className="font-mono text-base font-semibold tabular-nums text-gray-600">
+                                    {formatMoney(Number(item.montant_ht) * 0.19)} DT
+                                  </span>
+                                </div>
+                                {(item.montant_penalites || 0) > 0 && (
+                                  <div className="flex items-center justify-between gap-4 rounded-2xl border border-red-100 bg-red-50/80 px-4 py-4">
+                                    <span className="text-xs font-bold uppercase tracking-wide text-red-600">
+                                      Pénalités
+                                    </span>
+                                    <span className="font-mono text-base font-bold tabular-nums text-red-700">
+                                      −{formatMoney(item.montant_penalites || 0)} DT
+                                    </span>
                                   </div>
-                                  
-                                  <div className="space-y-4">
-                                    <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
-                                      <p className="text-xs text-white/70 font-medium mb-1">Montant HT</p>
-                                      <p className="text-2xl font-black text-white">{formatMoney(item.montant_ht)} DT</p>
-                                    </div>
-                                    
-                                    <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
-                                      <p className="text-xs text-white/70 font-medium mb-1">TVA (19%)</p>
-                                      <p className="text-xl font-bold text-white/90">{formatMoney(Number(item.montant_ht) * 0.19)} DT</p>
-                                    </div>
-                                    
-                                    {(item.montant_penalites || 0) > 0 && (
-                                      <div className="bg-red-500/20 backdrop-blur-sm rounded-xl p-4 border border-red-500/30">
-                                        <p className="text-xs text-red-100 font-medium mb-1">Pénalités appliquées</p>
-                                        <p className="text-xl font-bold text-red-100">-{formatMoney(item.montant_penalites || 0)} DT</p>
-                                      </div>
-                                    )}
-                                    
-                                    <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 border border-white/30">
-                                      <p className="text-xs text-white/90 font-medium mb-1">Net à payer (TTC)</p>
-                                      <p className="text-3xl font-black text-white">{formatMoney(item.montant_ttc)} DT</p>
-                                    </div>
-                                  </div>
+                                )}
+                                <div className="mt-2 rounded-[1.5rem] border-2 border-indigo-100 bg-gradient-to-br from-indigo-50/80 to-white px-5 py-6 sm:px-6 sm:py-7">
+                                  <p className="text-[10px] font-black uppercase tracking-[0.15em] text-indigo-600">
+                                    Net à payer (TTC)
+                                  </p>
+                                  <p className="mt-2 font-mono text-2xl font-black tabular-nums tracking-tight text-indigo-950 sm:text-3xl">
+                                    {formatMoney(item.montant_ttc)} DT
+                                  </p>
                                 </div>
                               </div>
                             </div>
@@ -972,125 +1003,284 @@ const filteredRows = useMemo(() => {
 
       {/* DRAWER FORM */}
       {isDrawerOpen && (
-          <div className="fixed inset-0 z-[999] flex justify-end">
-          <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-md" onClick={closeDrawer} />
-          <div className="relative w-full max-w-lg bg-white p-10 flex flex-col shadow-2xl animate-in slide-in-from-right duration-500">
-            <h2 className="text-3xl font-black italic mb-8 uppercase tracking-tighter text-gray-900">
-              {editing ? "Modifier Facture" : "Nouvelle Facture Groupée"}
-            </h2>
-
-            <form onSubmit={handleSubmit} className="form-scroll flex-1 space-y-6 pr-2">
-              {errorMessage && <div className="p-4 bg-red-50 text-red-600 rounded-2xl text-[10px] font-black border border-red-100 uppercase">{errorMessage}</div>}
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400">Fournisseur</label>
-                  <select
-                    className="w-full bg-gray-50 rounded-2xl p-4 text-sm font-bold border-2 border-transparent focus:border-indigo-600 outline-none"
-                    value={form.fournisseur_id}
-                    onChange={(e) => handleFournisseurChange(e.target.value)}
+        <>
+          <div
+            className="fixed inset-0 z-[1000] bg-gray-900/40 backdrop-blur-sm transition-opacity"
+            onClick={closeDrawer}
+            aria-hidden
+          />
+          <div className="fixed inset-y-0 right-0 z-[1001] flex h-full max-h-[100dvh] w-full max-w-md flex-col overflow-hidden rounded-l-[3.5rem] border-l border-gray-100 bg-white shadow-[-30px_0_80px_rgba(0,0,0,0.1)] transition-transform duration-500 ease-out">
+            <div className="flex min-h-0 flex-1 flex-col">
+              <div className="shrink-0 border-b border-gray-50 px-8 pb-5 pt-8 sm:px-10 sm:pt-10">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <h2 className="text-2xl font-black text-gray-900">
+                      {editing ? "Modifier facture" : "Nouvelle facture groupée"}
+                    </h2>
+                    <div className="mt-2 h-1.5 w-12 rounded-full bg-indigo-600 shadow-lg shadow-indigo-100" />
+                    <p className="mt-3 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
+                      Fournisseur, contrat & bons de livraison
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={closeDrawer}
+                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gray-50 text-gray-400 transition-all hover:bg-gray-100"
+                    aria-label="Fermer"
                   >
-                    <option value="">Choisir un fournisseur</option>
-                    {fournisseurOptions.map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400">Contrat</label>
-                  <select
-                    className="w-full bg-gray-50 rounded-2xl p-4 text-sm font-bold border-2 border-transparent focus:border-indigo-600 outline-none"
-                    value={form.contrat_id}
-                    onChange={(e) => handleContratChange(e.target.value)}
-                  >
-                    <option value="">Choisir un contrat</option>
-                    {contratOptions.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
+                    <X className="h-5 w-5" />
+                  </button>
                 </div>
               </div>
 
-              {/* MULTI-SELECT BL DROPDOWN */}
-              <div className="space-y-2 relative" ref={dropdownRef}>
-                <label className="text-[10px] font-black uppercase text-gray-400">Sélectionner un ou plusieurs BL</label>
-                
-                {/* Zone de Badges */}
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {form.bon_livraison_ids.map(id => {
-                    const bl = bonsLivraison.find(b => String(b.id) === id);
-                    return (
-                      <div key={id} className="bg-indigo-600 text-white px-3 py-1.5 rounded-full text-[10px] font-black flex items-center gap-2">
-                        {bl?.numero_bl}
-                        <X className="h-3 w-3 cursor-pointer" onClick={() => toggleBL(id)} />
-                      </div>
-                    );
-                  })}
-                </div>
+              <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+                <div className="form-scroll min-h-0 flex-1 space-y-5 px-8 py-5 sm:px-10 sm:py-6">
+                  {errorMessage && (
+                    <div className="flex items-center gap-3 rounded-3xl border-2 border-red-100 bg-red-50 p-5 text-[11px] font-black uppercase tracking-wider text-red-600">
+                      <AlertCircle className="h-5 w-5 shrink-0" />
+                      {errorMessage}
+                    </div>
+                  )}
 
-                <div className="relative">
-                  <Truck className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <input type="text" className="w-full bg-gray-50 rounded-2xl p-4 pl-12 text-sm font-bold outline-none border-2 border-transparent focus:border-indigo-600 transition-all" 
-                    placeholder="Ajouter un Bon de livraison..." value={blSearch} onFocus={() => setBlDropdownOpen(true)} onChange={e => setBlSearch(e.target.value)} />
-                </div>
-
-                {blDropdownOpen && (
-                  <div className="no-scrollbar absolute z-30 mt-2 max-h-56 w-full overflow-y-auto rounded-2xl border border-gray-100 bg-white p-2 shadow-2xl">
-                    {filteredBL.length > 0 ? filteredBL.map(bl => (
-                      <button key={bl.id} type="button" onClick={() => toggleBL(String(bl.id))} className={`w-full p-3 rounded-xl text-left text-xs font-black mb-1 flex justify-between items-center transition-colors ${form.bon_livraison_ids.includes(String(bl.id)) ? 'bg-indigo-50 text-indigo-600' : 'hover:bg-gray-50'}`}>
-                        <span>
-                          {bl.numero_bl}
-                          <span className="text-gray-400 ml-2">({bl.quantite_recue} reçus)</span>
-                          <span className="block text-[10px] text-gray-400 font-semibold mt-1">
-                            {bl.fournisseur_name || bl.commande?.fournisseur?.raison_sociale || "Fournisseur N/A"} - {bl.contrat_name || bl.commande?.contrat?.numero_contrat || "Contrat N/A"}
-                          </span>
+                  <div className="space-y-3 rounded-[1.75rem] border border-gray-100/90 bg-gradient-to-br from-white to-indigo-50/20 p-5 shadow-sm">
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">
+                        Fournisseur
+                      </label>
+                      {fournisseurPickerOptions.length > 0 ? (
+                        <span className="text-[9px] font-bold uppercase tracking-tight text-indigo-500">
+                          {fournisseurPickerOptions.length} choix
                         </span>
-                        {form.bon_livraison_ids.includes(String(bl.id)) && <Check className="h-4 w-4" />}
-                      </button>
-                    )) : <div className="p-4 text-center text-xs text-gray-400 uppercase font-black">Aucun BL disponible</div>}
+                      ) : null}
+                    </div>
+                    <OptionSearchablePicker
+                      value={form.fournisseur_id}
+                      onChange={handleFournisseurChange}
+                      options={fournisseurPickerOptions}
+                      placeholder="Rechercher ou choisir un fournisseur…"
+                      searchPlaceholder="Rechercher par nom…"
+                      emptyOptionsText="Aucun fournisseur lié aux BL disponibles."
+                      noResultsText="Aucun fournisseur ne correspond à la recherche."
+                      dropdownZClassName="z-[10050]"
+                    />
                   </div>
-                )}
-              </div>
 
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400">N° Facture Fournisseur</label>
-                <input className="w-full bg-gray-50 rounded-2xl p-4 text-sm font-bold border-2 border-transparent focus:border-indigo-600 outline-none" required value={form.numero_facture} onChange={e => setForm({...form, numero_facture: e.target.value})} />
-              </div>
+                  <div
+                    className={`space-y-3 rounded-[1.75rem] border border-gray-100/90 bg-gradient-to-br from-white to-slate-50/40 p-5 shadow-sm transition-all duration-300 ${
+                      !form.fournisseur_id ? "pointer-events-none scale-[0.98] opacity-45" : "opacity-100"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">
+                        Contrat
+                      </label>
+                      {form.fournisseur_id && contratPickerOptions.length > 0 ? (
+                        <span className="text-[9px] font-bold uppercase tracking-tight text-slate-500">
+                          {contratPickerOptions.length} contrat{contratPickerOptions.length !== 1 ? "s" : ""}
+                        </span>
+                      ) : null}
+                    </div>
+                    <OptionSearchablePicker
+                      value={form.contrat_id}
+                      onChange={handleContratChange}
+                      options={contratPickerOptions}
+                      disabled={!form.fournisseur_id}
+                      placeholder={
+                        form.fournisseur_id
+                          ? "Rechercher ou choisir un contrat…"
+                          : "Sélectionnez d'abord un fournisseur"
+                      }
+                      searchPlaceholder="Rechercher un n° de contrat…"
+                      emptyOptionsText="Aucun contrat pour ce fournisseur."
+                      noResultsText="Aucun contrat ne correspond à la recherche."
+                      dropdownZClassName="z-[10050]"
+                      selectedOptionClassName="bg-slate-800/10 text-slate-900"
+                    />
+                  </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400">Date Facture</label>
-                  <input type="date" className="w-full bg-gray-50 rounded-2xl p-4 text-sm font-bold" value={form.date_facture} onChange={e => setForm({...form, date_facture: e.target.value})} />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400 text-indigo-600">Montant HT (Auto)</label>
-                  <div className="relative">
-                     <Banknote className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-indigo-400" />
-                     <input type="number" step="0.001" className="w-full bg-indigo-50/50 rounded-2xl p-4 pl-12 text-sm font-black text-indigo-700 border-2 border-indigo-100" value={form.montant_ht} onChange={e => setForm({...form, montant_ht: e.target.value})} required />
+                  <div
+                    className="space-y-3 rounded-[1.75rem] border border-gray-100/90 bg-gradient-to-br from-white to-gray-50/60 p-5 shadow-sm"
+                    ref={dropdownRef}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">
+                        Bons de livraison
+                      </label>
+                      {form.bon_livraison_ids.length > 0 ? (
+                        <span className="text-[9px] font-bold uppercase tracking-tight text-indigo-600">
+                          {form.bon_livraison_ids.length} sélectionné{form.bon_livraison_ids.length !== 1 ? "s" : ""}
+                        </span>
+                      ) : null}
+                    </div>
+
+                    {form.bon_livraison_ids.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {form.bon_livraison_ids.map((id) => {
+                          const bl = bonsLivraison.find((b) => String(b.id) === id);
+                          return (
+                            <div
+                              key={id}
+                              className="flex items-center gap-2 rounded-full bg-indigo-600 px-3 py-1.5 text-[10px] font-black text-white"
+                            >
+                              {bl?.numero_bl}
+                              <button
+                                type="button"
+                                onClick={() => toggleBL(id)}
+                                className="rounded-full p-0.5 hover:bg-white/20"
+                                aria-label={`Retirer ${bl?.numero_bl}`}
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+
+                    <div className="relative">
+                      <Truck className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="text"
+                        className="w-full rounded-2xl border-2 border-gray-100 bg-gray-50/90 p-4 pl-12 text-sm font-black text-gray-900 outline-none transition-all hover:border-indigo-200 hover:bg-white focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/15"
+                        placeholder="Rechercher un bon de livraison…"
+                        value={blSearch}
+                        onFocus={() => setBlDropdownOpen(true)}
+                        onChange={(e) => setBlSearch(e.target.value)}
+                      />
+                    </div>
+
+                    {blDropdownOpen && (
+                      <div className="overflow-hidden rounded-2xl border-2 border-gray-100 bg-white shadow-xl ring-1 ring-black/5">
+                        <div className="border-b border-gray-100 bg-gradient-to-b from-gray-50 to-white px-3 py-2">
+                          <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">
+                            {filteredBL.length} BL disponible{filteredBL.length !== 1 ? "s" : ""}
+                          </p>
+                        </div>
+                        <ul className="role-picker-scroll max-h-52 overflow-y-auto overscroll-contain p-1.5">
+                          {filteredBL.length > 0 ? (
+                            filteredBL.map((bl) => {
+                              const selected = form.bon_livraison_ids.includes(String(bl.id));
+                              return (
+                                <li key={bl.id}>
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleBL(String(bl.id))}
+                                    className={`mb-1 flex w-full items-start justify-between gap-2 rounded-xl p-3 text-left text-xs font-bold transition-colors ${
+                                      selected
+                                        ? "bg-indigo-600/10 text-indigo-800"
+                                        : "text-gray-800 hover:bg-indigo-50/60"
+                                    }`}
+                                  >
+                                    <span className="min-w-0 flex-1">
+                                      <span className="font-black">{bl.numero_bl}</span>
+                                      <span className="ml-2 font-semibold text-gray-400">
+                                        ({bl.quantite_recue} reçus)
+                                      </span>
+                                      <span className="mt-1 block text-[10px] font-semibold text-gray-400">
+                                        {bl.fournisseur_name ||
+                                          bl.commande?.fournisseur?.raison_sociale ||
+                                          "Fournisseur N/A"}{" "}
+                                        —{" "}
+                                        {bl.contrat_name ||
+                                          bl.commande?.contrat?.numero_contrat ||
+                                          "Contrat N/A"}
+                                      </span>
+                                    </span>
+                                    {selected ? (
+                                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" />
+                                    ) : null}
+                                  </button>
+                                </li>
+                              );
+                            })
+                          ) : (
+                            <li className="rounded-xl px-3 py-6 text-center text-xs font-black uppercase text-gray-400">
+                              Aucun BL disponible
+                            </li>
+                          )}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="ml-1 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
+                      N° facture fournisseur
+                    </label>
+                    <input
+                      className="w-full rounded-2xl border-2 border-gray-100 bg-gray-50/90 p-4 text-sm font-black outline-none transition-all focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/15"
+                      required
+                      value={form.numero_facture}
+                      onChange={(e) => setForm({ ...form, numero_facture: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="ml-1 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
+                        Date facture
+                      </label>
+                      <input
+                        type="date"
+                        className="w-full rounded-2xl border-2 border-gray-100 bg-gray-50/90 p-4 text-sm font-bold outline-none focus:border-indigo-600 focus:bg-white"
+                        value={form.date_facture}
+                        onChange={(e) => setForm({ ...form, date_facture: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="ml-1 text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600">
+                        Montant HT (auto)
+                      </label>
+                      <div className="relative">
+                        <Banknote className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-indigo-400" />
+                        <input
+                          type="number"
+                          step="0.001"
+                          className="w-full rounded-2xl border-2 border-indigo-100 bg-indigo-50/50 p-4 pl-12 text-sm font-black text-indigo-700 outline-none focus:border-indigo-400 focus:bg-white"
+                          value={form.montant_ht}
+                          onChange={(e) => setForm({ ...form, montant_ht: e.target.value })}
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-r from-indigo-700 to-cyan-600 p-8 text-white shadow-xl">
+                    <div className="relative z-10 flex items-center justify-between">
+                      <div>
+                        <p className="mb-1 text-[10px] font-black uppercase text-indigo-200">
+                          Total estimé (TVA 19 %)
+                        </p>
+                        <p className="text-3xl font-black tabular-nums">
+                          {(Number(form.montant_ht) * 1.19).toFixed(3)}{" "}
+                          <span className="text-sm font-medium">DT</span>
+                        </p>
+                      </div>
+                      <TrendingUp className="h-10 w-10 text-white/40" />
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="p-8 bg-gradient-to-r from-indigo-700 to-cyan-600 rounded-[2rem] text-white shadow-xl relative overflow-hidden group">
-                <div className="relative z-10 flex justify-between items-center">
-                  <div>
-                    <p className="text-[10px] font-black uppercase text-gray-400 mb-1">Total Final Estimé (TVA 19%)</p>
-                    <p className="text-3xl font-black">{(Number(form.montant_ht) * 1.19).toFixed(3)} <span className="text-sm font-medium">DT</span></p>
-                  </div>
-                  <TrendingUp className="h-10 w-10 text-indigo-500 opacity-50 group-hover:scale-110 transition-transform" />
+                <div className="shrink-0 border-t border-gray-50 bg-white/95 px-6 py-5 backdrop-blur-md sm:px-10 sm:py-6">
+                  <button
+                    type="submit"
+                    disabled={submitLoading}
+                    className="flex w-full items-center justify-center gap-3 rounded-2xl bg-indigo-600 py-5 text-[11px] font-black uppercase tracking-[0.2em] text-white shadow-xl shadow-indigo-200 transition-all hover:bg-indigo-700 disabled:opacity-60"
+                  >
+                    {submitLoading ? (
+                      "Synchronisation…"
+                    ) : (
+                      <>
+                        <Save className="h-5 w-5" />
+                        Valider la facture groupée
+                      </>
+                    )}
+                  </button>
                 </div>
-              </div>
-
-              <button disabled={submitLoading} className="w-full bg-indigo-600 text-white p-6 rounded-[2rem] font-black text-[10px] tracking-widest hover:bg-indigo-700 transition-all shadow-lg flex items-center justify-center gap-3">
-                {submitLoading ? "SYNCHRONISATION..." : <><Save className="h-5 w-5" /> VALIDER LA FACTURE GROUPÉE</>}
-              </button>
-            </form>
+              </form>
+            </div>
           </div>
-        </div>
+        </>
       )}
     </>
   );

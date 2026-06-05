@@ -6,16 +6,14 @@ import {
   cancelCommande,
   createCommande,
   dropCommande,
+  listCommandes,
   normalizeCommande,
   updateCommande,
 } from "@/lib/commandes.api";
 import {
+  computeCommandeDashboardStats,
   computeCommandeStatusCounts,
-  computeFluxTotalQuantite,
   computeJoursRestants,
-  computeReliquatTotal,
-  computeTauxReceptionPct,
-  countCommandesEnRetard,
   filterCommandesByQuery,
   formatDelaiEcheanceLabel,
   isCommandeEnRetardTimeline,
@@ -44,6 +42,7 @@ import { UniteMesureSearchablePicker } from "@/components/unites-mesure/UniteMes
 import {
   convertQuantityBetweenUnites,
   normalizeUnitCode,
+  unitCodesEqual,
   resolvePrincipalUnitCode,
   unitesCompatibleQuantiteCommande,
   formatQuantitePrincipale,
@@ -74,6 +73,8 @@ import {
   Timer,
   History,
   CheckCircle2,
+  ClipboardList,
+  CalendarClock,
 } from "lucide-react";
 
 type Id = string | number;
@@ -233,6 +234,8 @@ export default function CommandesTable({
   const currentUser = useAuthStore((state) => state.user);
   const token = useAuthStore((state) => state.token);
   const [rows, setRows] = useState<TableCommande[]>(data);
+  /** Jeu élargi pour les cartes (toutes les commandes si possible). */
+  const [statsRows, setStatsRows] = useState<TableCommande[]>(data);
   const [userNamesById, setUserNamesById] = useState<Record<string, string>>({});
   const [expandedId, setExpandedId] = useState<Id | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -274,6 +277,38 @@ const goToPage = (page: number) => {
   }, [data]);
 
   useEffect(() => {
+    if (!token) {
+      setStatsRows(rows);
+      return;
+    }
+
+    const total = pagination.total ?? rows.length;
+    if (total <= rows.length) {
+      setStatsRows(rows);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const first = Math.min(total, 300);
+        const res = await listCommandes(1, first, { token });
+        if (!cancelled) {
+          setStatsRows(res.commandes.data.map(normalizeCommande));
+        }
+      } catch {
+        if (!cancelled) {
+          setStatsRows(rows);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, pagination.total, rows]);
+
+  useEffect(() => {
     if (!isDrawerOpen) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -294,6 +329,47 @@ const goToPage = (page: number) => {
     }, 180);
     return () => window.clearTimeout(timer);
   }, [focusId, rows]);
+
+  useEffect(() => {
+    if (searchParams.get("nouveau") !== "1") return;
+
+    const emballageId = searchParams.get("emballage_id");
+    const quantite = searchParams.get("quantite");
+    const entrepotId = searchParams.get("entrepot_id");
+    const dateLivraison = searchParams.get("date_livraison");
+
+    if (!emballageId && !quantite) return;
+
+    const emb = emballageId
+      ? emballages.find((e) => String(e.id) === String(emballageId))
+      : null;
+    const principal = emb
+      ? resolvePrincipalUnitCode(emb.capacity_unit ?? null, unitesMesure)
+      : "";
+
+    setEditing(null);
+    setForm({
+      ...emptyForm,
+      emballage_id: emballageId ?? "",
+      quantite: quantite ?? "",
+      entrepot_id: entrepotId ?? "",
+      date_livraison_prevue: dateLivraison ?? "",
+    });
+    setQuantiteUniteSaisie(principal);
+    setErrorMessage("");
+    setDrawerStep(1);
+    setIsDrawerOpen(true);
+
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("nouveau");
+    params.delete("emballage_id");
+    params.delete("quantite");
+    params.delete("entrepot_id");
+    params.delete("date_livraison");
+    params.delete("couverture_jours");
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [searchParams, emballages, unitesMesure, pathname, router]);
 
   useEffect(() => {
     async function loadUserNames() {
@@ -355,7 +431,7 @@ const goToPage = (page: number) => {
   );
 
   const principalUnitLabel = useMemo(() => {
-    const urow = unitesMesure.find((u) => normalizeUnitCode(u.code) === normalizeUnitCode(principalUnitCode));
+    const urow = unitesMesure.find((u) => unitCodesEqual(u.code, principalUnitCode));
     return urow ? `${urow.label} (${urow.code})` : principalUnitCode;
   }, [unitesMesure, principalUnitCode]);
 
@@ -369,7 +445,7 @@ const goToPage = (page: number) => {
       return null;
     }
     const fromU = normalizeUnitCode(quantiteUniteSaisie) || principalUnitCode;
-    if (normalizeUnitCode(fromU) === normalizeUnitCode(principalUnitCode)) {
+    if (unitCodesEqual(fromU, principalUnitCode)) {
       return q;
     }
     return convertQuantityBetweenUnites(q, fromU, principalUnitCode, unitesMesure);
@@ -380,7 +456,7 @@ const goToPage = (page: number) => {
       return;
     }
     const ok = unitesQuantiteCompat.some(
-      (u) => normalizeUnitCode(u.code) === normalizeUnitCode(quantiteUniteSaisie)
+      (u) => unitCodesEqual(u.code, quantiteUniteSaisie)
     );
     if (!ok) {
       setQuantiteUniteSaisie(principalUnitCode);
@@ -600,10 +676,19 @@ const goToPage = (page: number) => {
 
 const statusCounts = useMemo(() => computeCommandeStatusCounts(rows), [rows]);
 
+const dashboardStats = useMemo(
+  () => computeCommandeDashboardStats(statsRows),
+  [statsRows]
+);
+
 const filteredRows = useMemo(
   () => filterCommandesByQuery(rows, query, fournisseursMap),
   [rows, query, fournisseursMap]
 );
+
+const toggleQuickFilter = (filterKey: string) => {
+  setQuery((prev) => (prev === filterKey ? "" : filterKey));
+};
 
   const commandeSortColumns = useMemo<Record<string, SortColumn<TableCommande>>>(
     () => ({
@@ -649,56 +734,85 @@ const filteredRows = useMemo(
         </div>
       </div>
 
-{/* SECTION ANALYSE RAPIDE */}
-<div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-  {/* Widget 1: Volume Total Attendu */}
-  <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex items-center gap-4">
-    <div className="h-12 w-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-      <Package className="h-6 w-6" />
+{/* INDICATEURS — cliquables pour filtrer le tableau */}
+<div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+    Vue d&apos;ensemble
+    {statsRows.length < (pagination.total ?? statsRows.length)
+      ? ` (${statsRows.length} / ${pagination.total} commandes)`
+      : ` (${statsRows.length} commande${statsRows.length > 1 ? "s" : ""})`}
+  </p>
+  <p className="text-[10px] font-medium text-gray-400 italic">Cliquez sur une carte pour filtrer</p>
+</div>
+<div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+  <button
+    type="button"
+    onClick={() => toggleQuickFilter("ACTIVES")}
+    className={`bg-white p-6 rounded-[2rem] border shadow-sm flex items-center gap-4 text-left transition-all hover:shadow-md ${
+      query === "ACTIVES"
+        ? "border-indigo-300 ring-2 ring-indigo-500/20"
+        : "border-gray-100"
+    }`}
+  >
+    <div className="h-12 w-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+      <ClipboardList className="h-6 w-6" />
     </div>
     <div>
-      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Flux Total</p>
-      <p className="text-xl font-black text-gray-900">
-        {computeFluxTotalQuantite(rows)}
+      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">En cours</p>
+      <p className="text-xl font-black text-gray-900">{dashboardStats.actives}</p>
+      <p className="text-[10px] font-bold text-gray-400 uppercase mt-0.5">
+        hors réceptionnées / annulées
       </p>
     </div>
-  </div>
+  </button>
 
-  {/* Widget 2: Reste à recevoir (Somme des reliquats) */}
-  <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex items-center gap-4">
-    <div className="h-12 w-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
-      <ArrowRight className="h-6 w-6" />
-    </div>
-    <div>
-      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Reliquat Total</p>
-      <p className="text-xl font-black text-amber-600">
-        {computeReliquatTotal(rows)}
-      </p>
-    </div>
-  </div>
-
-  {/* Widget 3: Alertes Retards */}
-  <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex items-center gap-4">
-    <div className="h-12 w-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center">
+  <button
+    type="button"
+    onClick={() => toggleQuickFilter("EN_RETARD")}
+    className={`bg-white p-6 rounded-[2rem] border shadow-sm flex items-center gap-4 text-left transition-all hover:shadow-md ${
+      query === "EN_RETARD"
+        ? "border-red-300 ring-2 ring-red-500/20"
+        : "border-gray-100"
+    }`}
+  >
+    <div className="h-12 w-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center shrink-0">
       <AlertCircle className="h-6 w-6" />
     </div>
     <div>
-      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">En Retard</p>
-      <p className="text-xl font-black text-red-600">
-        {countCommandesEnRetard(rows)}
-      </p>
+      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">En retard</p>
+      <p className="text-xl font-black text-red-600">{dashboardStats.enRetard}</p>
+      <p className="text-[10px] font-bold text-gray-400 uppercase mt-0.5">échéance dépassée</p>
     </div>
-  </div>
+  </button>
 
-  {/* Widget 4: Taux de Service */}
+  <button
+    type="button"
+    onClick={() => toggleQuickFilter("PROCHAINES_7J")}
+    className={`bg-white p-6 rounded-[2rem] border shadow-sm flex items-center gap-4 text-left transition-all hover:shadow-md ${
+      query === "PROCHAINES_7J"
+        ? "border-amber-300 ring-2 ring-amber-500/20"
+        : "border-gray-100"
+    }`}
+  >
+    <div className="h-12 w-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+      <CalendarClock className="h-6 w-6" />
+    </div>
+    <div>
+      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">À livrer (7 j)</p>
+      <p className="text-xl font-black text-amber-600">{dashboardStats.livraisons7j}</p>
+      <p className="text-[10px] font-bold text-gray-400 uppercase mt-0.5">livraisons imminentes</p>
+    </div>
+  </button>
+
   <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex items-center gap-4">
-    <div className="h-12 w-12 rounded-2xl bg-green-50 text-green-600 flex items-center justify-center">
+    <div className="h-12 w-12 rounded-2xl bg-green-50 text-green-600 flex items-center justify-center shrink-0">
       <CheckCircle2 className="h-6 w-6" />
     </div>
     <div>
-      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Taux Réception</p>
-      <p className="text-xl font-black text-green-600">
-        {computeTauxReceptionPct(rows)}%
+      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Couverture</p>
+      <p className="text-xl font-black text-green-700">{dashboardStats.couverture}%</p>
+      <p className="text-[10px] font-bold text-amber-600 uppercase mt-0.5">
+        reste {dashboardStats.reliquat.toLocaleString("fr-FR")} · {dashboardStats.commandesOuvertes} ouvertes
       </p>
     </div>
   </div>

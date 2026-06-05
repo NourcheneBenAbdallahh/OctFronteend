@@ -15,7 +15,10 @@ import StocksCardsView from "./StocksCardsView";
 import StocksTableView from "./StocksTableView";
 import StockDetailsDrawer from "./StockDetailsDrawer";
 import StockEditDrawer from "./StockEditDrawer";
+import LotDetailsDrawer from "@/components/lots/LotDetailsDrawer";
 import { deleteStock, updateStock } from "@/lib/stock.api";
+import { getLotById } from "@/lib/lot.api";
+import type { Lot } from "@/types/lot";
 import {
   applyStockFilters,
   computeStocksStats,
@@ -78,6 +81,8 @@ export default function StocksClient({ initialStocks }: Props) {
   const [rows, setRows] = useState<Stock[]>(initialStocks);
   const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selectedLot, setSelectedLot] = useState<Lot | null>(null);
+  const [lotDrawerOpen, setLotDrawerOpen] = useState(false);
   const [editingStock, setEditingStock] = useState<Stock | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const {
@@ -175,6 +180,23 @@ export default function StocksClient({ initialStocks }: Props) {
     setDrawerOpen(true);
   };
 
+  const handleViewLot = async (stock: Stock) => {
+    const lotId = stock.lot_id ?? stock.lot?.id;
+    if (!lotId) return;
+    clearFeedback();
+    try {
+      const lot = await getLotById(lotId);
+      if (!lot) {
+        showError("Lot introuvable.");
+        return;
+      }
+      setSelectedLot(lot);
+      setLotDrawerOpen(true);
+    } catch (error) {
+      showError(getActionErrorMessage(error, "Impossible de charger le lot."));
+    }
+  };
+
   const handleEdit = (stock: Stock) => {
     setEditingStock(stock);
     setEditOpen(true);
@@ -255,8 +277,7 @@ export default function StocksClient({ initialStocks }: Props) {
           <StocksCardsView
             rows={paginatedRows}
             onView={handleView}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
+            onViewLot={handleViewLot}
           />
         ) : (
           <StocksTableView
@@ -266,7 +287,7 @@ export default function StocksClient({ initialStocks }: Props) {
             sortDirection={sortDirection}
             onSort={toggleSort}
             onView={handleView}
-            onDelete={handleDelete}
+            onViewLot={handleViewLot}
           />
         )}
       </div>
@@ -294,6 +315,11 @@ export default function StocksClient({ initialStocks }: Props) {
         open={editOpen}
         onClose={() => setEditOpen(false)}
         onSubmit={handleSubmitEdit}
+      />
+      <LotDetailsDrawer
+        lot={selectedLot}
+        open={lotDrawerOpen}
+        onClose={() => setLotDrawerOpen(false)}
       />
     </div>
   );

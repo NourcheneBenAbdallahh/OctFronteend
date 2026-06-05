@@ -25,6 +25,7 @@ import {
   X, FileText, Upload, Edit2, AlertCircle, ShoppingCart, Truck, CheckCircle2, Search, ArrowRight, Eye, Download
 } from "lucide-react";
 import { CommandeSearchablePicker } from "@/components/bon-livraisons/CommandeSearchablePicker";
+import { formatNumber } from "@/lib/utils";
 import { BonLivraisonDocumentModal } from "@/components/bon-livraisons/BonLivraisonDocumentModal";
 import {
   downloadBlob,
@@ -38,6 +39,7 @@ import {
   convertQuantityBetweenUnites,
   formatQuantitePrincipale,
   normalizeUnitCode,
+  unitCodesEqual,
   resolvePrincipalUnitCode,
   unitesCompatibleQuantiteCommande,
 } from "@/lib/unite-conversion";
@@ -318,7 +320,7 @@ export default function BonLivraisonsTable({
 
   const principalUnitLabel = useMemo(() => {
     if (!principalUnitCode) return "";
-    const urow = unitesMesure.find((u) => normalizeUnitCode(u.code) === normalizeUnitCode(principalUnitCode));
+    const urow = unitesMesure.find((u) => unitCodesEqual(u.code, principalUnitCode));
     return urow ? `${urow.label} (${urow.code})` : principalUnitCode;
   }, [unitesMesure, principalUnitCode]);
 
@@ -340,7 +342,7 @@ export default function BonLivraisonsTable({
       return null;
     }
     const fromU = normalizeUnitCode(quantiteUniteSaisie) || principalUnitCode;
-    if (normalizeUnitCode(fromU) === normalizeUnitCode(principalUnitCode)) {
+    if (unitCodesEqual(fromU, principalUnitCode)) {
       return q;
     }
     return convertQuantityBetweenUnites(q, fromU, principalUnitCode, unitesMesure);
@@ -351,7 +353,7 @@ export default function BonLivraisonsTable({
       return;
     }
     const ok = unitesQuantiteCompat.some(
-      (u) => normalizeUnitCode(u.code) === normalizeUnitCode(quantiteUniteSaisie)
+      (u) => unitCodesEqual(u.code, quantiteUniteSaisie)
     );
     if (!ok) {
       setQuantiteUniteSaisie(principalUnitCode);
@@ -637,7 +639,7 @@ export default function BonLivraisonsTable({
         </div>
         <div>
           <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Commandé</span>
-          <span className="text-xl font-black text-gray-900">{stats.totalCommande.toLocaleString()}</span>
+          <span className="text-xl font-black text-gray-900">{formatNumber(stats.totalCommande)}</span>
         </div>
       </div>
 
@@ -648,7 +650,7 @@ export default function BonLivraisonsTable({
         </div>
         <div>
           <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Reçu Validé</span>
-          <span className="text-xl font-black text-amber-600">{stats.totalRecuValide.toLocaleString()}</span>
+          <span className="text-xl font-black text-amber-600">{formatNumber(stats.totalRecuValide)}</span>
         </div>
       </div>
 
@@ -659,7 +661,7 @@ export default function BonLivraisonsTable({
         </div>
         <div>
           <span className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Reste à Recevoir</span>
-          <span className="text-xl font-black text-red-600">{stats.reliquatGlobal.toLocaleString()}</span>
+          <span className="text-xl font-black text-red-600">{formatNumber(stats.reliquatGlobal)}</span>
           <span className="block text-[10px] text-gray-400 font-bold uppercase">{stats.commandesOuvertes} commandes ouvertes</span>
         </div>
       </div>

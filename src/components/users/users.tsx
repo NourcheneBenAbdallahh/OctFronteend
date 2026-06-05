@@ -14,6 +14,10 @@ import {
   adminSetUserActive, adminCreateUser, adminUpdateUser, adminResetUserPassword
 } from "@/lib/users.api";
 import { AppFeedbackBanner } from "@/components/ui/feedback";
+import {
+  PasswordResetEmailSentModal,
+  type PasswordResetEmailSentInfo,
+} from "./PasswordResetEmailSentModal";
 import { ResponsiveTableWrap } from "@/components/ui/ResponsiveTableWrap";
 import { SortableTh } from "@/components/ui/SortableTableHeader";
 import { useTableSort } from "@/hooks/useTableSort";
@@ -64,6 +68,9 @@ export default function UsersAdminPage() {
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [selectedUserName, setSelectedUserName] = useState("");
+  const [selectedUserEmail, setSelectedUserEmail] = useState("");
+  const [passwordEmailSentInfo, setPasswordEmailSentInfo] =
+    useState<PasswordResetEmailSentInfo | null>(null);
   const [createForm, setCreateForm] = useState({
     name: "",
     email: "",
@@ -114,7 +121,7 @@ export default function UsersAdminPage() {
           password: createForm.password,
           is_active: createForm.is_active,
         }),
-      "Utilisateur créé avec succès."
+      "Utilisateur créé avec succès. Un email avec les identifiants d'accès a été envoyé."
     );
 
     if (successCreate) {
@@ -134,9 +141,10 @@ export default function UsersAdminPage() {
     setEditModalOpen(true);
   };
 
-  const openPasswordModal = (user: any) => {
+  const openPasswordModal = (user: AdminUser) => {
     setSelectedUserId(String(user.id));
     setSelectedUserName(user.name ?? "");
+    setSelectedUserEmail(user.email ?? "");
     setPasswordForm({ password: "", confirmPassword: "" });
     setPasswordModalOpen(true);
   };
@@ -175,16 +183,25 @@ export default function UsersAdminPage() {
       return;
     }
 
+    const newPassword = passwordForm.password;
+
     const ok = await handleAction(
       "reset-password",
-      () => adminResetUserPassword(selectedUserId, passwordForm.password),
-      "Mot de passe réinitialisé. Un email a été envoyé à l'utilisateur."
+      () => adminResetUserPassword(selectedUserId, newPassword),
+      ""
     );
 
     if (ok) {
+      setSuccess(null);
+      setPasswordEmailSentInfo({
+        userName: selectedUserName || "l'utilisateur",
+        userEmail: selectedUserEmail,
+        password: newPassword,
+      });
       setPasswordModalOpen(false);
       setSelectedUserId(null);
       setSelectedUserName("");
+      setSelectedUserEmail("");
       setPasswordForm({ password: "", confirmPassword: "" });
     }
   };
@@ -672,6 +689,11 @@ export default function UsersAdminPage() {
           </form>
         </div>
       </Modal>
+
+      <PasswordResetEmailSentModal
+        info={passwordEmailSentInfo}
+        onClose={() => setPasswordEmailSentInfo(null)}
+      />
     </div>
   );
 }

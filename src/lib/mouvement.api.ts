@@ -104,6 +104,49 @@ export async function fetchMouvements(filters: {
 
   return data.mouvementStocks;
 }
+
+export async function fetchMouvementById(id: string | number): Promise<MouvementStock | null> {
+  const query = `
+    query GetMouvement($id: ID!) {
+      mouvementStock(id: $id) {
+        id
+        code_mouvement
+        type_mouvement
+        statut
+        quantite
+        date_mouvement
+        entrepot_source_id
+        entrepot_destination_id
+        emballage {
+          id
+          code
+          name
+        }
+        lot {
+          id
+          code_lot
+          emballage_id
+        }
+        user {
+          id
+          name
+        }
+        entrepotSource {
+          id
+          nom
+        }
+        entrepotDestination {
+          id
+          nom
+        }
+      }
+    }
+  `;
+
+  const data = await graphqlRequest<{ mouvementStock: MouvementStock | null }>(query, { id });
+  return data.mouvementStock ?? null;
+}
+
 export async function fetchEntrepots(): Promise<EntrepotRef[]> {
   const query = `
     query {

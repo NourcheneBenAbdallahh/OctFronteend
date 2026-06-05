@@ -31,9 +31,9 @@ export const APP_MODULE_GROUPS: AppModuleGroup[] = [
       },
       {
         id: "prediction",
-        title: "Prévisions stock",
+        title: "Aide à la commande",
         description:
-          "Anticipation des ruptures et tendances de consommation par emballage grâce aux modèles prédictifs.",
+          "Indique combien de stock il reste, combien de temps ça tiendra, et combien commander si besoin.",
         path: "/prediction",
         roles: ["ADMIN", "STOCK"],
       },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useCallback, useEffect } from "react";
+import { useMemo, useState, useCallback } from "react";
 import type {
   Lot,
   LotFiltersState,
@@ -13,10 +13,9 @@ import LotsFilters from "./LotsFilters";
 import LotsTimelineView from "./LotsTimelineView";
 import LotsCardsView from "./LotsCardsView";
 import LotDetailsDrawer from "./LotDetailsDrawer";
-import LotEditDrawer from "./LotEditDrawer";
-import { deleteLot, updateLot, getLots } from "@/lib/lot.api";
+import { deleteLot, getLots } from "@/lib/lot.api";
 import { AppConfirmModal, AppFeedbackBanner } from "@/components/ui/feedback";
-import { getActionErrorMessage, useAppFeedback } from "@/hooks/useAppFeedback";
+import { useAppFeedback } from "@/hooks/useAppFeedback";
 
 interface Props {
   initialLots: Lot[];
@@ -60,14 +59,11 @@ export default function LotsClient({ initialLots, initialPagination }: Props) {
   // UI States
   const [selectedLot, setSelectedLot] = useState<Lot | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [editingLot, setEditingLot] = useState<Lot | null>(null);
-  const [editOpen, setEditOpen] = useState(false);
 
   const {
     feedback,
     confirm,
     showSuccess,
-    showError,
     clearFeedback,
     openConfirm,
     closeConfirm,
@@ -139,12 +135,6 @@ const grouped: LotsGroupedByDate[] = useMemo(() => {
     setDrawerOpen(true);
   }, []);
 
-  const handleEdit = useCallback((lot: Lot) => {
-    setDrawerOpen(false);
-    setEditingLot(lot);
-    setEditOpen(true);
-  }, []);
-
   const handleDelete = (lot: Lot) => {
     clearFeedback();
     openConfirm({
@@ -159,19 +149,6 @@ const grouped: LotsGroupedByDate[] = useMemo(() => {
           showSuccess("Lot supprimé.");
         }),
     });
-  };
-
-  const handleSubmitEdit = async (payload: any) => {
-    if (!editingLot) return;
-    clearFeedback();
-    try {
-      const updated = await updateLot(editingLot.id, payload);
-      setRows((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
-      setEditOpen(false);
-      showSuccess("Lot modifié.");
-    } catch (error) {
-      showError(getActionErrorMessage(error));
-    }
   };
 
   return (
@@ -199,7 +176,6 @@ const grouped: LotsGroupedByDate[] = useMemo(() => {
             pagination={pagination}
             onPageChange={handlePageChange}
             onView={handleView}
-            onEdit={handleEdit}
             onDelete={handleDelete}
           />
         ) : (
@@ -208,7 +184,6 @@ const grouped: LotsGroupedByDate[] = useMemo(() => {
             pagination={pagination}
             onPageChange={handlePageChange}
             onView={handleView}
-            onEdit={handleEdit}
             onDelete={handleDelete}
           />
         )}
@@ -219,13 +194,6 @@ const grouped: LotsGroupedByDate[] = useMemo(() => {
         lot={selectedLot}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-      />
-
-      <LotEditDrawer
-        lot={editingLot}
-        open={editOpen}
-        onClose={() => setEditOpen(false)}
-        onSubmit={handleSubmitEdit}
       />
     </div>
   );

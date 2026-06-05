@@ -63,6 +63,7 @@ export default function MouvementsTable({
   onValidate,
   onDelete,
   busyActionId,
+  focusedId,
   currentPage,
   totalPages,
   totalItems,
@@ -74,6 +75,7 @@ export default function MouvementsTable({
   onDelete: (id: string) => void;
   /** Désactive les boutons pendant validate/delete */
   busyActionId?: string | null;
+  focusedId?: string | number | null;
   currentPage: number;
   totalPages: number;
   totalItems: number;
@@ -143,7 +145,15 @@ export default function MouvementsTable({
                 </tr>
               ) : (
                 sortedItems.map((m) => (
-                  <tr key={m.id} className="group transition-all hover:bg-gray-50/50">
+                  <tr
+                    id={`mouvement-row-${m.id}`}
+                    key={m.id}
+                    className={`group transition-all ${
+                      String(focusedId ?? "") === String(m.id)
+                        ? "bg-amber-50 ring-2 ring-inset ring-amber-400"
+                        : "hover:bg-gray-50/50"
+                    }`}
+                  >
                     <td className="px-8 py-6">
                       <div className="font-mono text-sm font-black text-[#1C2434]">
                         {m.code_mouvement ?? `#${m.id.substring(0, 8)}`}

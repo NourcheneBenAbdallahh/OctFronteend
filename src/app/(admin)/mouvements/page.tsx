@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   fetchMouvements,
+  fetchMouvementById,
   fetchEmballages,
   fetchEntrepots,
   fetchGlobalStats,
@@ -29,6 +31,8 @@ import { AppConfirmModal, AppFeedbackBanner } from "@/components/ui/feedback";
 import { getActionErrorMessage, useAppFeedback } from "@/hooks/useAppFeedback";
 
 export default function MouvementsPage() {
+  const searchParams = useSearchParams();
+  const focusId = searchParams.get("focus");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
@@ -59,6 +63,7 @@ export default function MouvementsPage() {
   const [busyActionId, setBusyActionId] = useState<string | null>(null);
 
   const [form, setForm] = useState<MouvementFormState>(emptyForm());
+  const [focusedMouvement, setFocusedMouvement] = useState<MouvementStock | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -97,6 +102,42 @@ setPagination(mouvementsResult.paginatorInfo);
 
     return () => clearTimeout(delayDebounceFn);
   }, [load]);
+
+  useEffect(() => {
+    if (!focusId) {
+      setFocusedMouvement(null);
+      return;
+    }
+
+    let cancelled = false;
+    void fetchMouvementById(focusId)
+      .then((mouvement) => {
+        if (!cancelled) setFocusedMouvement(mouvement);
+      })
+      .catch(() => {
+        if (!cancelled) setFocusedMouvement(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [focusId]);
+
+  const displayItems = useMemo(() => {
+    if (!focusId || !focusedMouvement) return items;
+    if (items.some((item) => String(item.id) === String(focusId))) return items;
+    return [focusedMouvement, ...items];
+  }, [items, focusId, focusedMouvement]);
+
+  useEffect(() => {
+    if (!focusId || loading) return;
+    const timer = window.setTimeout(() => {
+      document
+        .getElementById(`mouvement-row-${focusId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 220);
+    return () => window.clearTimeout(timer);
+  }, [focusId, loading, displayItems]);
 
   // reset page quand filtre change
   useEffect(() => {
@@ -277,11 +318,12 @@ setPagination(mouvementsResult.paginatorInfo);
 
       <div className="rounded-[35px] overflow-hidden border border-gray-100 bg-white shadow-sm transition-all hover:shadow-md">
        <MouvementsTable
-          items={items}
+          items={displayItems}
           loading={loading}
           onValidate={handleValidate}
           onDelete={handleDelete}
           busyActionId={busyActionId}
+          focusedId={focusId}
           currentPage={pagination?.currentPage ?? 1}
           totalPages={pagination?.lastPage ?? 1}
           totalItems={pagination?.total ?? 0}
