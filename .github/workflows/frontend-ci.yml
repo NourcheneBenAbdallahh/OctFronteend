@@ -62,16 +62,23 @@ jobs:
             exit 0
           fi
 
-          CHANGED=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.mjs' | tr '\n' ' ' | xargs)
+          CHANGED_RAW=$(git diff --name-only --diff-filter=d "$BASE_SHA" "$HEAD_SHA" -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.mjs')
 
-          if [[ -z "$CHANGED" ]]; then
-            echo "No changed source files. Skipping ESLint."
+          EXISTING_FILES=()
+          while IFS= read -r file; do
+            if [[ -n "$file" && -f "$file" ]]; then
+              EXISTING_FILES+=("$file")
+            fi
+          done <<< "$CHANGED_RAW"
+
+          if [[ ${#EXISTING_FILES[@]} -eq 0 ]]; then
+            echo "No changed source files to lint. Skipping ESLint."
             exit 0
           fi
 
           echo "Linting changed files:"
-          echo "$CHANGED"
-          npx eslint $CHANGED
+          printf '%s\n' "${EXISTING_FILES[@]}"
+          npx eslint "${EXISTING_FILES[@]}"
 
   build:
     name: build
