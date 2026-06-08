@@ -306,7 +306,7 @@ function resolveBrowserGraphqlEndpoint(): string {
 function publicGraphqlEndpoint(): string {
   return (
     readExplicitPublicGraphqlEndpoint() ||
-    browserGraphqlEndpointFromLocation() ||
+    (typeof window !== "undefined" ? browserGraphqlEndpointFromLocation() : "") ||
     DEFAULT_GRAPHQL_ENDPOINT
   );
 }

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   getBonLivraisonDocumentUrl,
   guessDocumentKind,
@@ -6,10 +6,18 @@ import {
 } from "./bon-livraisons.document";
 
 describe("bon-livraisons.document", () => {
+  const origEnv = process.env;
+
+  afterEach(() => {
+    process.env = { ...origEnv };
+  });
+
   it("construit l'URL API du justificatif", () => {
+    process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT = "http://localhost:8000/graphql";
     const url = getBonLivraisonDocumentUrl(42, "attachment");
-    expect(url).toContain("/api/bon-livraisons/42/document");
-    expect(url).toContain("disposition=attachment");
+    expect(url).toBe(
+      "http://localhost:8000/api/bon-livraisons/42/document?disposition=attachment"
+    );
   });
 
   it("parse le nom de fichier depuis Content-Disposition", () => {
