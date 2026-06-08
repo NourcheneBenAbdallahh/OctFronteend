@@ -21,11 +21,13 @@ function fmtDate(v: string | null | undefined): string {
   }
 }
 
-export function exportInventaireCsv(
+export function buildInventaireCsvContent(
   rows: TableInventaire[],
   filters: InventaireFilters
-): void {
-  if (!rows.length || typeof window === "undefined") return;
+): string {
+  if (!rows.length) {
+    return "";
+  }
 
   const periodLabel = buildInventaireFiltersLabel(filters);
   const header = [
@@ -78,7 +80,17 @@ export function exportInventaireCsv(
     "",
   ].join("\r\n");
 
-  const blob = new Blob(["\uFEFF" + preamble + header + "\r\n" + lines.join("\r\n")], {
+  return preamble + header + "\r\n" + lines.join("\r\n");
+}
+
+export function exportInventaireCsv(
+  rows: TableInventaire[],
+  filters: InventaireFilters
+): void {
+  if (!rows.length || typeof window === "undefined") return;
+
+  const body = buildInventaireCsvContent(rows, filters);
+  const blob = new Blob(["\uFEFF" + body], {
     type: "text/csv;charset=utf-8",
   });
   const url = URL.createObjectURL(blob);
