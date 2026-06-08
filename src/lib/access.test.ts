@@ -49,6 +49,12 @@ describe("canAccessPath", () => {
     expect(canAccessPath("/commandes", "FINANCE")).toBe(false);
   });
 
+  it("refuse STOCK et LOGISTIQUE sur /factures", () => {
+    expect(canAccessPath("/factures", "STOCK")).toBe(false);
+    expect(canAccessPath("/factures", "LOGISTIQUE")).toBe(false);
+    expect(canAccessPath("/factures", "CONTRAT")).toBe(false);
+  });
+
   it("restreint STOCK au BI et aux routes stock", () => {
     expect(canAccessPath("/bi", "STOCK")).toBe(true);
     expect(canAccessPath("/stock", "STOCK")).toBe(true);

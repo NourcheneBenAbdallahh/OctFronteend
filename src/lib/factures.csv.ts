@@ -72,14 +72,11 @@ function buildCsvPreamble(factureCount: number): string {
   return lines.join("\r\n");
 }
 
-/**
- * Télécharge un CSV des factures sélectionnées (récap une ligne par facture).
- * Préambule commenté (#) + en-têtes en français.
- * Valeurs absentes → littéral `null`.
- * BOM UTF-8 + séparateur ; pour Excel (locale FR).
- */
-export function exportFacturesCsv(factures: TableFacture[]): void {
-  if (!factures.length || typeof window === "undefined") return;
+/** Contenu CSV complet (préambule + en-têtes + lignes), sans déclenchement de téléchargement. */
+export function buildFacturesCsvContent(factures: TableFacture[]): string {
+  if (!factures.length) {
+    return "";
+  }
 
   const headerLabels = [
     "ID facture",
@@ -123,9 +120,22 @@ export function exportFacturesCsv(factures: TableFacture[]): void {
     ].join(SEP);
   });
 
-  const bom = "\ufeff";
   const preamble = buildCsvPreamble(factures.length);
-  const body = [preamble, headerLine, ...rows].join("\r\n");
+
+  return [preamble, headerLine, ...rows].join("\r\n");
+}
+
+/**
+ * Télécharge un CSV des factures sélectionnées (récap une ligne par facture).
+ * Préambule commenté (#) + en-têtes en français.
+ * Valeurs absentes → littéral `null`.
+ * BOM UTF-8 + séparateur ; pour Excel (locale FR).
+ */
+export function exportFacturesCsv(factures: TableFacture[]): void {
+  if (!factures.length || typeof window === "undefined") return;
+
+  const body = buildFacturesCsvContent(factures);
+  const bom = "\ufeff";
   const blob = new Blob([bom + body], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
