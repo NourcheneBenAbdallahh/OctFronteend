@@ -1,23 +1,21 @@
 "use client";
 
+import Link from "next/link";
 import {
   CalendarDays,
-  Package,
   User2,
   Warehouse,
   ArrowDownToLine,
   ArrowUpFromLine,
-  Trash2,
   Eye,
-  Hash,
-  ArrowRight
+  History,
 } from "lucide-react";
 import type { Stock } from "@/types/stock";
 
 interface Props {
   stock: Stock;
   onView?: (stock: Stock) => void;
-  onEdit?: (stock: Stock) => void;
+  onViewLot?: (stock: Stock) => void;
 }
 
 function formatDate(date?: string | null) {
@@ -27,108 +25,128 @@ function formatDate(date?: string | null) {
     month: "2-digit",
     year: "numeric",
     hour: "2-digit",
-    minute: "2-digit"
+    minute: "2-digit",
   });
 }
 
-export default function StockCard({ stock, onView }: Props) {
+function getMouvementId(stock: Stock) {
+  return stock.mouvement_stock_id ?? stock.mouvementStock?.id ?? null;
+}
+
+export default function StockCard({ stock, onView, onViewLot }: Props) {
   const isEntree = stock.sens === "entree";
+  const mouvementId = getMouvementId(stock);
+  const lotId = stock.lot_id ?? stock.lot?.id;
 
   return (
-    <div className="group bg-white border border-gray-100 rounded-[32px] p-8 hover:shadow-2xl hover:shadow-gray-200/50 transition-all duration-500 relative overflow-hidden">
-      
-      {/* HEADER DE LA CARTE */}
-      <div className="flex justify-between items-start mb-8">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <span className={`px-4 py-1 rounded-full text-[10px] font-[1000] uppercase tracking-[0.2em] border ${
-              isEntree 
-                ? "bg-emerald-50 text-emerald-600 border-emerald-100" 
-                : "bg-orange-50 text-orange-600 border-orange-100"
-            }`}>
-              {stock.sens}
-            </span>
-            <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">
-              ID #{stock.id}
-            </span>
-          </div>
-          <h3 className="text-[13px] font-[1000] text-gray-400 uppercase mt-2 flex items-center gap-2">
-            <Hash size={14} className="text-[#00A09D]" />
-            Lot: <span className="text-[#1C2434]">{stock.lot?.code_lot || "N/A"}</span>
-          </h3>
-        </div>
-
-        <div className="flex gap-2">
-          <button
-            onClick={() => onView?.(stock)}
-            className="w-12 h-12 flex items-center justify-center rounded-2xl bg-gray-50 text-gray-400 hover:text-[#00A09D] hover:bg-[#F2F7F7] transition-all"
+    <article className="group flex flex-col rounded-[2rem] border border-gray-100 bg-white p-6 text-left shadow-sm transition-all hover:border-indigo-100 hover:shadow-md">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-4">
+          <div
+            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${
+              isEntree ? "bg-emerald-50 text-emerald-600" : "bg-orange-50 text-orange-600"
+            }`}
           >
-            <Eye size={20} />
-          </button>
-          
-        </div>
-      </div>
-
-      {/* ZONE QUANTITÉ (TRÈS GRANDE) */}
-      <div className="mb-8">
-        <div className="flex items-baseline gap-2">
-          <span className="text-[52px] font-[1000] text-[#1C2434] tracking-tighter leading-none">
-            {Number(stock.quantite).toLocaleString("fr-FR")}
-          </span>
-          <span className="text-gray-400 font-bold text-lg uppercase tracking-widest">Unités</span>
-        </div>
-        <div className="w-full bg-gray-50 h-[1px] mt-4 relative">
-            <div className={`absolute left-0 top-0 h-full w-24 ${isEntree ? 'bg-emerald-400' : 'bg-orange-400'}`} />
-        </div>
-      </div>
-
-      {/* DETAILS GRID */}
-      <div className="grid grid-cols-2 gap-6">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2 text-gray-400">
-            <Warehouse size={14} />
-            <span className="text-[10px] font-black uppercase tracking-widest">Entrepôt</span>
+            {isEntree ? (
+              <ArrowDownToLine className="h-6 w-6" aria-hidden />
+            ) : (
+              <ArrowUpFromLine className="h-6 w-6" aria-hidden />
+            )}
           </div>
-          <p className="text-[15px] font-[900] text-[#1C2434] leading-tight">
+          <div className="min-w-0">
+            <span className="block text-[10px] font-black uppercase tracking-widest leading-none text-gray-400 mb-1">
+              {isEntree ? "Entrée" : "Sortie"}
+            </span>
+            <span
+              className={`text-2xl font-black leading-none ${
+                isEntree ? "text-emerald-600" : "text-orange-600"
+              }`}
+            >
+              {Number(stock.quantite).toLocaleString("fr-FR")}
+            </span>
+            <span className="mt-1.5 block text-[10px] font-bold uppercase leading-snug text-gray-400">
+              Unités · ID #{stock.id}
+            </span>
+          </div>
+        </div>
+
+        <span
+          className={`shrink-0 rounded-xl border px-2.5 py-1 text-[9px] font-black uppercase tracking-widest ${
+            isEntree
+              ? "border-emerald-100 bg-emerald-50 text-emerald-600"
+              : "border-orange-100 bg-orange-50 text-orange-600"
+          }`}
+        >
+          {stock.sens}
+        </span>
+      </div>
+
+      {lotId ? (
+        <button
+          type="button"
+          onClick={() => onViewLot?.(stock)}
+          className="mt-4 line-clamp-1 text-left text-sm font-black uppercase tracking-tight text-[#00A09D] underline-offset-2 transition-colors hover:text-[#007a78] hover:underline"
+        >
+          Lot {stock.lot?.code_lot || "N/A"}
+        </button>
+      ) : (
+        <h3 className="mt-4 line-clamp-1 text-sm font-black uppercase tracking-tight text-gray-900">
+          Lot N/A
+        </h3>
+      )}
+      <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-indigo-500">
+        {stock.emballage?.name || "Vrac / Aucun"}
+      </p>
+
+      <dl className="mt-4 grid grid-cols-3 gap-3 border-t border-gray-50 pt-4 text-[10px] font-bold uppercase tracking-wide text-gray-500">
+        <div>
+          <dt className="flex items-center gap-1.5 text-[8px] text-gray-400">
+            <Warehouse size={10} aria-hidden />
+            Entrepôt
+          </dt>
+          <dd className="mt-0.5 line-clamp-2 font-black normal-case text-gray-900">
             {stock.entrepot?.nom || stock.entrepot?.name || "Non défini"}
-          </p>
+          </dd>
         </div>
-
-        <div className="space-y-1">
-          <div className="flex items-center gap-2 text-gray-400">
-            <Package size={14} />
-            <span className="text-[10px] font-black uppercase tracking-widest">Emballage</span>
-          </div>
-          <p className="text-[15px] font-[900] text-[#1C2434] leading-tight truncate">
-            {stock.emballage?.name || "Vrac / Aucun"}
-          </p>
-        </div>
-
-        <div className="space-y-1">
-          <div className="flex items-center gap-2 text-gray-400">
-            <CalendarDays size={14} />
-            <span className="text-[10px] font-black uppercase tracking-widest">Date</span>
-          </div>
-          <p className="text-[13px] font-bold text-gray-600">
+        <div>
+          <dt className="flex items-center gap-1.5 text-[8px] text-gray-400">
+            <CalendarDays size={10} aria-hidden />
+            Date
+          </dt>
+          <dd className="mt-0.5 font-black normal-case text-gray-600">
             {formatDate(stock.date_stock)}
-          </p>
+          </dd>
         </div>
-
-        <div className="space-y-1">
-          <div className="flex items-center gap-2 text-gray-400">
-            <User2 size={14} />
-            <span className="text-[10px] font-black uppercase tracking-widest">Auteur</span>
-          </div>
-          <p className="text-[13px] font-bold text-gray-600 truncate">
+        <div>
+          <dt className="flex items-center gap-1.5 text-[8px] text-gray-400">
+            <User2 size={10} aria-hidden />
+            Auteur
+          </dt>
+          <dd className="mt-0.5 line-clamp-1 font-black normal-case text-gray-600">
             {stock.user?.name || "Système"}
-          </p>
+          </dd>
         </div>
-      </div>
+      </dl>
 
-      {/* DÉCORATION ICON SENS (FOND DE CARTE) */}
-      <div className="absolute -right-4 -bottom-4 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity pointer-events-none">
-        {isEntree ? <ArrowDownToLine size={180} /> : <ArrowUpFromLine size={180} />}
+      <div className="mt-4 flex justify-end gap-2 border-t border-gray-50 pt-4 opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100">
+        {mouvementId ? (
+          <Link
+            href={`/mouvements?focus=${mouvementId}`}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-gray-100 bg-white px-3 py-2 text-[10px] font-black uppercase tracking-widest text-gray-500 shadow-sm transition-all hover:border-[#00A09D]/30 hover:text-[#00A09D]"
+          >
+            <History size={14} aria-hidden />
+            Mouvement
+          </Link>
+        ) : null}
+        <button
+          type="button"
+          onClick={() => onView?.(stock)}
+          className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-100 bg-white text-gray-400 shadow-sm transition-all hover:border-[#00A09D]/30 hover:text-[#00A09D]"
+          aria-label="Voir le détail"
+        >
+          <Eye size={14} />
+        </button>
       </div>
-    </div>
+    </article>
   );
 }

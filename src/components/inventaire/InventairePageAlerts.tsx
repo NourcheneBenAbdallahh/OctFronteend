@@ -10,7 +10,7 @@ import type { TableInventaire } from "@/types/inventaire";
 export type InventaireFeedback = AppFeedback;
 
 interface ConfirmDeleteProps {
-  item: TableInventaire | null;
+  items: TableInventaire[];
   open: boolean;
   loading?: boolean;
   onClose: () => void;
@@ -28,15 +28,17 @@ export function InventaireFeedbackBanner({
 }
 
 export function InventaireConfirmDeleteModal({
-  item,
+  items,
   open,
   loading = false,
   onClose,
   onConfirm,
 }: ConfirmDeleteProps) {
-  if (!item) return null;
+  if (!items.length) return null;
 
-  const isRegularise = item.statut === "REGULARISEE";
+  const regulariseCount = items.filter((i) => i.statut === "REGULARISEE").length;
+  const canDelete = regulariseCount === 0;
+  const isBulk = items.length > 1;
 
   return (
     <Modal
@@ -48,22 +50,43 @@ export function InventaireConfirmDeleteModal({
       <div className="text-center">
         <div
           className={`mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl ${
-            isRegularise ? "bg-gray-100 text-gray-400" : "bg-red-50 text-red-600"
+            canDelete ? "bg-red-50 text-red-600" : "bg-gray-100 text-gray-400"
           }`}
         >
           <Trash2 size={28} />
         </div>
         <h3 className="text-xl font-[1000] text-[#1C2434] tracking-tight mb-2">
-          Supprimer cet inventaire ?
+          {isBulk
+            ? `Supprimer ${items.length} ligne(s) d'inventaire ?`
+            : "Supprimer cet inventaire ?"}
         </h3>
-        <p className="text-sm font-medium text-gray-500 mb-1">
-          <span className="font-black text-[#1C2434]">{item.emballage_name}</span>
-          {" — "}
-          {item.entrepot_name}
-        </p>
-        {isRegularise ? (
+        {isBulk ? (
+          <div className="text-left mt-4 max-h-40 overflow-y-auto filter-picker-scroll rounded-2xl border border-gray-100 bg-gray-50/50 p-4 space-y-2">
+            {items.slice(0, 8).map((item) => (
+              <p key={item.id} className="text-sm font-medium text-gray-500">
+                <span className="font-black text-[#1C2434]">{item.emballage_name}</span>
+                {" — "}
+                {item.entrepot_name}
+              </p>
+            ))}
+            {items.length > 8 && (
+              <p className="text-xs font-bold text-gray-400">
+                … et {items.length - 8} autre(s) ligne(s)
+              </p>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm font-medium text-gray-500 mb-1">
+            <span className="font-black text-[#1C2434]">{items[0].emballage_name}</span>
+            {" — "}
+            {items[0].entrepot_name}
+          </p>
+        )}
+        {!canDelete ? (
           <p className="text-sm font-bold text-red-600 mt-4">
-            Cette ligne est régularisée : la suppression n&apos;est pas autorisée.
+            {regulariseCount === 1
+              ? "Une ligne sélectionnée est régularisée : la suppression n'est pas autorisée."
+              : `${regulariseCount} ligne(s) régularisée(s) : la suppression n'est pas autorisée.`}
           </p>
         ) : (
           <p className="text-sm text-gray-400 mt-4">
@@ -82,10 +105,14 @@ export function InventaireConfirmDeleteModal({
           <button
             type="button"
             onClick={onConfirm}
-            disabled={loading || isRegularise}
+            disabled={loading || !canDelete}
             className="h-12 px-8 rounded-full bg-red-600 text-white text-[11px] font-black uppercase tracking-widest hover:bg-red-700 disabled:opacity-40 transition-colors"
           >
-            {loading ? "Suppression…" : "Supprimer"}
+            {loading
+              ? "Suppression…"
+              : isBulk
+                ? `Supprimer ${items.length} ligne(s)`
+                : "Supprimer"}
           </button>
         </div>
       </div>

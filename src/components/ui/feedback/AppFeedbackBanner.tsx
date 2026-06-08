@@ -30,7 +30,7 @@ export function AppFeedbackBanner({
         : "text-blue-600";
 
   return (
-    <div role="alert" className={`flex items-start gap-4 rounded-[24px] border px-6 py-4 ${styles}`}>
+    <div role="alert" className={`mb-6 flex items-start gap-4 rounded-[24px] border px-6 py-4 ${styles}`}>
       <Icon className={`h-6 w-6 shrink-0 ${iconColor}`} />
       <p className="flex-1 text-sm font-bold leading-relaxed">{feedback.message}</p>
       <button

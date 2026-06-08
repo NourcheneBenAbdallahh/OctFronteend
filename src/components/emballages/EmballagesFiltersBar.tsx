@@ -85,22 +85,22 @@ export default function EmballagesFiltersBar({ rows, filters, onChange }: Props)
 
       {showFilters && (
         <div className="rounded-[1.75rem] border border-gray-100 bg-gradient-to-br from-[#F0F4F4]/80 to-white p-3 shadow-sm animate-in fade-in slide-in-from-top-2 duration-200">
-          <div className="relative min-w-0">
+          <div className="relative w-full min-w-0">
             <div
-              className="pointer-events-none absolute inset-y-0 left-0 z-10 w-6 bg-gradient-to-r from-[#F0F4F4] to-transparent"
+              className="pointer-events-none absolute inset-y-0 left-0 z-10 hidden w-6 bg-gradient-to-r from-[#F0F4F4] to-transparent lg:block"
               aria-hidden
             />
             <div
-              className="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-gradient-to-l from-white to-transparent"
+              className="pointer-events-none absolute inset-y-0 right-0 z-10 hidden w-8 bg-gradient-to-l from-white to-transparent lg:block"
               aria-hidden
             />
 
-            <div className="flex items-center gap-2.5 overflow-x-auto overscroll-x-contain px-1 pb-2 filter-bar-scroll">
+            <div className="flex w-full min-w-0 flex-wrap items-center gap-2.5 px-1 pb-2 lg:flex-nowrap lg:overflow-x-auto lg:overscroll-x-contain filter-bar-scroll">
               <span className="shrink-0 rounded-full bg-[#1C2434] px-4 py-2.5 text-[9px] font-black uppercase tracking-[0.2em] text-white shadow-sm">
                 Filtrer le catalogue
               </span>
 
-              <div className="h-8 w-px shrink-0 bg-gray-200/80" aria-hidden />
+              <div className="hidden h-8 w-px shrink-0 bg-gray-200/80 lg:block" aria-hidden />
 
               {(
                 [
@@ -128,7 +128,7 @@ export default function EmballagesFiltersBar({ rows, filters, onChange }: Props)
                 </button>
               ))}
 
-              <div className="h-8 w-px shrink-0 bg-gray-200/80" aria-hidden />
+              <div className="hidden h-8 w-px shrink-0 bg-gray-200/80 lg:block" aria-hidden />
 
               <FilterBarSelect
                 value={filters.type}
@@ -157,7 +157,7 @@ export default function EmballagesFiltersBar({ rows, filters, onChange }: Props)
                 options={units.map((u) => ({ value: u, label: u }))}
               />
 
-              <div className="h-8 w-px shrink-0 bg-gray-200/80" aria-hidden />
+              <div className="hidden h-8 w-px shrink-0 bg-gray-200/80 lg:block" aria-hidden />
 
               <button
                 type="button"

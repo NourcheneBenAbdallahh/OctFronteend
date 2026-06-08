@@ -110,14 +110,15 @@ export function FilterBarSelect({
         aria-label={ariaLabel}
         onWheel={(e) => e.stopPropagation()}
       >
-        <ul className="unite-mesure-picker-scroll min-h-0 flex-1 p-1.5">
+        <ul className="filter-picker-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain p-1.5">
           {allOptions.map((o) => (
             <li key={o.value || "__all__"}>
               <button
                 type="button"
                 role="option"
                 aria-selected={value === o.value}
-                onClick={() => {
+                onMouseDown={(e) => {
+                  e.preventDefault();
                   onChange(o.value);
                   setOpen(false);
                 }}

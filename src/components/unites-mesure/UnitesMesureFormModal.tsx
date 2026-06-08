@@ -6,6 +6,14 @@ import type { UniteMesure } from "@/types/unite-mesure";
 import { createUniteMesure, updateUniteMesure } from "@/lib/unites-mesure.api";
 import { OptionSearchablePicker } from "@/components/ui/OptionSearchablePicker";
 import { Modal } from "@/components/ui/modal";
+import {
+  emptyUniteMesureForm,
+  parseOptionalPositiveFactor,
+  parseSortOrder,
+  validateUniteMesureForm,
+  type UniteMesureFieldErrors,
+  type UniteMesureFormState,
+} from "./uniteMesureForm";
 
 const DIMENSIONS = [
   { id: "masse", label: "Masse" },
@@ -13,6 +21,21 @@ const DIMENSIONS = [
   { id: "nombre", label: "Nombre (pièce, palette…)" },
   { id: "surface", label: "Surface" },
 ];
+
+function formFromEditing(editing: UniteMesure): UniteMesureFormState {
+  return {
+    code: editing.code,
+    label: editing.label,
+    dimension: editing.dimension,
+    facteur_vers_kg: editing.facteur_vers_kg != null ? String(editing.facteur_vers_kg) : "",
+    facteur_vers_l: editing.facteur_vers_l != null ? String(editing.facteur_vers_l) : "",
+    sort_order: String(editing.sort_order ?? 0),
+  };
+}
+
+const inputClass =
+  "w-full rounded-2xl border-2 border-gray-50 bg-gray-50 p-4 text-sm font-semibold text-gray-900 outline-none transition-all focus:border-indigo-500/30 focus:bg-white";
+const inputErrorClass = "border-red-200 bg-red-50/50 focus:border-red-400";
 
 export default function UnitesMesureFormModal({
   editing,
@@ -28,39 +51,37 @@ export default function UnitesMesureFormModal({
   onError?: (message: string) => void;
 }) {
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState(() =>
-    editing
-      ? {
-          code: editing.code,
-          label: editing.label,
-          dimension: editing.dimension,
-          facteur_vers_kg: editing.facteur_vers_kg ?? "",
-          facteur_vers_l: editing.facteur_vers_l ?? "",
-          sort_order: editing.sort_order ?? 0,
-        }
-      : {
-          code: "",
-          label: "",
-          dimension: "masse",
-          facteur_vers_kg: "",
-          facteur_vers_l: "",
-          sort_order: 0,
-        }
+  const [form, setForm] = useState<UniteMesureFormState>(() =>
+    editing ? formFromEditing(editing) : emptyUniteMesureForm()
   );
+  const [fieldErrors, setFieldErrors] = useState<UniteMesureFieldErrors>({});
+
+  const clearError = (key: keyof UniteMesureFormState) => {
+    setFieldErrors((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const showMassFactor = form.dimension === "masse";
+  const showVolumeFactor = form.dimension === "volume";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const errors = validateUniteMesureForm(form, !!editing);
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      onError?.("Corrigez les champs signalés avant d’enregistrer.");
+      return;
+    }
+    setFieldErrors({});
     setLoading(true);
     try {
-      const sortOrder = Number(form.sort_order) || 0;
-      const fKg =
-        form.facteur_vers_kg === "" || form.facteur_vers_kg === null || form.facteur_vers_kg === undefined
-          ? null
-          : Number(form.facteur_vers_kg);
-      const fL =
-        form.facteur_vers_l === "" || form.facteur_vers_l === null || form.facteur_vers_l === undefined
-          ? null
-          : Number(form.facteur_vers_l);
+      const sortOrder = parseSortOrder(form.sort_order);
+      const fKg = parseOptionalPositiveFactor(form.facteur_vers_kg);
+      const fL = parseOptionalPositiveFactor(form.facteur_vers_l);
 
       if (editing) {
         await updateUniteMesure(editing.id, {
@@ -72,7 +93,7 @@ export default function UnitesMesureFormModal({
         });
       } else {
         await createUniteMesure({
-          code: form.code.trim().toUpperCase(),
+          code: form.code.trim(),
           label: form.label.trim(),
           dimension: form.dimension,
           facteur_vers_kg: fKg ?? undefined,
@@ -119,99 +140,179 @@ export default function UnitesMesureFormModal({
         </div>
 
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-          <div className="form-scroll min-h-0 flex-1 space-y-10 px-12 py-6">
-          <div className="grid grid-cols-2 gap-8">
-            <div className="space-y-3">
-              <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Code</label>
+          <div className="form-scroll min-h-0 flex-1 space-y-8 px-12 py-6">
+            <div className="grid grid-cols-2 gap-8">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">
+                  Code
+                </label>
+                <input
+                  required={!editing}
+                  disabled={!!editing}
+                  className={`${inputClass} font-mono tracking-tight disabled:opacity-50 ${fieldErrors.code ? inputErrorClass : ""}`}
+                  placeholder="Ex. Kg, L, m3"
+                  value={form.code}
+                  onChange={(e) => {
+                    setForm({ ...form, code: e.target.value });
+                    clearError("code");
+                  }}
+                />
+                {fieldErrors.code ? (
+                  <p className="text-[10px] font-bold text-red-600 ml-1">{fieldErrors.code}</p>
+                ) : (
+                  <p className="text-[10px] font-medium text-gray-400 ml-1">
+                    Respectez la casse souhaitée (ex. Kg, pas KG).
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">
+                  Ordre d’affichage
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  className={`${inputClass} ${fieldErrors.sort_order ? inputErrorClass : ""}`}
+                  placeholder="0"
+                  value={form.sort_order}
+                  onChange={(e) => {
+                    setForm({ ...form, sort_order: e.target.value.replace(/[^\d]/g, "") });
+                    clearError("sort_order");
+                  }}
+                />
+                {fieldErrors.sort_order ? (
+                  <p className="text-[10px] font-bold text-red-600 ml-1">{fieldErrors.sort_order}</p>
+                ) : (
+                  <p className="text-[10px] font-medium text-gray-400 ml-1">0 = affiché en premier.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">
+                Libellé
+              </label>
               <input
                 required
-                disabled={!!editing}
-                className="w-full rounded-2xl border-2 border-gray-50 bg-gray-50 p-4 text-xs font-black text-gray-900 outline-none focus:border-indigo-500/20 focus:bg-white transition-all disabled:opacity-50"
-                placeholder="Ex: QUINTAL"
-                value={form.code}
-                onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
+                className={`${inputClass} text-base ${fieldErrors.label ? inputErrorClass : ""}`}
+                placeholder="Ex. Kilogramme, Litre, Pièce…"
+                value={form.label}
+                onChange={(e) => {
+                  setForm({ ...form, label: e.target.value });
+                  clearError("label");
+                }}
               />
+              {fieldErrors.label ? (
+                <p className="text-[10px] font-bold text-red-600 ml-1">{fieldErrors.label}</p>
+              ) : (
+                <p className="text-[10px] font-medium text-gray-400 ml-1">
+                  Nom complet affiché dans les listes et sélecteurs.
+                </p>
+              )}
             </div>
+
             <div className="space-y-3">
-              <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Ordre d’affichage</label>
-              <input
-                type="number"
-                className="w-full rounded-2xl border-2 border-gray-50 bg-gray-50 p-4 text-xs font-black text-gray-900 outline-none focus:border-indigo-500/20 focus:bg-white transition-all"
-                value={form.sort_order}
-                onChange={(e) => setForm({ ...form, sort_order: Number(e.target.value) })}
+              <label className="ml-1 text-[10px] font-black uppercase tracking-widest text-gray-400">
+                Dimension
+              </label>
+              <OptionSearchablePicker
+                value={form.dimension}
+                onChange={(dimension) => {
+                  setForm({ ...form, dimension });
+                  setFieldErrors((prev) => {
+                    const next = { ...prev };
+                    delete next.facteur_vers_kg;
+                    delete next.facteur_vers_l;
+                    return next;
+                  });
+                }}
+                options={DIMENSIONS}
+                placeholder="Choisir une dimension…"
+                searchPlaceholder="Rechercher (Masse, Volume…)"
+                noResultsText="Aucune dimension"
               />
             </div>
-          </div>
 
-          <div className="border-b-4 border-gray-50 focus-within:border-indigo-500 pb-4 transition-all">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2 ml-1">
-              Libellé
-            </label>
-            <input
-              required
-              className="w-full text-2xl font-black text-gray-900 placeholder:text-gray-100 bg-transparent outline-none tracking-tight"
-              placeholder="Ex: Quintal métrique"
-              value={form.label}
-              onChange={(e) => setForm({ ...form, label: e.target.value })}
-            />
-          </div>
-
-          <div className="space-y-3">
-            <label className="ml-1 text-[10px] font-black uppercase tracking-widest text-gray-400">
-              Dimension
-            </label>
-            <OptionSearchablePicker
-              value={form.dimension}
-              onChange={(dimension) => setForm({ ...form, dimension })}
-              options={DIMENSIONS}
-              placeholder="Choisir une dimension…"
-              searchPlaceholder="Rechercher (Masse, Volume…)"
-              noResultsText="Aucune dimension"
-            />
-          </div>
-
-          <div className="bg-gray-50/80 p-10 rounded-[2.5rem] space-y-8 border border-gray-100">
-            <div className="flex items-center gap-3 text-indigo-600">
-              <Settings2 size={18} />
-              <span className="text-[10px] font-black uppercase tracking-[0.2em]">Conversion (optionnel)</span>
-            </div>
-            <p className="text-[11px] font-medium text-gray-500 leading-relaxed">
-              Multiplicateur pour convertir une quantité dans cette unité vers des kilogrammes ou des litres (référence
-              interne, ex. 1 T → 1000 kg).
-            </p>
-            <div className="grid grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Facteur → kg</label>
-                <input
-                  type="number"
-                  step="any"
-                  className="w-full bg-transparent border-b-2 border-gray-200 py-2 text-xl font-black outline-none focus:border-indigo-500 transition-all"
-                  value={form.facteur_vers_kg === null || form.facteur_vers_kg === undefined ? "" : form.facteur_vers_kg}
-                  onChange={(e) => setForm({ ...form, facteur_vers_kg: e.target.value })}
-                />
+            {(showMassFactor || showVolumeFactor) && (
+              <div className="bg-gray-50/80 p-10 rounded-[2.5rem] space-y-8 border border-gray-100">
+                <div className="flex items-center gap-3 text-indigo-600">
+                  <Settings2 size={18} />
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em]">Conversion</span>
+                </div>
+                <p className="text-[11px] font-medium text-gray-500 leading-relaxed">
+                  {showMassFactor
+                    ? "Quantité dans cette unité × facteur = équivalent en kilogrammes (ex. 1 T → facteur 1000)."
+                    : "Quantité dans cette unité × facteur = équivalent en litres (ex. 1 m³ → facteur 1000)."}
+                </p>
+                <div className="grid grid-cols-1 gap-6">
+                  {showMassFactor && (
+                    <div className="space-y-2">
+                      <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest">
+                        Facteur → kg
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        className={`w-full bg-transparent border-b-2 py-2 text-xl font-black outline-none transition-all ${
+                          fieldErrors.facteur_vers_kg
+                            ? "border-red-400 text-red-900"
+                            : "border-gray-200 focus:border-indigo-500"
+                        }`}
+                        placeholder="1"
+                        value={form.facteur_vers_kg}
+                        onChange={(e) => {
+                          setForm({ ...form, facteur_vers_kg: e.target.value });
+                          clearError("facteur_vers_kg");
+                        }}
+                      />
+                      {fieldErrors.facteur_vers_kg ? (
+                        <p className="text-[10px] font-bold text-red-600">{fieldErrors.facteur_vers_kg}</p>
+                      ) : null}
+                    </div>
+                  )}
+                  {showVolumeFactor && (
+                    <div className="space-y-2">
+                      <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest">
+                        Facteur → L
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        className={`w-full bg-transparent border-b-2 py-2 text-xl font-black outline-none transition-all ${
+                          fieldErrors.facteur_vers_l
+                            ? "border-red-400 text-red-900"
+                            : "border-gray-200 focus:border-indigo-500"
+                        }`}
+                        placeholder="1"
+                        value={form.facteur_vers_l}
+                        onChange={(e) => {
+                          setForm({ ...form, facteur_vers_l: e.target.value });
+                          clearError("facteur_vers_l");
+                        }}
+                      />
+                      {fieldErrors.facteur_vers_l ? (
+                        <p className="text-[10px] font-bold text-red-600">{fieldErrors.facteur_vers_l}</p>
+                      ) : null}
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="space-y-2">
-                <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Facteur → L</label>
-                <input
-                  type="number"
-                  step="any"
-                  className="w-full bg-transparent border-b-2 border-gray-200 py-2 text-xl font-black outline-none focus:border-indigo-500 transition-all"
-                  value={form.facteur_vers_l === null || form.facteur_vers_l === undefined ? "" : form.facteur_vers_l}
-                  onChange={(e) => setForm({ ...form, facteur_vers_l: e.target.value })}
-                />
-              </div>
-            </div>
-          </div>
+            )}
           </div>
 
           <div className="p-12 border-t border-gray-50 bg-white flex items-center gap-6 shrink-0">
-            <button type="button" onClick={onClose} className="text-[11px] font-black text-gray-300 uppercase tracking-widest hover:text-gray-900">
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-[11px] font-black text-gray-300 uppercase tracking-widest hover:text-gray-900"
+            >
               Annuler
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 bg-gray-900 hover:bg-indigo-600 text-white py-6 rounded-2xl font-black text-[12px] uppercase tracking-[0.25em] shadow-2xl transition-all flex justify-center items-center gap-2"
+              className="flex-1 bg-gray-900 hover:bg-indigo-600 text-white py-6 rounded-2xl font-black text-[12px] uppercase tracking-[0.25em] shadow-2xl transition-all flex justify-center items-center gap-2 disabled:opacity-60"
             >
               {loading ? "Enregistrement…" : (
                 <>

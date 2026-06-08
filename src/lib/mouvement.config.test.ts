@@ -25,4 +25,10 @@ describe("mouvement.config", () => {
     expect(needsDestination("PTE")).toBe(false);
     expect(needsLot("PTE")).toBe(true);
   });
+
+  it("EMC nécessite source et lot, pas de destination séparée", () => {
+    expect(needsSource("EMC")).toBe(true);
+    expect(needsDestination("EMC")).toBe(false);
+    expect(needsLot("EMC")).toBe(true);
+  });
 });

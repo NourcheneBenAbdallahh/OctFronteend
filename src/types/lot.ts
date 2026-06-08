@@ -11,6 +11,13 @@ export interface LotEmballage {
   code?: string | null;
 }
 
+export interface LotEntrepot {
+  id: string | number;
+  nom?: string | null;
+  name?: string | null;
+  adresse?: string | null;
+}
+
 export interface Lot {
   id: string | number;
   code_lot: string;
@@ -21,6 +28,7 @@ export interface Lot {
   user_id?: string | number | null;
   emballage?: LotEmballage | null;
   user?: LotUser | null;
+  entrepot?: LotEntrepot | null;
   created_at?: string | null;
   updated_at?: string | null;
 }

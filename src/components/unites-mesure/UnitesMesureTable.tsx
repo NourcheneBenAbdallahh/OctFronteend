@@ -10,6 +10,7 @@ import { getActionErrorMessage, useAppFeedback } from "@/hooks/useAppFeedback";
 import { UnitesMesureHeader } from "./UnitesMesureHeader";
 import { UnitesMesureListView } from "./UnitesMesureListView";
 import UnitesMesureFormModal from "./UnitesMesureFormModal";
+import { EMPTY_UNITES_FILTERS, type UnitesMesureFiltersState } from "./unitesMesureFilters";
 import { useTableSort } from "@/hooks/useTableSort";
 import type { SortColumn } from "@/lib/tableSort";
 
@@ -33,7 +34,7 @@ export default function UnitesMesureTable({ data, onRefresh }: Props) {
   const [rows, setRows] = useState<UniteMesure[]>(data);
   const [isOpen, setIsOpen] = useState(false);
   const [editing, setEditing] = useState<UniteMesure | null>(null);
-  const [query, setQuery] = useState("");
+  const [filters, setFilters] = useState<UnitesMesureFiltersState>(EMPTY_UNITES_FILTERS);
   const [page, setPage] = useState(1);
   const {
     feedback,
@@ -54,18 +55,22 @@ export default function UnitesMesureTable({ data, onRefresh }: Props) {
 
   useEffect(() => {
     setPage(1);
-  }, [query, sortKey, sortDirection]);
+  }, [filters, sortKey, sortDirection]);
 
   const filteredRows = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter(
-      (r) =>
+    const q = filters.search.trim().toLowerCase();
+    return rows.filter((r) => {
+      if (filters.dimension && r.dimension.toLowerCase() !== filters.dimension) {
+        return false;
+      }
+      if (!q) return true;
+      return (
         r.code.toLowerCase().includes(q) ||
         r.label.toLowerCase().includes(q) ||
         r.dimension.toLowerCase().includes(q)
-    );
-  }, [rows, query]);
+      );
+    });
+  }, [rows, filters]);
 
   const sortedRows = useMemo(() => sortRows(filteredRows), [filteredRows, sortRows]);
 
@@ -97,9 +102,10 @@ export default function UnitesMesureTable({ data, onRefresh }: Props) {
   return (
     <div className="flex flex-col min-h-[600px]">
       <UnitesMesureHeader
-        query={query}
-        setQuery={setQuery}
+        filters={filters}
+        onFiltersChange={setFilters}
         total={rows.length}
+        filteredCount={filteredRows.length}
         onOpenNew={() => {
           setEditing(null);
           setIsOpen(true);
@@ -130,7 +136,9 @@ export default function UnitesMesureTable({ data, onRefresh }: Props) {
             </div>
             <h3 className="text-lg font-black text-gray-900 tracking-tight">Aucune unité</h3>
             <p className="text-sm text-gray-400 font-medium">
-              {query ? "Modifiez votre recherche ou ajoutez une unité." : "Ajoutez une première unité de mesure."}
+              {filters.search || filters.dimension
+                ? "Modifiez les filtres ou ajoutez une unité."
+                : "Ajoutez une première unité de mesure."}
             </p>
           </div>
         )}

@@ -2,6 +2,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { InventaireFilters, TableInventaire } from "@/types/inventaire";
 import { buildInventaireFiltersLabel } from "@/lib/inventaire.filters";
+import { drawOctPdfHeader } from "@/lib/octPdfHeader";
 
 const SEP = ";";
 
@@ -88,27 +89,35 @@ export function exportInventaireCsv(
   URL.revokeObjectURL(url);
 }
 
-export function exportInventairePdf(
+export async function exportInventairePdf(
   rows: TableInventaire[],
   filters: InventaireFilters
-): void {
+): Promise<void> {
   if (!rows.length || typeof window === "undefined") return;
 
   const doc = new jsPDF({ orientation: "landscape" });
   const periodLabel = buildInventaireFiltersLabel(filters);
 
-  doc.setFontSize(10);
-  doc.text("Inventaire stock — Comparaison systeme / reel", 14, 14);
+  let y = await drawOctPdfHeader(
+    doc,
+    "Inventaire stock — Comparaison système / réel",
+    12
+  );
+
   doc.setFontSize(9);
-  doc.text(`Export: ${new Date().toLocaleString("fr-FR")}`, 14, 21);
-  doc.text(`Filtres: ${periodLabel}`, 14, 27);
-  doc.text(`Lignes: ${rows.length}`, 14, 33);
+  doc.setTextColor(60, 60, 60);
+  doc.text(`Export : ${new Date().toLocaleString("fr-FR")}`, 14, y);
+  y += 5;
+  doc.text(`Filtres : ${periodLabel}`, 14, y);
+  y += 5;
+  doc.text(`Lignes : ${rows.length}`, 14, y);
+  y += 8;
 
   const conformes = rows.filter((r) => Math.abs(r.ecart) < 0.0001).length;
   const nonReg = rows.filter((r) => r.statut !== "REGULARISEE").length;
 
   autoTable(doc, {
-    startY: 38,
+    startY: y,
     head: [["Indicateur", "Valeur"]],
     body: [
       ["Lignes exportees", String(rows.length)],

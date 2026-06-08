@@ -45,9 +45,17 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const tunnelGraphqlEndpoint =
+    process.env.OCT_PUBLIC_GRAPHQL_ENDPOINT?.trim() ||
+    process.env.TUNNEL_BACKEND_GRAPHQL?.trim() ||
+    "";
+
   return (
     <html lang="fr" suppressHydrationWarning>
       <head>
+        {tunnelGraphqlEndpoint ? (
+          <meta name="oct-graphql-endpoint" content={tunnelGraphqlEndpoint} />
+        ) : null}
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body

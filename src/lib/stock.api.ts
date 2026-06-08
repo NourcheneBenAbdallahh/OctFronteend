@@ -39,6 +39,7 @@ export async function getStocks(
  quantite
           sens
           user_id
+          mouvement_stock_id
           created_at
           updated_at
           entrepot {
@@ -62,6 +63,10 @@ export async function getStocks(
             id
             name
             email
+          }
+          mouvementStock {
+            id
+            code_mouvement
           }
         }
         paginatorInfo {
@@ -94,6 +99,7 @@ const STOCKS_PAGE_QUERY = `
         quantite
         sens
         user_id
+        mouvement_stock_id
         created_at
         updated_at
         entrepot {
@@ -116,6 +122,10 @@ const STOCKS_PAGE_QUERY = `
           id
           name
           email
+        }
+        mouvementStock {
+          id
+          code_mouvement
         }
       }
       paginatorInfo {

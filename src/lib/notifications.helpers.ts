@@ -1,47 +1,136 @@
 import type { Alert } from "@/lib/notifications.api";
 
 const ENTITY_FOCUS_ROUTES: Record<string, string> = {
-  contrat: "/contrats",
   commande: "/commandes",
+  contrat: "/contrats",
   entrepot: "/entrepots",
   stock: "/stock",
   stock_inventaire: "/stock-inventaire",
+  mouvement: "/mouvements",
+  mouvement_stock: "/mouvements",
+  user: "/users",
+};
+
+const LEGACY_PATH_ROUTES: Record<string, string> = {
+  stocks: "/stock",
+  stock: "/stock",
+  commandes: "/commandes",
+  contrats: "/contrats",
+  entrepots: "/entrepots",
+  "stock-inventaire": "/stock-inventaire",
+  "bon-livraisons": "/bon-livraisons",
+  factures: "/factures",
+  mouvements: "/mouvements",
+  users: "/users",
+};
+
+const ALERT_TYPE_ROUTES: Partial<Record<string, string>> = {
+  COMMAND_DELAY: "/commandes",
+  SUPPLIER_DELAY: "/commandes",
+  CONTRACT_EXHAUSTED: "/contrats",
+  CONTRACT_EXPIRED: "/contrats",
+  CONTRACT_EXPIRING: "/contrats",
+  WAREHOUSE_CAPACITY_HIGH: "/entrepots",
+  WAREHOUSE_CAPACITY_CRITICAL: "/entrepots",
+  LOW_STOCK: "/stock",
+  INVENTORY_ANOMALY: "/stock-inventaire",
+  NEW_USER_PENDING: "/users",
 };
 
 function buildFocusUrl(basePath: string, entityId: string | number): string {
   return `${basePath}?focus=${encodeURIComponent(String(entityId))}`;
 }
 
+function resolveLegacyPath(pathKey: string): string {
+  return LEGACY_PATH_ROUTES[pathKey] ?? `/${pathKey}`;
+}
+
+function resolveEntityRoute(
+  entityType?: string | null,
+  entityId?: string | number | null
+): string | null {
+  const normalizedType = (entityType || "").trim().toLowerCase();
+  if (!normalizedType || entityId == null || entityId === "") return null;
+
+  const basePath = ENTITY_FOCUS_ROUTES[normalizedType];
+  if (!basePath) return null;
+
+  return buildFocusUrl(basePath, entityId);
+}
+
+function resolveTypeRoute(
+  alertType?: string | null,
+  entityId?: string | number | null
+): string | null {
+  const normalizedType = (alertType || "").trim().toUpperCase();
+  if (!normalizedType) return null;
+
+  const basePath = ALERT_TYPE_ROUTES[normalizedType];
+  if (!basePath) return null;
+
+  if (entityId != null && entityId !== "") {
+    return buildFocusUrl(basePath, entityId);
+  }
+
+  return basePath;
+}
+
 export function getSafeAlertUrl(alert: Alert): string | null {
   const rawUrl = (alert.action_url || "").trim();
+  const entityId = alert.entity_id;
 
-  if (!rawUrl) {
-    const entityType = (alert.entity_type || "").trim().toLowerCase();
-    const entityId = alert.entity_id;
-    if (entityType && entityId != null && entityId !== "") {
-      const basePath = ENTITY_FOCUS_ROUTES[entityType];
-      if (basePath) return buildFocusUrl(basePath, entityId);
+  if (rawUrl) {
+    if (rawUrl.includes("focus=")) {
+      return rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`;
     }
-    return null;
-  }
 
-  if (rawUrl.startsWith("/admin/(others-pages)/")) {
-    const legacy = rawUrl.replace("/admin/(others-pages)/", "/");
-    const [legacyPath, maybeId] = legacy.split("/").filter(Boolean);
+    if (rawUrl.startsWith("/admin/(others-pages)/")) {
+      const legacy = rawUrl.replace("/admin/(others-pages)/", "");
+      const [pathKey, maybeId] = legacy.split("/").filter(Boolean);
 
-    if (!legacyPath) return "/notifications";
-    if (maybeId && /^\d+$/.test(maybeId)) {
-      return buildFocusUrl(`/${legacyPath}`, maybeId);
+      if (!pathKey) return "/notifications";
+
+      const basePath = resolveLegacyPath(pathKey);
+      if (maybeId && /^\d+$/.test(maybeId)) {
+        return buildFocusUrl(basePath, maybeId);
+      }
+      if (entityId != null && entityId !== "") {
+        return buildFocusUrl(basePath, entityId);
+      }
+      return basePath;
     }
-    return `/${legacyPath}`;
+
+    const pathWithId = rawUrl.match(/^(\/[^?#]+)\/(\d+)$/);
+    if (pathWithId) {
+      return buildFocusUrl(pathWithId[1], pathWithId[2]);
+    }
+
+    if (entityId != null && entityId !== "" && !rawUrl.includes("?")) {
+      const fromEntity = resolveEntityRoute(alert.entity_type, entityId);
+      if (fromEntity) return fromEntity;
+    }
+
+    return rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`;
   }
 
-  const pathWithId = rawUrl.match(/^(\/[^?#]+)\/(\d+)$/);
-  if (pathWithId) {
-    return buildFocusUrl(pathWithId[1], pathWithId[2]);
-  }
+  const fromEntity = resolveEntityRoute(alert.entity_type, entityId);
+  if (fromEntity) return fromEntity;
 
-  return rawUrl;
+  return resolveTypeRoute(alert.type, entityId);
+}
+
+export function hasAlertTarget(alert: Alert): boolean {
+  return getSafeAlertUrl(alert) != null;
+}
+
+export function navigateToAlert(
+  alert: Alert,
+  router: { push: (url: string) => void }
+): boolean {
+  const targetUrl = getSafeAlertUrl(alert);
+  if (!targetUrl) return false;
+  router.push(targetUrl);
+  return true;
 }
 
 export function formatAlertType(type: Alert["type"]): string {
@@ -88,7 +177,7 @@ export function formatRelativeTime(dateString?: string | null): string {
 
 export function getAlertCtaLabel(alert: Alert): string {
   if (alert.type === "NEW_USER_PENDING") return "Activer";
-  if (alert.action_url) return "Voir";
+  if (hasAlertTarget(alert)) return "Voir";
   return "Ouvrir";
 }
 

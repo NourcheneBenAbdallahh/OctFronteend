@@ -6,15 +6,13 @@ import StockCard from "./StockCard";
 interface Props {
   rows: Stock[];
   onView?: (stock: Stock) => void;
-  onEdit?: (stock: Stock) => void;
-  onDelete?: (stock: Stock) => void;
+  onViewLot?: (stock: Stock) => void;
 }
 
 export default function StocksCardsView({
   rows,
   onView,
-  onEdit,
-  onDelete,
+  onViewLot,
 }: Props) {
   if (!rows.length) {
     return (
@@ -25,13 +23,13 @@ export default function StocksCardsView({
   }
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {rows.map((stock) => (
         <StockCard
           key={stock.id}
           stock={stock}
           onView={onView}
-          onEdit={onEdit}
+          onViewLot={onViewLot}
         />
       ))}
     </div>

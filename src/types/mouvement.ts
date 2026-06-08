@@ -38,6 +38,7 @@ export type MouvementStock = {
   entrepot_source_id?: string | null;
   entrepot_destination_id?: string | null;
   quantite: number;
+  motif?: string | null;
   date_mouvement?: string | null;
   statut: MouvementStatut;
 
@@ -55,6 +56,7 @@ export type MouvementFormState = {
   sourceId: string;
   destId: string;
   quantite: number | "";
+  motif: string;
   dateMouvement: string;
 };
 
@@ -74,4 +76,13 @@ export type PaginationInfo = {
   total: number;
   perPage: number;
   hasMorePages: boolean;
+};
+
+export type MouvementFiltersState = {
+  search: string;
+  type: string;
+  statut: string;
+  sort: "recent" | "oldest";
+  dateFrom: string;
+  dateTo: string;
 };

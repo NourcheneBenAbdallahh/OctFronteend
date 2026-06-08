@@ -1,14 +1,23 @@
 import React from "react";
-import { Search, Filter, Plus, Ruler, ChevronRight } from "lucide-react";
+import { Plus, Ruler, ChevronRight } from "lucide-react";
+import UnitesMesureFiltersBar from "./UnitesMesureFiltersBar";
+import type { UnitesMesureFiltersState } from "./unitesMesureFilters";
 
 interface Props {
-  query: string;
-  setQuery: (q: string) => void;
+  filters: UnitesMesureFiltersState;
+  onFiltersChange: (filters: UnitesMesureFiltersState) => void;
   onOpenNew: () => void;
   total: number;
+  filteredCount?: number;
 }
 
-export const UnitesMesureHeader = ({ query, setQuery, onOpenNew, total }: Props) => (
+export const UnitesMesureHeader = ({
+  filters,
+  onFiltersChange,
+  onOpenNew,
+  total,
+  filteredCount,
+}: Props) => (
   <div className="space-y-8 mb-8">
     <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
       <div>
@@ -25,29 +34,29 @@ export const UnitesMesureHeader = ({ query, setQuery, onOpenNew, total }: Props)
           <Ruler size={18} />
         </div>
         <div>
-          <span className="block text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Référentiel</span>
-          <span className="text-xl font-black text-gray-900 leading-none">{total} unités</span>
+          <span className="block text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">
+            Référentiel
+          </span>
+          <span className="text-xl font-black text-gray-900 leading-none">
+            {filteredCount != null && filteredCount !== total ? `${filteredCount} / ${total}` : total} unités
+          </span>
         </div>
       </div>
     </div>
 
-    <div className="flex items-center gap-4">
-      <div className="flex-1 flex items-center bg-white border border-gray-100 shadow-sm rounded-2xl px-4 py-3 focus-within:ring-2 ring-indigo-500/10 transition-all">
-        <Search size={18} className="text-gray-300 mr-3" />
-        <input
-          className="flex-1 outline-none text-sm font-medium placeholder:text-gray-300"
-          placeholder="Rechercher par code, libellé ou dimension…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        <Filter size={18} className="text-gray-400 ml-3 cursor-pointer hover:text-indigo-600" />
+    <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+      <div className="min-w-0 flex-1">
+        <UnitesMesureFiltersBar filters={filters} onChange={onFiltersChange} />
       </div>
       <button
         type="button"
         onClick={onOpenNew}
-        className="bg-white text-gray-900 border-2 border-gray-900 px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all shadow-[8px_8px_0px_rgba(0,160,157,0.2)]"
+        className="shrink-0 bg-white text-gray-900 border-2 border-gray-900 px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all shadow-[8px_8px_0px_rgba(0,160,157,0.2)] lg:self-center"
       >
-        Ajouter
+        <span className="inline-flex items-center gap-2">
+          <Plus size={16} />
+          Ajouter
+        </span>
       </button>
     </div>
   </div>

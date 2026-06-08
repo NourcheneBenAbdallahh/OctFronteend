@@ -99,6 +99,23 @@ describe("getGraphqlEndpoint", () => {
       "https://api-tunnel.trycloudflare.com/graphql"
     );
   });
+
+  it("utilise la meta runtime si le build a encore localhost sur trycloudflare", () => {
+    process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT = "http://localhost:8000/graphql";
+    document.head.innerHTML =
+      '<meta name="oct-graphql-endpoint" content="https://back-tunnel.trycloudflare.com/graphql" />';
+    Object.defineProperty(window, "location", {
+      value: {
+        hostname: "front-tunnel.trycloudflare.com",
+        protocol: "https:",
+        port: "",
+      },
+      configurable: true,
+    });
+    expect(getGraphqlEndpoint()).toBe(
+      "https://back-tunnel.trycloudflare.com/graphql"
+    );
+  });
 });
 
 describe("shouldUseExplicitBrowserGraphqlEndpoint", () => {

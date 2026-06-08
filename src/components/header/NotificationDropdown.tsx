@@ -7,7 +7,12 @@ import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
 import { useLiveAlertsContext } from "@/context/LiveAlertsContext";
 import type { Alert, AlertSeverity } from "@/lib/notifications.api";
-import { formatAlertType, getSafeAlertUrl } from "@/lib/notifications.helpers";
+import {
+  formatAlertType,
+  getSafeAlertUrl,
+  hasAlertTarget,
+  navigateToAlert,
+} from "@/lib/notifications.helpers";
 
 export default function NotificationDropdown() {
   const router = useRouter();
@@ -156,20 +161,25 @@ export default function NotificationDropdown() {
               <span>Aucune notification</span>
             </li>
           ) : (
-            alerts.slice(0, 10).map((alert) => (
+            alerts.slice(0, 10).map((alert) => {
+              const targetUrl = getSafeAlertUrl(alert);
+              const openAlert = () => {
+                if (alert.status === "unread") {
+                  void markAsRead(alert.id);
+                }
+                navigateToAlert(alert, router);
+                closeDropdown();
+              };
+
+              return (
               <li key={alert.id}>
                 <DropdownItem
-                  onItemClick={() => {
-                    if (alert.status === "unread") {
-                      void markAsRead(alert.id);
-                    }
-                    const targetUrl = getSafeAlertUrl(alert);
-                    if (targetUrl) router.push(targetUrl);
-                    closeDropdown();
-                  }}
+                  tag={targetUrl ? "a" : "button"}
+                  href={targetUrl ?? undefined}
+                  onItemClick={openAlert}
                   className={`flex gap-3 rounded-lg border-b border-gray-100 p-3 px-4.5 py-3 hover:bg-gray-100 dark:border-gray-800 dark:hover:bg-white/5 ${
                     alert.status === "unread" ? "bg-blue-50 dark:bg-blue-900/20" : ""
-                  }`}
+                  } ${hasAlertTarget(alert) ? "cursor-pointer" : ""}`}
                 >
                   <span className="relative block w-full h-10 rounded-full z-1 max-w-10">
                     <div
@@ -210,7 +220,8 @@ export default function NotificationDropdown() {
                   )}
                 </DropdownItem>
               </li>
-            ))
+            );
+            })
           )}
         </ul>
         <Link

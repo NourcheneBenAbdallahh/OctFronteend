@@ -26,6 +26,11 @@ export interface StockUser {
 
 export type StockSens = "entree" | "sortie";
 
+export interface StockMouvementRef {
+  id: string | number;
+  code_mouvement?: string | null;
+}
+
 export interface Stock {
   id: string | number;
   entrepot_id: string | number;
@@ -37,6 +42,7 @@ export interface Stock {
   sens: StockSens;
   //quantite_finale: number;
   user_id?: string | number | null;
+  mouvement_stock_id?: string | number | null;
   created_at?: string | null;
   updated_at?: string | null;
 
@@ -44,6 +50,7 @@ export interface Stock {
   emballage?: StockEmballage | null;
   lot?: StockLot | null;
   user?: StockUser | null;
+  mouvementStock?: StockMouvementRef | null;
 }
 
 export interface StockFiltersState {

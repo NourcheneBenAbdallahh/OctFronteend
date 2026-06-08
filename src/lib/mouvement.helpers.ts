@@ -9,6 +9,12 @@ import {
 } from "@/types/mouvement";
 import { MOUVEMENT_TYPES, needsDestination, needsLot, needsSource } from "./mouvement.config";
 
+export function getMouvementTypeLabel(type: MouvementType | string | null | undefined) {
+  if (!type) return "";
+  const meta = MOUVEMENT_TYPES[type as MouvementType];
+  return meta?.label ?? String(type);
+}
+
 export function formatDate(date?: string | null) {
   if (!date) return "-";
   return new Date(date.replace(" ", "T")).toLocaleString();
@@ -89,6 +95,7 @@ export function emptyForm(): MouvementFormState {
     sourceId: "",
     destId: "",
     quantite: "",
+    motif: "",
     dateMouvement: currentDateTimeLocal(),
   };
 }
@@ -144,8 +151,17 @@ export function validateForm(form: MouvementFormState) {
     return "Le lot est requis pour ce type de mouvement.";
   }
 
-  if (form.type === "CDD" && form.sourceId && form.destId && form.sourceId === form.destId) {
+  if (
+    form.type === "CDD" &&
+    form.sourceId &&
+    form.destId &&
+    form.sourceId === form.destId
+  ) {
     return "La source et la destination doivent être différentes.";
+  }
+
+  if (form.type === "PTE" && !form.motif.trim()) {
+    return "Le motif de la perte est obligatoire (ex. casse, péremption, vol…).";
   }
 
   return null;
@@ -181,7 +197,7 @@ export function buildSummary(
   const meta = MOUVEMENT_TYPES[form.type];
   const emballage = emballages.find((e) => e.id === form.emballageId);
   const source = entrepots.find((e) => e.id === form.sourceId);
-  const dest = entrepots.find((e) => e.id === form.destId);
+  const dest = entrepots.find((e) => e.id === (form.type === "EMC" ? form.sourceId : form.destId));
 const lot = lots.find((l) => l.lot_id === form.lotId);
   return {
     typeLabel: meta.label,
@@ -191,5 +207,6 @@ const lot = lots.find((l) => l.lot_id === form.lotId);
     destLabel: dest?.adresse ?? "-",
 lotLabel: lot?.code_lot ?? (form.type === "SPL" ? "Nouveau lot si vide" : "-"), 
    quantiteLabel: form.quantite === "" ? "-" : formatQuantity(Number(form.quantite)),
+   motifLabel: form.type === "PTE" ? (form.motif.trim() || "-") : undefined,
   };
 }

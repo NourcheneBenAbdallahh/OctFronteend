@@ -62,12 +62,12 @@ export const MOUVEMENT_TYPES: Record<
   
   EMC: {
     label: "Échange / Modif",
-    description: "Changement d'état ou échange de lot",
+    description: "Échange ou modification d'un lot dans le même entrepôt",
     badgeClass: "bg-violet-100 text-violet-700 border border-violet-200",
     cardClass: "border-violet-200 bg-violet-50/70",
     icon: "⇄",
     needsSource: true,
-    needsDestination: true,
+    needsDestination: false,
     needsLot: true,
     allowOptionalLot: false,
   },

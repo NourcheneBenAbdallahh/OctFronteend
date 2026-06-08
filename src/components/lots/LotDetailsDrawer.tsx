@@ -1,6 +1,6 @@
 "use client";
 
-import { X, Package, CalendarDays, User2, MessageSquareText, Hash, Info, History } from "lucide-react";
+import { X, Package, CalendarDays, User2, MessageSquareText, Hash, Info, History, Warehouse } from "lucide-react";
 import type { Lot } from "@/types/lot";
 
 interface Props {
@@ -25,20 +25,30 @@ function getEmballageLabel(lot: Lot | null) {
   return lot.emballage?.name || lot.emballage?.code || `Emballage #${lot.emballage_id}`;
 }
 
+function getEntrepotLabel(lot: Lot | null) {
+  if (!lot) return "-";
+  return lot.entrepot?.nom || lot.entrepot?.name || "Non défini";
+}
+
 export default function LotDetailsDrawer({ lot, open, onClose }: Props) {
   if (!open || !lot) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex justify-end">
-      {/* Overlay avec flou pour le focus */}
-      <div
-        className="absolute inset-0 bg-[#1C2434]/20 backdrop-blur-sm transition-opacity"
+    <div className="fixed inset-0 z-[100] overflow-hidden">
+      <button
+        type="button"
+        className="absolute inset-0 cursor-default border-0 bg-[#1C2434]/20 backdrop-blur-sm transition-opacity"
+        aria-label="Fermer la fiche lot"
         onClick={onClose}
       />
 
-      <div className="relative h-full w-full max-w-xl bg-white shadow-[-20px_0_80px_rgba(0,0,0,0.1)] flex flex-col animate-in slide-in-from-right duration-500">
-        
-        <div className="px-8 py-8 border-b border-gray-50">
+      <aside
+        className="absolute right-0 top-0 flex h-full max-h-[100dvh] min-h-0 w-full max-w-xl flex-col overflow-hidden bg-white shadow-[-20px_0_80px_rgba(0,0,0,0.1)] animate-in slide-in-from-right duration-500"
+        aria-modal="true"
+        role="dialog"
+        aria-labelledby="lot-detail-title"
+      >
+        <div className="shrink-0 px-8 py-8 border-b border-gray-50">
           <div className="flex items-start justify-between">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
@@ -47,7 +57,10 @@ export default function LotDetailsDrawer({ lot, open, onClose }: Props) {
                 </span>
                
               </div>
-              <h2 className="text-4xl font-[1000] text-[#1C2434] uppercase tracking-tighter mt-2">
+              <h2
+                id="lot-detail-title"
+                className="text-4xl font-[1000] text-[#1C2434] uppercase tracking-tighter mt-2"
+              >
                 {lot.code_lot}
               </h2>
             </div>
@@ -61,7 +74,7 @@ export default function LotDetailsDrawer({ lot, open, onClose }: Props) {
           </div>
         </div>
 
-        <div className="form-scroll flex-1 space-y-10 px-8 py-8">
+        <div className="form-scroll no-scrollbar min-h-0 flex-1 space-y-10 overflow-y-auto overscroll-contain px-8 py-8">
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="p-6 rounded-[32px] bg-[#F2F7F7] border border-[#DDF2F1]">
@@ -106,6 +119,18 @@ export default function LotDetailsDrawer({ lot, open, onClose }: Props) {
               <div className="flex items-center justify-between p-5 bg-white border border-gray-100 rounded-2xl group hover:border-[#DDF2F1] transition-colors">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 group-hover:text-[#00A09D] transition-colors">
+                    <Warehouse size={18} />
+                  </div>
+                  <span className="text-[13px] font-bold text-gray-500 uppercase tracking-wider">Entrepôt</span>
+                </div>
+                <span className="text-[14px] font-[900] text-[#1C2434] uppercase text-right break-words max-w-[55%]">
+                  {getEntrepotLabel(lot)}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between p-5 bg-white border border-gray-100 rounded-2xl group hover:border-[#DDF2F1] transition-colors">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 group-hover:text-[#00A09D] transition-colors">
                     <User2 size={18} />
                   </div>
                   <span className="text-[13px] font-bold text-gray-500 uppercase tracking-wider">Opérateur</span>
@@ -143,15 +168,16 @@ export default function LotDetailsDrawer({ lot, open, onClose }: Props) {
           </div>
         </div>
 
-        <div className="px-8 py-6 border-t border-gray-50 bg-[#F8FAFA] flex justify-end">
+        <div className="shrink-0 px-8 py-6 border-t border-gray-50 bg-[#F8FAFA] flex justify-end">
           <button
+            type="button"
             onClick={onClose}
             className="px-8 py-4 bg-[#1C2434] text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-[#00A09D] transition-all shadow-lg shadow-gray-200"
           >
             Fermer l&apos;inspecteur
           </button>
         </div>
-      </div>
+      </aside>
     </div>
   );
 }

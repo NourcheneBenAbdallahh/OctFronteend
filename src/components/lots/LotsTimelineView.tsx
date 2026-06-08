@@ -15,8 +15,6 @@ interface Props {
   onPageChange?: (page: number) => void;
   
   onView?: (lot: Lot) => void;
-  onEdit?: (lot: Lot) => void;
-  onDelete?: (lot: Lot) => void;
 }
 
 export default function LotsTimelineView({
@@ -24,8 +22,6 @@ export default function LotsTimelineView({
   pagination,    // On les récupère ici
   onPageChange,  // Et ici
   onView,
-  onEdit,
-  onDelete,
 }: Props) {
   if (!groups.length) {
     return (
@@ -43,14 +39,21 @@ export default function LotsTimelineView({
 
   return (
     <div className="relative px-8 pb-20">
-      {/* LA LIGNE DE TEMPS */}
-      <div className="absolute left-[58px] top-0 bottom-0 w-[3px] bg-gradient-to-b from-[#00A09D] via-[#DDF2F1] to-transparent rounded-full opacity-60" />
+      {/* Ligne continue sur toute la hauteur (sans fade transparent) */}
+      <div
+        className="pointer-events-none absolute left-8 top-0 bottom-0 z-0 w-[3px] -translate-x-1/2 rounded-full bg-[#DDF2F1]"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute left-8 top-0 z-0 h-24 w-[3px] -translate-x-1/2 rounded-full bg-gradient-to-b from-[#00A09D] to-[#DDF2F1]"
+        aria-hidden
+      />
 
-      <div className="space-y-20">
+      <div className="relative z-10 space-y-20">
         {groups.map((group) => (
           <div key={group.dateKey} className="relative">
             {/* EN-TÊTE DE GROUPE */}
-            <div className="flex items-center gap-8 mb-10 relative z-10">
+            <div className="relative z-10 mb-10 flex items-center gap-8">
               <div className="w-16 h-16 rounded-[24px] bg-white border-2 border-gray-100 flex items-center justify-center shadow-xl shadow-gray-100 group transition-all">
                 <div className="w-10 h-10 rounded-xl bg-[#F2F7F7] flex items-center justify-center text-[#00A09D]">
                    <CalendarRange size={22} />
@@ -76,17 +79,18 @@ export default function LotsTimelineView({
             </div>
 
             {/* LISTE DES CARTES DU GROUPE */}
-            <div className="pl-24 space-y-8 relative">
-              {group.items.map((lot) => (
-                <div key={lot.id} className="transition-all duration-500 hover:translate-x-3">
-                  <LotCard
-                    lot={lot}
-                    onView={onView}
-                    onEdit={onEdit}
-                    onDelete={onDelete}
-                  />
-                </div>
-              ))}
+            <div className="relative pl-24">
+              <div className="space-y-8">
+                {group.items.map((lot) => (
+                  <div key={lot.id} className="relative transition-all duration-500 hover:translate-x-3">
+                    <div
+                      className="pointer-events-none absolute -left-16 top-10 z-20 h-3 w-3 -translate-x-1/2 rounded-full border-[3px] border-gray-50 bg-[#00A09D]"
+                      aria-hidden
+                    />
+                    <LotCard lot={lot} onView={onView} />
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         ))}

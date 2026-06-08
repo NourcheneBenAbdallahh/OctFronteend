@@ -334,6 +334,21 @@
   @apply overflow-y-auto overscroll-contain no-scrollbar;
 }
 
+/** Listes déroulantes des barres de filtres (scroll OCT teal visible). */
+@utility filter-picker-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(0 160 157 / 0.55) rgb(240 244 244);
+  &::-webkit-scrollbar {
+    @apply w-2;
+  }
+  &::-webkit-scrollbar-track {
+    @apply rounded-full bg-[#F0F4F4];
+  }
+  &::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-[#00A09D]/45 hover:bg-[#00A09D]/70;
+  }
+}
+
 /** Liste déroulante rôles / pickers indigo (modales admin). */
 @utility role-picker-scroll {
   scrollbar-width: thin;

@@ -3,6 +3,7 @@
 import {
   ComposedChart,
   Line,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -31,10 +32,18 @@ export default function StockForecastChart({
   predictions,
   unitLabel,
 }: Props) {
+  const recentAvg =
+    history.length > 0
+      ? history.slice(-30).reduce((s, h) => s + h.quantite, 0) /
+        Math.min(30, history.length)
+      : null;
+
   const historyData = history.map((h) => ({
     date: formatDay(h.date),
     sortiesReelles: h.quantite,
     sortiesPrevues: null as number | null,
+    min: null as number | null,
+    max: null as number | null,
   }));
 
   const forecastData = predictions.map((p) => ({
@@ -53,8 +62,15 @@ export default function StockForecastChart({
   return (
     <div className="space-y-3">
       <p className="text-sm text-gray-600">
-        Courbe bleue : sorties déjà enregistrées. Courbe orange pointillée : sorties
-        estimées pour les 7 prochains jours ({unitLabel}/jour).
+        <strong>Ligne bleue</strong> : ce qui est déjà sorti du stock.{" "}
+        <strong>Ligne orange</strong> : estimation pour les 7 prochains jours.
+        {recentAvg != null && (
+          <>
+            {" "}
+            La ligne grise pointillée = moyenne des dernières sorties (
+            {Math.round(recentAvg)} {unitLabel}/jour).
+          </>
+        )}
       </p>
       <div className="h-[380px] w-full">
         <ResponsiveContainer width="100%" height="100%">
@@ -71,7 +87,7 @@ export default function StockForecastChart({
               tickLine={false}
               tick={{ fill: "#64748b", fontSize: 11 }}
               label={{
-                value: `Sorties (${unitLabel})`,
+                value: `${unitLabel} / jour`,
                 angle: -90,
                 position: "insideLeft",
                 style: { fill: "#94a3b8", fontSize: 11 },
@@ -88,8 +104,10 @@ export default function StockForecastChart({
                   return ["—", ""];
                 }
                 const labels: Record<string, string> = {
-                  sortiesReelles: "Sorties enregistrées",
-                  sortiesPrevues: "Sorties prévues",
+                  sortiesReelles: "Déjà sorti",
+                  sortiesPrevues: "Estimation",
+                  min: "Minimum possible",
+                  max: "Maximum possible",
                 };
                 return [`${value} ${unitLabel}`, labels[String(name)] ?? String(name)];
               }}
@@ -100,23 +118,54 @@ export default function StockForecastChart({
                 value === "sortiesReelles"
                   ? "Passé (réel)"
                   : value === "sortiesPrevues"
-                    ? "À venir (estimé)"
+                    ? "À venir (estimation)"
                     : value
               }
             />
+            {recentAvg != null && (
+              <ReferenceLine
+                y={recentAvg}
+                stroke="#94a3b8"
+                strokeDasharray="3 3"
+                label={{
+                  value: "Moyenne récente",
+                  position: "insideTopRight",
+                  fill: "#64748b",
+                  fontSize: 10,
+                }}
+              />
+            )}
             {dividerDate && (
               <ReferenceLine
                 x={dividerDate}
                 stroke="#94a3b8"
                 strokeDasharray="4 4"
                 label={{
-                  value: "Aujourd'hui →",
+                  value: "Aujourd'hui",
                   position: "top",
                   fill: "#64748b",
                   fontSize: 10,
                 }}
               />
             )}
+            <Area
+              type="monotone"
+              dataKey="max"
+              stroke="none"
+              fill="#fed7aa"
+              fillOpacity={0.35}
+              connectNulls={false}
+              legendType="none"
+            />
+            <Area
+              type="monotone"
+              dataKey="min"
+              stroke="none"
+              fill="#ffffff"
+              fillOpacity={1}
+              connectNulls={false}
+              legendType="none"
+            />
             <Line
               type="monotone"
               dataKey="sortiesReelles"

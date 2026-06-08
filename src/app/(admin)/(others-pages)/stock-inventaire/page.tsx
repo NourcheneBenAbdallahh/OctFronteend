@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   createInventaire,
   deleteInventaire,
@@ -25,7 +26,6 @@ import InventaireAuditCards from "@/components/inventaire/InventaireAuditCards";
 import InventaireDetailDrawer from "@/components/inventaire/InventaireDetailDrawer";
 import InventaireFormDrawer from "@/components/inventaire/InventaireFormDrawer";
 import InventaireContextBar from "@/components/inventaire/InventaireContextBar";
-import InventaireGenererEntrepotModal from "@/components/inventaire/InventaireGenererEntrepotModal";
 import {
   InventaireConfirmDeleteModal,
   InventaireConfirmRegulariserModal,
@@ -37,10 +37,12 @@ import { getInventaireErrorMessage } from "@/lib/inventaire.errors";
 
 import { listEmballages } from "@/lib/emballages.api";
 import { fetchEntrepots } from "@/lib/entrepot.api";
-import { currentYear, todayIsoDay } from "@/lib/inventaire.dates";
+import { currentYear, dayScopeBounds, todayIsoDay, yearScopeBounds } from "@/lib/inventaire.dates";
 import { useAuthStore } from "@/store/useAuthStore";
 
 export default function InventairePage() {
+  const searchParams = useSearchParams();
+  const focusId = searchParams.get("focus");
   const token = useAuthStore((state) => state.token);
   const [data, setData] = useState<TableInventaire[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,7 +64,8 @@ export default function InventairePage() {
   });
   const [exporting, setExporting] = useState(false);
   const [feedback, setFeedback] = useState<InventaireFeedback>(null);
-  const [deleteTarget, setDeleteTarget] = useState<TableInventaire | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [deleteTargets, setDeleteTargets] = useState<TableInventaire[]>([]);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [regularizeTarget, setRegularizeTarget] = useState<TableInventaire | null>(null);
@@ -70,7 +73,6 @@ export default function InventairePage() {
   const [regularizing, setRegularizing] = useState(false);
   const [sessionRegularizeOpen, setSessionRegularizeOpen] = useState(false);
   const [sessionRegularizing, setSessionRegularizing] = useState(false);
-  const [genererOpen, setGenererOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
 
   const showFeedback = (type: "success" | "error", message: string) => {
@@ -109,14 +111,44 @@ export default function InventairePage() {
     [data, filters]
   );
 
-  const handleExportPdf = () => {
+  useEffect(() => {
+    if (!focusId || loading || data.length === 0) return;
+
+    const target = data.find((item) => String(item.id) === String(focusId));
+    if (!target) return;
+
+    const isVisible = filtered.some((item) => String(item.id) === String(focusId));
+    if (!isVisible) {
+      setFilters({
+        ...EMPTY_INVENTAIRE_FILTERS,
+        date_mode: "all",
+      });
+      return;
+    }
+
+    setSelected(target);
+    setDetailOpen(true);
+
+    const timer = window.setTimeout(() => {
+      document
+        .getElementById(`inventaire-row-${focusId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 220);
+
+    return () => window.clearTimeout(timer);
+  }, [focusId, loading, data, filtered]);
+
+  const handleExportPdf = async () => {
     if (!filtered.length) {
       showFeedback("error", "Aucune ligne à exporter avec ces filtres.");
       return;
     }
     setExporting(true);
     try {
-      exportInventairePdf(filtered, filters);
+      await exportInventairePdf(filtered, filters);
+    } catch (err) {
+      console.error("Export PDF inventaire:", err);
+      showFeedback("error", "Impossible de générer le PDF (logo ou export).");
     } finally {
       setExporting(false);
     }
@@ -143,6 +175,35 @@ export default function InventairePage() {
     [filtered]
   );
 
+  const deletableFiltered = useMemo(
+    () => filtered.filter((i) => i.statut !== "REGULARISEE"),
+    [filtered]
+  );
+
+  const toggleSelectRow = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllFiltered = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      const every =
+        deletableFiltered.length > 0 &&
+        deletableFiltered.every((r) => next.has(r.id));
+      if (every) {
+        deletableFiltered.forEach((r) => next.delete(r.id));
+      } else {
+        deletableFiltered.forEach((r) => next.add(r.id));
+      }
+      return next;
+    });
+  };
+
   const sessionCodes = useMemo(() => {
     const base = filters.entrepot
       ? data.filter((d) => d.entrepot_id === filters.entrepot)
@@ -152,12 +213,41 @@ export default function InventairePage() {
     );
   }, [data, filters.entrepot]);
 
-  const openGenererModal = () => {
+  const handleGenererCampagne = async () => {
     if (!filters.entrepot) {
       showFeedback("error", "Choisissez d'abord un entrepôt dans le panneau ci-dessus.");
       return;
     }
-    setGenererOpen(true);
+    if (filters.date_mode === "all") {
+      showFeedback(
+        "error",
+        "Choisissez le mode Par jour ou Par année avant de générer une campagne."
+      );
+      return;
+    }
+
+    const payload =
+      filters.date_mode === "year"
+        ? (() => {
+            const b = yearScopeBounds(filters.pivot_year);
+            return {
+              entrepotId: filters.entrepot,
+              scope: "YEAR" as const,
+              dateInventaire: b.dateInventaire,
+              periodeDebut: b.periodeDebut,
+              periodeFin: b.periodeFin,
+            };
+          })()
+        : (() => {
+            const b = dayScopeBounds(filters.pivot_day);
+            return {
+              entrepotId: filters.entrepot,
+              scope: "DAY" as const,
+              dateInventaire: b.dateInventaire,
+            };
+          })();
+
+    await handleGenererConfirm(payload);
   };
 
   const handleGenererConfirm = async (payload: {
@@ -176,7 +266,6 @@ export default function InventairePage() {
         periodeDebut: payload.periodeDebut,
         periodeFin: payload.periodeFin,
       });
-      setGenererOpen(false);
       if (lignes.length > 0 && lignes[0].code_session) {
         const session = lignes[0].code_session!;
         setActiveSession(session);
@@ -300,16 +389,31 @@ export default function InventairePage() {
 
   const openDeleteConfirm = (item: TableInventaire) => {
     setFeedback(null);
-    setDeleteTarget(item);
+    setDeleteTargets([item]);
+    setDeleteOpen(true);
+  };
+
+  const openBulkDeleteConfirm = () => {
+    const targets = deletableFiltered.filter((r) => selectedIds.has(r.id));
+    if (!targets.length) {
+      showFeedback("error", "Sélectionnez au moins une ligne à supprimer.");
+      return;
+    }
+    setFeedback(null);
+    setDeleteTargets(targets);
     setDeleteOpen(true);
   };
 
   const handleDeleteConfirm = async () => {
-    if (!deleteTarget) return;
-    if (deleteTarget.statut === "REGULARISEE") {
+    if (!deleteTargets.length) return;
+
+    const regularisees = deleteTargets.filter((t) => t.statut === "REGULARISEE");
+    if (regularisees.length > 0) {
       showFeedback(
         "error",
-        "Impossible de supprimer une ligne déjà régularisée (mouvement stock déjà appliqué)."
+        regularisees.length === 1
+          ? "Impossible de supprimer une ligne déjà régularisée (mouvement stock déjà appliqué)."
+          : `${regularisees.length} ligne(s) régularisée(s) ne peuvent pas être supprimées.`
       );
       setDeleteOpen(false);
       return;
@@ -317,15 +421,28 @@ export default function InventairePage() {
 
     setDeleting(true);
     try {
-      await deleteInventaire(deleteTarget.id);
+      const deletedIds = new Set(deleteTargets.map((t) => t.id));
+      for (const target of deleteTargets) {
+        await deleteInventaire(target.id);
+      }
       setDeleteOpen(false);
-      setDeleteTarget(null);
-      if (selected?.id === deleteTarget.id) {
+      setDeleteTargets([]);
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        deletedIds.forEach((id) => next.delete(id));
+        return next;
+      });
+      if (selected && deletedIds.has(selected.id)) {
         setDetailOpen(false);
         setSelected(null);
       }
       await load();
-      showFeedback("success", "Ligne d'inventaire supprimée.");
+      showFeedback(
+        "success",
+        deleteTargets.length > 1
+          ? `${deleteTargets.length} ligne(s) d'inventaire supprimée(s).`
+          : "Ligne d'inventaire supprimée."
+      );
     } catch (err) {
       showFeedback(
         "error",
@@ -344,13 +461,13 @@ export default function InventairePage() {
       />
 
       <InventaireConfirmDeleteModal
-        item={deleteTarget}
+        items={deleteTargets}
         open={deleteOpen}
         loading={deleting}
         onClose={() => {
           if (deleting) return;
           setDeleteOpen(false);
-          setDeleteTarget(null);
+          setDeleteTargets([]);
         }}
         onConfirm={handleDeleteConfirm}
       />
@@ -379,21 +496,6 @@ export default function InventairePage() {
         onConfirm={handleRegulariserSessionConfirm}
       />
 
-      <InventaireGenererEntrepotModal
-        open={genererOpen}
-        entrepots={allEntrepots}
-        initialEntrepotId={filters.entrepot}
-        initialMode={filters.date_mode === "year" ? "year" : "day"}
-        initialDay={filters.pivot_day}
-        initialYear={filters.pivot_year}
-        loading={generating}
-        onClose={() => {
-          if (generating) return;
-          setGenererOpen(false);
-        }}
-        onConfirm={handleGenererConfirm}
-      />
-
       <InventaireHeader
         loading={loading}
         onRefresh={load}
@@ -401,7 +503,7 @@ export default function InventairePage() {
           setEditing(null);
           setFormOpen(true);
         }}
-        onGenererEntrepot={openGenererModal}
+        onGenererEntrepot={handleGenererCampagne}
         onRegulariserSession={openRegulariserSessionConfirm}
         hasActiveSession={!!(activeSession || filters.code_session)}
         total={filtered.length}
@@ -414,8 +516,8 @@ export default function InventairePage() {
         onChange={setFilters}
         scopedCount={filtered.length}
         totalCount={data.length}
-        onGenerer={openGenererModal}
-        loading={loading}
+        onGenerer={handleGenererCampagne}
+        loading={loading || generating}
       />
 
       {sessionCodes.length > 0 && (
@@ -463,6 +565,11 @@ export default function InventairePage() {
 
       <InventaireAuditCards
         data={filtered}
+        focusedId={focusId}
+        selectedIds={selectedIds}
+        onToggleSelect={toggleSelectRow}
+        onToggleSelectAll={toggleSelectAllFiltered}
+        onBulkDelete={openBulkDeleteConfirm}
         onAdjust={async (id, val) => {
           await updateInventaire(id, { stock_physique: val });
           await load();

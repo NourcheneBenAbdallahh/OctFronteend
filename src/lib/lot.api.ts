@@ -24,6 +24,44 @@ export type PaginatedLots = {
   hasMorePages: boolean;
 };
 
+export async function getLotById(
+  id: string | number,
+  opts?: GraphqlRequestOptions
+): Promise<Lot | null> {
+  const query = `
+    query GetLot($id: ID!) {
+      lot(id: $id) {
+        id
+        code_lot
+        quantite
+        date_mvt
+        commentaire
+        emballage_id
+        user_id
+        created_at
+        updated_at
+        emballage {
+          id
+          name
+          code
+        }
+        user {
+          id
+          name
+          email
+        }
+        entrepot {
+          id
+          nom
+        }
+      }
+    }
+  `;
+
+  const data = await graphqlRequest<{ lot: Lot | null }>(query, { id }, opts);
+  return data.lot ?? null;
+}
+
 export async function getLots(
   page = 1,
   first = 12,
@@ -52,6 +90,10 @@ export async function getLots(
             name 
             email 
           }
+          entrepot {
+            id
+            nom
+          }
         }
         paginatorInfo {
           currentPage
@@ -78,7 +120,64 @@ export async function getLots(
   };
 }
 
+const LOTS_PAGE_QUERY = `
+  query GetLotsPage($page: Int!, $first: Int!) {
+    lots(page: $page, first: $first) {
+      data {
+        id
+        code_lot
+        quantite
+        date_mvt
+        commentaire
+        emballage_id
+        user_id
+        created_at
+        updated_at
+        emballage {
+          id
+          name
+          code
+        }
+        user {
+          id
+          name
+          email
+        }
+        entrepot {
+          id
+          nom
+        }
+      }
+      paginatorInfo {
+        currentPage
+        lastPage
+        total
+        hasMorePages
+      }
+    }
+  }
+`;
 
+/** Charge toutes les pages de lots (limite de sécurité sur le nombre de pages). */
+export async function getAllLots(
+  firstPerPage = 100,
+  maxPages = 50,
+  opts?: GraphqlRequestOptions
+): Promise<Lot[]> {
+  const acc: Lot[] = [];
+  for (let page = 1; page <= maxPages; page++) {
+    const data = await graphqlRequest<LotsQueryResponse>(
+      LOTS_PAGE_QUERY,
+      { page, first: firstPerPage },
+      opts
+    );
+    const chunk = data.lots?.data ?? [];
+    acc.push(...chunk);
+    const p = data.lots?.paginatorInfo;
+    if (!p?.hasMorePages || page >= (p.lastPage ?? page)) break;
+  }
+  return acc;
+}
 
 export async function updateLot(
   id: string | number,
@@ -114,6 +213,10 @@ export async function updateLot(
           id
           name
           email
+        }
+        entrepot {
+          id
+          nom
         }
       }
     }

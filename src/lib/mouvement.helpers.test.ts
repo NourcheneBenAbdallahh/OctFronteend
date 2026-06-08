@@ -9,11 +9,13 @@ import {
   formatGraphQLDateTime,
   formatQuantity,
   getEntrepotIdForLots,
+  getMouvementTypeLabel,
   getSelectedLotAvailable,
   isMouvementBrouillon,
   validateForm,
   validateQuantityAgainstLot,
 } from "./mouvement.helpers";
+import { sortTableRows } from "./tableSort";
 
 function mouvement(partial: Partial<MouvementStock>): MouvementStock {
   return {
@@ -42,6 +44,34 @@ describe("mouvement.helpers", () => {
   it("isMouvementBrouillon est insensible à la casse", () => {
     expect(isMouvementBrouillon("brouillon")).toBe(true);
     expect(isMouvementBrouillon("VALIDE")).toBe(false);
+  });
+
+  it("getMouvementTypeLabel retourne le libellé affiché", () => {
+    expect(getMouvementTypeLabel("PRD")).toBe("Production");
+    expect(getMouvementTypeLabel("CDD")).toBe("Transfert");
+    expect(getMouvementTypeLabel(null)).toBe("");
+  });
+
+  it("trie les mouvements par libellé de type (pas par code)", () => {
+    const rows = [
+      mouvement({ id: "1", type_mouvement: "CDD" }),
+      mouvement({ id: "2", type_mouvement: "PTE" }),
+      mouvement({ id: "3", type_mouvement: "PRD" }),
+      mouvement({ id: "4", type_mouvement: "SPL" }),
+    ];
+    const columns = {
+      typeMouvement: {
+        accessor: (m: MouvementStock) => getMouvementTypeLabel(m.type_mouvement),
+        type: "string" as const,
+      },
+    };
+    const asc = sortTableRows(rows, "typeMouvement", "asc", columns);
+    expect(asc.map((m) => getMouvementTypeLabel(m.type_mouvement))).toEqual([
+      "Perte",
+      "Production",
+      "Surplus",
+      "Transfert",
+    ]);
   });
 
   it("computeStats agrège par statut et type", () => {
@@ -94,6 +124,7 @@ describe("mouvement.helpers", () => {
       sourceId: "",
       destId: "",
       quantite: "",
+      motif: "",
       dateMouvement: "2026-05-20T10:00",
     };
     expect(validateForm(empty)).toContain("emballage");
@@ -108,6 +139,24 @@ describe("mouvement.helpers", () => {
       lotId: "1",
     };
     expect(validateForm(cdd)).toContain("différentes");
+
+    const emc: MouvementFormState = {
+      ...cdd,
+      type: "EMC",
+      destId: "",
+    };
+    expect(validateForm(emc)).toBeNull();
+
+    const pte: MouvementFormState = {
+      ...empty,
+      type: "PTE",
+      emballageId: "1",
+      quantite: 2,
+      sourceId: "1",
+      lotId: "1",
+      motif: "",
+    };
+    expect(validateForm(pte)).toContain("motif");
   });
 
   it("emptyForm et getEntrepotIdForLots", () => {
@@ -134,6 +183,7 @@ describe("mouvement.helpers", () => {
       sourceId: "s1",
       destId: "",
       quantite: 4,
+      motif: "",
       dateMouvement: "2026-05-20T10:00",
     };
     const summary = buildSummary(
@@ -162,6 +212,7 @@ describe("mouvement.helpers", () => {
       sourceId: "1",
       destId: "",
       quantite: 100,
+      motif: "",
       dateMouvement: "2026-05-20T10:00",
     };
     expect(validateQuantityAgainstLot(form, 50)).toContain("dépasse");

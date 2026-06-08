@@ -19,11 +19,20 @@ const tour = tourPageAttrs("/stock-inventaire");
 
 interface Props {
   data: TableInventaire[];
+  focusedId?: string | number | null;
+  selectedIds: Set<string>;
+  onToggleSelect: (id: string) => void;
+  onToggleSelectAll: () => void;
+  onBulkDelete: () => void;
   onAdjust: (id: string, newVal: number) => void;
   onRegulariser: (item: TableInventaire) => void;
   onView: (item: TableInventaire) => void;
   onEdit: (item: TableInventaire) => void;
   onDelete: (item: TableInventaire) => void;
+}
+
+function isDeletable(row: TableInventaire): boolean {
+  return row.statut !== "REGULARISEE";
 }
 
 function theoriqueRef(row: TableInventaire): number {
@@ -36,7 +45,25 @@ function statutLabel(statut: string): string {
   return "Brouillon";
 }
 
-export default function InventaireAuditCards({ data, onAdjust, onRegulariser, onView, onEdit, onDelete }: Props) {
+export default function InventaireAuditCards({
+  data,
+  focusedId,
+  selectedIds,
+  onToggleSelect,
+  onToggleSelectAll,
+  onBulkDelete,
+  onAdjust,
+  onRegulariser,
+  onView,
+  onEdit,
+  onDelete,
+}: Props) {
+  const deletableRows = data.filter(isDeletable);
+  const selectedCount = deletableRows.filter((r) => selectedIds.has(r.id)).length;
+  const allDeletableSelected =
+    deletableRows.length > 0 &&
+    deletableRows.every((r) => selectedIds.has(r.id));
+
   if (!data.length) {
     return (
       <div className="bg-white border-2 border-dashed border-gray-100 rounded-[32px] p-20 text-center">
@@ -51,7 +78,41 @@ export default function InventaireAuditCards({ data, onAdjust, onRegulariser, on
   }
 
   return (
-    <div className="grid grid-cols-1 gap-6 pb-20" {...tour.table}>
+    <div className="space-y-4 pb-20" {...tour.table}>
+      {deletableRows.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-[24px] border border-gray-100 bg-white px-6 py-4 shadow-sm">
+          <label className="flex cursor-pointer items-center gap-3">
+            <input
+              type="checkbox"
+              className="h-4 w-4 cursor-pointer rounded border-gray-300 text-[#00A09D] focus:ring-[#00A09D]"
+              checked={allDeletableSelected}
+              ref={(el) => {
+                if (el) {
+                  el.indeterminate = selectedCount > 0 && !allDeletableSelected;
+                }
+              }}
+              onChange={onToggleSelectAll}
+              aria-label="Tout sélectionner les lignes supprimables"
+            />
+            <span className="text-[11px] font-black uppercase tracking-widest text-gray-500">
+              Tout sélectionner
+              <span className="ml-2 text-gray-400">({deletableRows.length} supprimable{deletableRows.length > 1 ? "s" : ""})</span>
+            </span>
+          </label>
+          {selectedCount > 0 && (
+            <button
+              type="button"
+              onClick={onBulkDelete}
+              className="inline-flex items-center gap-2 rounded-full bg-red-600 px-5 py-2.5 text-[11px] font-black uppercase tracking-widest text-white transition-colors hover:bg-red-700"
+            >
+              <Trash2 size={14} />
+              Supprimer {selectedCount} ligne{selectedCount > 1 ? "s" : ""}
+            </button>
+          )}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-6">
       {data.map((row) => {
         const ref = theoriqueRef(row);
         const isLoss = row.ecart < 0;
@@ -59,15 +120,37 @@ export default function InventaireAuditCards({ data, onAdjust, onRegulariser, on
         const isRegularise = row.statut === "REGULARISEE";
         const progress = ref > 0 ? Math.min((row.stock_physique / ref) * 100, 100) : 0;
 
+        const rowDeletable = isDeletable(row);
+        const isSelected = selectedIds.has(row.id);
+
         return (
           <div
             key={row.id}
-            className="group relative bg-white rounded-[32px] border border-gray-100 hover:shadow-2xl hover:shadow-gray-200/50 transition-all duration-500 overflow-hidden"
+            id={`inventaire-row-${row.id}`}
+            className={`group relative bg-white rounded-[32px] border transition-all duration-500 overflow-hidden ${
+              String(focusedId ?? "") === String(row.id)
+                ? "border-[#00A09D] shadow-lg shadow-[#00A09D]/20 ring-2 ring-[#00A09D]/30"
+                : isSelected
+                ? "border-[#00A09D] shadow-lg shadow-[#00A09D]/10"
+                : "border-gray-100 hover:shadow-2xl hover:shadow-gray-200/50"
+            }`}
           >
             {/* Barre de statut latérale */}
             <div className={`absolute left-0 top-0 bottom-0 w-2 ${
               isLoss ? "bg-red-500" : isPerfect ? "bg-[#00A09D]" : "bg-blue-500"
             }`} />
+
+            {rowDeletable && (
+              <div className="absolute left-5 top-5 z-10">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 cursor-pointer rounded border-gray-300 text-[#00A09D] focus:ring-[#00A09D]"
+                  checked={isSelected}
+                  onChange={() => onToggleSelect(row.id)}
+                  aria-label={`Sélectionner ${row.emballage_name}`}
+                />
+              </div>
+            )}
 
             <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_0.8fr_0.8fr_1fr] gap-0">
               
@@ -211,6 +294,7 @@ export default function InventaireAuditCards({ data, onAdjust, onRegulariser, on
           </div>
         );
       })}
+      </div>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { TableCommande } from "@/types/commandes";
 import {
+  computeCommandeDashboardStats,
   computeCommandeStatusCounts,
   computeFluxTotalQuantite,
   computeJoursRestants,
@@ -11,6 +12,7 @@ import {
   formatDelaiEcheanceLabel,
   isCommandeEnRetardTimeline,
   isCommandeEnRetardWidget,
+  isCommandeLivraisonProchaine7J,
 } from "./commandes.helpers";
 
 const REF = new Date("2026-05-22T12:00:00");
@@ -81,6 +83,17 @@ describe("commandes.helpers — compteurs", () => {
       row({ ...r, date_livraison_prevue: "2026-06-01T12:00:00" })
     );
     expect(countCommandesEnRetard(noneLate, REF)).toBe(0);
+  });
+
+  it("calcule les indicateurs tableau de bord", () => {
+    const stats = computeCommandeDashboardStats(dataset, REF);
+    expect(stats.actives).toBe(4);
+    expect(stats.enRetard).toBe(1);
+    expect(stats.reliquat).toBe(22);
+    expect(stats.commandesOuvertes).toBe(3);
+    expect(stats.totalRecu).toBe(0);
+    expect(stats.couverture).toBe(0);
+    expect(stats.livraisons7j).toBeGreaterThanOrEqual(0);
   });
 });
 
@@ -157,6 +170,29 @@ describe("commandes.helpers — recherche par référence", () => {
     const out = filterCommandesByQuery(rows, "EN_ATTENTE", fournisseurs);
     expect(out).toHaveLength(1);
     expect(out[0].statut).toBe("EN_ATTENTE");
+  });
+
+  it("filtre les commandes actives (carte rapide)", () => {
+    const mixed = [
+      ...rows,
+      row({ id: "4", statut: "RECEPTIONNEE" }),
+      row({ id: "5", statut: "ANNULEE" }),
+    ];
+    const out = filterCommandesByQuery(mixed, "ACTIVES", fournisseurs);
+    expect(out.every((r) => r.statut !== "RECEPTIONNEE" && r.statut !== "ANNULEE")).toBe(true);
+    expect(out).toHaveLength(3);
+  });
+
+  it("filtre les livraisons dans les 7 prochains jours", () => {
+    const ref = new Date("2026-05-22T12:00:00");
+    const soon = row({
+      id: "10",
+      statut: "VALIDEE",
+      date_livraison_prevue: "2026-05-25T12:00:00",
+    });
+    expect(isCommandeLivraisonProchaine7J(soon.date_livraison_prevue, soon.statut, ref)).toBe(true);
+    const out = filterCommandesByQuery([soon], "PROCHAINES_7J", fournisseurs, ref);
+    expect(out).toHaveLength(1);
   });
 
   it("retourne aucun résultat si la référence est introuvable", () => {

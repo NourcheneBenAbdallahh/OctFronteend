@@ -223,6 +223,25 @@ function readExplicitPublicGraphqlEndpoint(): string | undefined {
   return url || undefined;
 }
 
+/** URL backend tunnel injectée à l’exécution (meta), si le build a encore localhost. */
+function readRuntimeGraphqlEndpointFromMeta(): string | undefined {
+  if (typeof document === "undefined") return undefined;
+  const content = document
+    .querySelector('meta[name="oct-graphql-endpoint"]')
+    ?.getAttribute("content")
+    ?.trim();
+  if (!content) return undefined;
+  try {
+    return new URL(content).toString();
+  } catch {
+    return undefined;
+  }
+}
+
+function isPublicTunnelHost(hostname: string): boolean {
+  return PUBLIC_TUNNEL_HOST_PATTERN.test(hostname);
+}
+
 /**
  * Navigateur : API sur le même hôte que la page (port 8000).
  * Évite d’appeler une IP LAN figée au build quand on ouvre http://localhost:3000.
@@ -260,13 +279,24 @@ export function shouldUseExplicitBrowserGraphqlEndpoint(
 }
 
 function resolveBrowserGraphqlEndpoint(): string {
+  const pageHostname = window.location.hostname;
   const explicit = readExplicitPublicGraphqlEndpoint();
+
+  // Front tunnel Cloudflare/ngrok : l’API est sur une autre URL, jamais :8000 sur le front.
+  if (isPublicTunnelHost(pageHostname)) {
+    const runtime = readRuntimeGraphqlEndpointFromMeta();
+    if (runtime) return runtime;
+    if (
+      explicit &&
+      shouldUseExplicitBrowserGraphqlEndpoint(explicit, pageHostname)
+    ) {
+      return explicit;
+    }
+  }
+
   if (
     explicit &&
-    shouldUseExplicitBrowserGraphqlEndpoint(
-      explicit,
-      window.location.hostname
-    )
+    shouldUseExplicitBrowserGraphqlEndpoint(explicit, pageHostname)
   ) {
     return explicit;
   }

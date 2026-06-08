@@ -1,15 +1,25 @@
 import type { UniteMesure } from "@/types/unite-mesure";
 
+/** Code tel qu’affiché (casse conservée). */
 export function normalizeUnitCode(code: string | null | undefined): string {
-  return String(code ?? "")
-    .trim()
-    .toUpperCase();
+  return String(code ?? "").trim();
+}
+
+/** Clé de comparaison insensible à la casse (Kg ≡ KG). */
+export function unitCodeKey(code: string | null | undefined): string {
+  return normalizeUnitCode(code).toLowerCase();
 }
 
 /** Libellé court pour affichage (code normalisé, ex. KG, L, UNITE). */
 export function formatUnitCodeShort(code: string | null | undefined): string {
   const c = normalizeUnitCode(code);
   return c || "—";
+}
+
+export function unitCodesEqual(a: string | null | undefined, b: string | null | undefined): boolean {
+  const ka = unitCodeKey(a);
+  const kb = unitCodeKey(b);
+  return ka !== "" && ka === kb;
 }
 
 /**
@@ -21,8 +31,9 @@ export function resolvePrincipalUnitCode(
   unites: UniteMesure[]
 ): string {
   const raw = normalizeUnitCode(capacityUnit);
-  if (raw && unites.some((u) => normalizeUnitCode(u.code) === raw)) {
-    return raw;
+  const match = unites.find((u) => unitCodesEqual(u.code, raw));
+  if (match) {
+    return normalizeUnitCode(match.code);
   }
   if (raw) {
     return raw;
@@ -38,7 +49,7 @@ export function unitesCompatibleQuantiteCommande(
   principalCode: string,
   unites: UniteMesure[]
 ): UniteMesure[] {
-  const p = unites.find((u) => normalizeUnitCode(u.code) === normalizeUnitCode(principalCode));
+  const p = unites.find((u) => unitCodesEqual(u.code, principalCode));
   if (!p) {
     return [];
   }
@@ -62,12 +73,12 @@ export function convertQuantityBetweenUnites(
   if (!Number.isFinite(quantity)) {
     return null;
   }
-  const from = unites.find((u) => normalizeUnitCode(u.code) === normalizeUnitCode(fromCode));
-  const to = unites.find((u) => normalizeUnitCode(u.code) === normalizeUnitCode(toCode));
+  const from = unites.find((u) => unitCodesEqual(u.code, fromCode));
+  const to = unites.find((u) => unitCodesEqual(u.code, toCode));
   if (!from || !to || from.dimension !== to.dimension) {
     return null;
   }
-  if (normalizeUnitCode(from.code) === normalizeUnitCode(to.code)) {
+  if (unitCodesEqual(from.code, to.code)) {
     return quantity;
   }
 
