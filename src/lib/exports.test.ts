@@ -7,31 +7,19 @@ import {
   buildInventaireCsvContent,
   exportInventaireCsv,
 } from "./inventaire.export";
+import { EMPTY_INVENTAIRE_FILTERS } from "@/lib/inventaire.filters";
 import type { TableFacture } from "@/types/facture";
 import type { TableInventaire } from "@/types/inventaire";
 
-const defaultFilters = {
-  search: "",
-  entrepotId: "",
-  statut: "",
-  ecartMode: "all" as const,
-  dateFrom: "",
-  dateTo: "",
-  periodeDebut: "",
-  periodeFin: "",
-  mode: "all" as const,
-  year: "",
-};
-
 describe("exports inventaire et factures", () => {
   it("refuse un export inventaire vide", () => {
-    expect(buildInventaireCsvContent([], defaultFilters)).toBe("");
+    expect(buildInventaireCsvContent([], EMPTY_INVENTAIRE_FILTERS)).toBe("");
 
     const click = vi.fn();
-    const anchor = { click, href: "", download: "" } as HTMLAnchorElement;
+    const anchor = { click, href: "", download: "" } as unknown as HTMLAnchorElement;
     vi.spyOn(document, "createElement").mockReturnValue(anchor);
 
-    exportInventaireCsv([], defaultFilters);
+    exportInventaireCsv([], EMPTY_INVENTAIRE_FILTERS);
     expect(click).not.toHaveBeenCalled();
   });
 
@@ -53,7 +41,7 @@ describe("exports inventaire et factures", () => {
       },
     ];
 
-    const content = buildInventaireCsvContent(rows, defaultFilters);
+    const content = buildInventaireCsvContent(rows, EMPTY_INVENTAIRE_FILTERS);
 
     expect(content).toContain("INV-001");
     expect(content).toContain("Tunis");
@@ -68,7 +56,7 @@ describe("exports inventaire et factures", () => {
     expect(buildFacturesCsvContent([])).toBe("");
 
     const click = vi.fn();
-    const anchor = { click, href: "", download: "" } as HTMLAnchorElement;
+    const anchor = { click, href: "", download: "" } as unknown as HTMLAnchorElement;
     vi.spyOn(document, "createElement").mockReturnValue(anchor);
 
     exportFacturesCsv([]);
