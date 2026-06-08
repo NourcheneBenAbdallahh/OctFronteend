@@ -1,124 +1,73 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Search,
   Filter,
   ChevronDown,
   ChevronUp,
   RotateCcw,
-  Warehouse,
-  Package,
-  User,
-  ArrowDownUp,
-  ArrowDownToLine,
-  ArrowUpFromLine,
   CalendarDays,
+  CheckCircle2,
+  FilePenLine,
+  ArrowDownUp,
 } from "lucide-react";
-import type { Stock, StockFiltersState } from "@/types/stock";
+import type { MouvementFiltersState, MouvementType } from "@/types/mouvement";
+import { MOUVEMENT_TYPES } from "@/lib/mouvement.config";
+import {
+  countActiveMouvementFilters,
+  EMPTY_MOUVEMENT_FILTERS,
+} from "@/lib/mouvement.filters";
 import { FilterBarSelect } from "@/components/ui/FilterBarSelect";
 
 interface Props {
-  rows: Stock[];
-  filters: StockFiltersState;
-  onChange: (filters: StockFiltersState) => void;
+  filters: MouvementFiltersState;
+  onChange: (filters: MouvementFiltersState) => void;
 }
 
-const EMPTY_FILTERS: StockFiltersState = {
-  search: "",
-  entrepot: "",
-  emballage: "",
-  sens: "",
-  user: "",
-  sort: "recent",
-  dateFrom: "",
-  dateTo: "",
-};
+const TYPE_OPTIONS: { id: string; label: string }[] = [
+  { id: "ALL", label: "Tous" },
+  ...(Object.entries(MOUVEMENT_TYPES) as [MouvementType, (typeof MOUVEMENT_TYPES)[MouvementType]][]).map(
+    ([id, meta]) => ({
+      id,
+      label: meta.label,
+    })
+  ),
+];
+
+const STATUT_OPTIONS: {
+  id: string;
+  label: string;
+  icon?: typeof FilePenLine;
+}[] = [
+  { id: "ALL", label: "Tous" },
+  { id: "BROUILLON", label: "Brouillon", icon: FilePenLine },
+  { id: "VALIDE", label: "Validé", icon: CheckCircle2 },
+];
 
 const SORT_OPTIONS = [
   { value: "recent", label: "Plus récent" },
   { value: "oldest", label: "Plus ancien" },
-  { value: "quantite_desc", label: "Qté décroissante" },
-  { value: "quantite_asc", label: "Qté croissante" },
 ] as const;
 
-function countActiveFilters(filters: StockFiltersState) {
-  let count = 0;
-  if (filters.entrepot) count += 1;
-  if (filters.emballage) count += 1;
-  if (filters.sens) count += 1;
-  if (filters.user) count += 1;
-  if (filters.sort !== "recent") count += 1;
-  if (filters.dateFrom) count += 1;
-  if (filters.dateTo) count += 1;
-  return count;
-}
-
-export default function StocksFilters({ rows, filters, onChange }: Props) {
+export default function MouvementsFilters({ filters, onChange }: Props) {
   const [showFilters, setShowFilters] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
-  const activeCount = countActiveFilters(filters);
-
-  const entrepots = useMemo(
-    () =>
-      Array.from(
-        new Map(
-          rows
-            .filter((r) => r.entrepot)
-            .map((r) => [
-              String(r.entrepot?.id),
-              {
-                value: String(r.entrepot?.id),
-                label: r.entrepot?.nom || r.entrepot?.name || `Entrepôt #${r.entrepot_id}`,
-              },
-            ])
-        ).values()
-      ),
-    [rows]
-  );
-
-  const emballages = useMemo(
-    () =>
-      Array.from(
-        new Map(
-          rows
-            .filter((r) => r.emballage)
-            .map((r) => [
-              String(r.emballage?.id),
-              {
-                value: String(r.emballage?.id),
-                label: r.emballage?.name || r.emballage?.code || `Emballage #${r.emballage_id}`,
-              },
-            ])
-        ).values()
-      ),
-    [rows]
-  );
-
-  const users = useMemo(
-    () =>
-      Array.from(
-        new Map(
-          rows
-            .filter((r) => r.user)
-            .map((r) => [
-              String(r.user?.id),
-              {
-                value: String(r.user?.id),
-                label: r.user?.name || r.user?.email || `User #${r.user_id}`,
-              },
-            ])
-        ).values()
-      ),
-    [rows]
-  );
+  const activeCount = countActiveMouvementFilters(filters);
 
   useEffect(() => {
     if (!showFilters) return;
     const onDocClick = (e: MouseEvent) => {
-      if (barRef.current && !barRef.current.contains(e.target as Node)) {
-        setShowFilters(false);
+      const target = e.target;
+      if (!(target instanceof Node)) return;
+      if (barRef.current?.contains(target)) return;
+      if (
+        target instanceof Element &&
+        target.closest('[id^="filter-bar-select-"]')
+      ) {
+        return;
       }
+      setShowFilters(false);
     };
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
@@ -131,7 +80,7 @@ export default function StocksFilters({ rows, filters, onChange }: Props) {
         <input
           value={filters.search}
           onChange={(e) => onChange({ ...filters, search: e.target.value })}
-          placeholder="Rechercher par lot, entrepôt, emballage ou utilisateur…"
+          placeholder="Rechercher code, lot, emballage, entrepôt…"
           className="min-w-0 flex-1 outline-none text-sm font-medium placeholder:text-gray-300"
         />
         <button
@@ -163,31 +112,20 @@ export default function StocksFilters({ rows, filters, onChange }: Props) {
           <div className="flex w-full min-w-0 flex-col gap-2.5">
             <div className="flex w-full min-w-0 flex-wrap items-center gap-2.5">
               <span className="shrink-0 rounded-full bg-[#1C2434] px-4 py-2.5 text-[9px] font-black uppercase tracking-[0.2em] text-white shadow-sm">
-                Filtrer les stocks
+                Filtrer les mouvements
               </span>
 
-              {(
-                [
-                  { id: "" as const, label: "Tous", icon: null },
-                  { id: "entree" as const, label: "Entrées", icon: ArrowDownToLine },
-                  { id: "sortie" as const, label: "Sorties", icon: ArrowUpFromLine },
-                ] as const
-              ).map(({ id, label, icon: Icon }) => (
+              {TYPE_OPTIONS.map(({ id, label }) => (
                 <button
-                  key={id || "all"}
+                  key={id}
                   type="button"
-                  onClick={() => onChange({ ...filters, sens: id })}
+                  onClick={() => onChange({ ...filters, type: id })}
                   className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-4 py-2.5 text-[10px] font-black uppercase tracking-wider transition-all ${
-                    filters.sens === id
-                      ? id === "sortie"
-                        ? "bg-orange-500 text-white shadow-md shadow-orange-500/20"
-                        : id === "entree"
-                          ? "bg-[#00A09D] text-white shadow-md shadow-[#00A09D]/25"
-                          : "bg-[#1C2434] text-white shadow-md"
+                    filters.type === id
+                      ? "bg-[#1C2434] text-white shadow-md"
                       : "border border-gray-100 bg-white text-gray-500 hover:border-[#00A09D]/40 hover:text-[#00A09D]"
                   }`}
                 >
-                  {Icon ? <Icon size={14} className="shrink-0" /> : null}
                   {label}
                 </button>
               ))}
@@ -197,44 +135,34 @@ export default function StocksFilters({ rows, filters, onChange }: Props) {
               <FilterBarSelect
                 value={filters.sort}
                 onChange={(sort) =>
-                  onChange({ ...filters, sort: sort as StockFiltersState["sort"] })
+                  onChange({ ...filters, sort: sort as MouvementFiltersState["sort"] })
                 }
                 placeholder="Tri par défaut"
-                ariaLabel="Trier les mouvements de stock"
+                ariaLabel="Trier les mouvements"
                 icon={<ArrowDownUp size={14} />}
                 options={SORT_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
                 triggerClassName="min-w-[148px] max-w-full"
               />
 
-              <FilterBarSelect
-                value={filters.entrepot}
-                onChange={(entrepot) => onChange({ ...filters, entrepot })}
-                placeholder="Tous les entrepôts"
-                ariaLabel="Filtrer par entrepôt"
-                icon={<Warehouse size={14} />}
-                options={entrepots}
-                triggerClassName="min-w-[148px] max-w-full"
-              />
-
-              <FilterBarSelect
-                value={filters.emballage}
-                onChange={(emballage) => onChange({ ...filters, emballage })}
-                placeholder="Tous les emballages"
-                ariaLabel="Filtrer par emballage"
-                icon={<Package size={14} />}
-                options={emballages}
-                triggerClassName="min-w-[148px] max-w-full"
-              />
-
-              <FilterBarSelect
-                value={filters.user}
-                onChange={(user) => onChange({ ...filters, user })}
-                placeholder="Tous les utilisateurs"
-                ariaLabel="Filtrer par utilisateur"
-                icon={<User size={14} />}
-                options={users}
-                triggerClassName="min-w-[148px] max-w-full"
-              />
+              {STATUT_OPTIONS.map(({ id, label, icon: Icon }) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => onChange({ ...filters, statut: id })}
+                  className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-4 py-2.5 text-[10px] font-black uppercase tracking-wider transition-all ${
+                    filters.statut === id
+                      ? id === "VALIDE"
+                        ? "bg-[#00A09D] text-white shadow-md shadow-[#00A09D]/25"
+                        : id === "BROUILLON"
+                          ? "bg-amber-500 text-white shadow-md shadow-amber-500/20"
+                          : "bg-[#1C2434] text-white shadow-md"
+                      : "border border-gray-100 bg-white text-gray-500 hover:border-[#00A09D]/40 hover:text-[#00A09D]"
+                  }`}
+                >
+                  {Icon ? <Icon size={14} className="shrink-0" /> : null}
+                  {label}
+                </button>
+              ))}
 
               <div className="flex h-11 min-w-0 max-w-full shrink-0 items-center gap-2 rounded-full border border-gray-100 bg-white px-4 shadow-sm">
                 <CalendarDays size={14} className="shrink-0 text-[#00A09D]" aria-hidden />
@@ -259,7 +187,7 @@ export default function StocksFilters({ rows, filters, onChange }: Props) {
 
               <button
                 type="button"
-                onClick={() => onChange(EMPTY_FILTERS)}
+                onClick={() => onChange(EMPTY_MOUVEMENT_FILTERS)}
                 disabled={!filters.search && activeCount === 0}
                 className="flex h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-gray-100 bg-white px-4 text-[10px] font-black uppercase tracking-widest text-gray-500 shadow-sm transition-all hover:border-red-200 hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-40"
               >

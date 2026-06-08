@@ -12,6 +12,8 @@ import {
   getAlertCtaTone,
   getAlertIconTone,
   getSafeAlertUrl,
+  hasAlertTarget,
+  navigateToAlert,
 } from "@/lib/notifications.helpers";
 
 type ToastItem = {
@@ -47,14 +49,12 @@ export default function AlertToastStack() {
   }, [subscribeNewAlert, dismissToast]);
 
   const openToast = async (toast: ToastItem) => {
+    if (!hasAlertTarget(toast.alert)) return;
     if (toast.alert.status === "unread") {
       await markAsRead(toast.alert.id);
     }
     dismissToast(toast.key);
-    const targetUrl = getSafeAlertUrl(toast.alert);
-    if (targetUrl) {
-      router.push(targetUrl);
-    }
+    navigateToAlert(toast.alert, router);
   };
 
   if (!mounted || toasts.length === 0) return null;
@@ -73,8 +73,21 @@ export default function AlertToastStack() {
         return (
           <div
             key={toast.key}
-            className="pointer-events-auto flex w-full max-w-[420px] items-center gap-3 rounded-2xl border border-gray-100 bg-white p-3 shadow-[0_8px_30px_rgba(0,0,0,0.12)] animate-in slide-in-from-left-4 fade-in duration-300"
+            className={`pointer-events-auto flex w-full max-w-[420px] items-center gap-3 rounded-2xl border border-gray-100 bg-white p-3 shadow-[0_8px_30px_rgba(0,0,0,0.12)] animate-in slide-in-from-left-4 fade-in duration-300 ${
+              targetUrl ? "cursor-pointer hover:border-[#00A09D]/30" : ""
+            }`}
             role="status"
+            onClick={() => {
+              if (targetUrl) void openToast(toast);
+            }}
+            onKeyDown={(event) => {
+              if (!targetUrl) return;
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                void openToast(toast);
+              }
+            }}
+            tabIndex={targetUrl ? 0 : undefined}
           >
             <div
               className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${iconTone}`}
@@ -94,7 +107,10 @@ export default function AlertToastStack() {
               {targetUrl ? (
                 <button
                   type="button"
-                  onClick={() => void openToast(toast)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void openToast(toast);
+                  }}
                   className={`rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white transition-colors ${ctaTone}`}
                 >
                   {getAlertCtaLabel(toast.alert)}
@@ -102,7 +118,10 @@ export default function AlertToastStack() {
               ) : null}
               <button
                 type="button"
-                onClick={() => dismissToast(toast.key)}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  dismissToast(toast.key);
+                }}
                 className="rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
                 aria-label="Fermer la notification"
               >

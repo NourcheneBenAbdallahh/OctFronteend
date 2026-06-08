@@ -6,6 +6,7 @@ import {
   cancelCommande,
   createCommande,
   dropCommande,
+  fetchCommandeById,
   listCommandes,
   normalizeCommande,
   updateCommande,
@@ -44,7 +45,6 @@ import {
   normalizeUnitCode,
   unitCodesEqual,
   resolvePrincipalUnitCode,
-  unitesCompatibleQuantiteCommande,
   formatQuantitePrincipale,
 } from "@/lib/unite-conversion";
 import type { UniteMesure } from "@/types/unite-mesure";
@@ -319,16 +319,40 @@ const goToPage = (page: number) => {
 
   useEffect(() => {
     if (!focusId) return;
-    const target = rows.find((r) => String(r.id) === String(focusId));
-    if (!target) return;
 
-    setExpandedId(target.id);
-    const timer = window.setTimeout(() => {
-      const el = document.getElementById(`commande-row-${target.id}`);
-      el?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 180);
-    return () => window.clearTimeout(timer);
-  }, [focusId, rows]);
+    const scrollToFocusedRow = (id: Id) => {
+      setExpandedId(id);
+      const timer = window.setTimeout(() => {
+        const el = document.getElementById(`commande-row-${id}`);
+        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 180);
+      return timer;
+    };
+
+    const target = rows.find((r) => String(r.id) === String(focusId));
+    if (target) {
+      const timer = scrollToFocusedRow(target.id);
+      return () => window.clearTimeout(timer);
+    }
+
+    if (!token) return;
+
+    let cancelled = false;
+    void fetchCommandeById(focusId, { token }).then((response) => {
+      if (cancelled || !response.commande) return;
+      const normalized = normalizeCommande(response.commande);
+      setRows((prev) =>
+        prev.some((row) => String(row.id) === String(normalized.id))
+          ? prev
+          : [normalized, ...prev]
+      );
+      scrollToFocusedRow(normalized.id);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [focusId, rows, token]);
 
   useEffect(() => {
     if (searchParams.get("nouveau") !== "1") return;
@@ -425,9 +449,12 @@ const goToPage = (page: number) => {
     [selectedEmballage, unitesMesure]
   );
 
-  const unitesQuantiteCompat = useMemo(
-    () => unitesCompatibleQuantiteCommande(principalUnitCode, unitesMesure),
-    [principalUnitCode, unitesMesure]
+  const unitesSaisieOptions = useMemo(
+    () =>
+      [...unitesMesure].sort(
+        (a, b) => a.sort_order - b.sort_order || a.label.localeCompare(b.label, "fr")
+      ),
+    [unitesMesure]
   );
 
   const principalUnitLabel = useMemo(() => {
@@ -452,16 +479,16 @@ const goToPage = (page: number) => {
   }, [form.emballage_id, form.quantite, quantiteUniteSaisie, principalUnitCode, unitesMesure]);
 
   useEffect(() => {
-    if (!form.emballage_id || !unitesQuantiteCompat.length) {
+    if (!form.emballage_id || !unitesSaisieOptions.length) {
       return;
     }
-    const ok = unitesQuantiteCompat.some(
+    const ok = unitesSaisieOptions.some(
       (u) => unitCodesEqual(u.code, quantiteUniteSaisie)
     );
     if (!ok) {
       setQuantiteUniteSaisie(principalUnitCode);
     }
-  }, [form.emballage_id, principalUnitCode, unitesQuantiteCompat, quantiteUniteSaisie]);
+  }, [form.emballage_id, principalUnitCode, unitesSaisieOptions, quantiteUniteSaisie]);
 
   const filteredFournisseurs = useMemo(() => {
     if (!form.emballage_id) return [];
@@ -729,7 +756,7 @@ const toggleQuickFilter = (filterKey: string) => {
           <button onClick={openNew}
           
         className="bg-white text-gray-900 border-2 border-gray-900 px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all shadow-[8px_8px_0px_rgba(0,160,157,0.2)]"
-             > NOUVEAU
+             > Ajouter
           </button>
         </div>
       </div>
@@ -1223,11 +1250,11 @@ const toggleQuickFilter = (filterKey: string) => {
                               <label className="ml-1 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
                                 ⚖️ Unité de saisie
                               </label>
-                              {form.emballage_id && unitesQuantiteCompat.length > 0 ? (
+                              {form.emballage_id && unitesSaisieOptions.length > 0 ? (
                                 <UniteMesureSearchablePicker
                                   value={quantiteUniteSaisie}
                                   onChange={(code) => setQuantiteUniteSaisie(code)}
-                                  unites={unitesQuantiteCompat}
+                                  unites={unitesSaisieOptions}
                                   placeholder={"Choisir l'unité…"}
                                   allowEmpty={false}
                                   dropdownZClassName="z-[1200]"

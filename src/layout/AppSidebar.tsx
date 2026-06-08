@@ -75,13 +75,10 @@ const navItems: NavItem[] = [
   name: "Stocks",
   subItems: [
     { name: "Stocks", path: "/stock", pro: false },
+    { name: "Mouvements", path: "/mouvements", pro: false },
+    { name: "Lots", path: "/lot", pro: false },
     { name: "Inventaire", path: "/stock-inventaire", pro: false },
   ],
-},
-{
-  icon: <Boxes />,
-  name: "Lots",
-  path: "/lot",
 },
 
 {
@@ -100,12 +97,7 @@ const navItems: NavItem[] = [
   name: "Factures",
    path: "/factures",
 },
-{
-  icon: <ArrowLeftRight />,
-  name: "Mouvements de stock",
-   path: "/mouvements"
 
-},
   {
     icon: <CalenderIcon />,
     name: "Calendar",
@@ -116,8 +108,6 @@ const navItems: NavItem[] = [
     name: "Prévisions stock",
     path: "/prediction",
   }
-  
-
 ];
 
 function navItemsVisibleForRole(role: string | undefined): NavItem[] {

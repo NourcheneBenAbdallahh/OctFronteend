@@ -1,5 +1,5 @@
 "use client";
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 
 interface ModalProps {
   isOpen: boolean;
@@ -21,6 +21,8 @@ export const Modal: React.FC<ModalProps> = ({
   position = "center",
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
+  /** Ignore backdrop clicks right after open (same pointer event that opened the modal). */
+  const [backdropReady, setBackdropReady] = useState(false);
 
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
@@ -41,9 +43,16 @@ export const Modal: React.FC<ModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
+      setBackdropReady(false);
+      const timer = window.setTimeout(() => setBackdropReady(true), 0);
+      return () => {
+        window.clearTimeout(timer);
+        document.body.style.overflow = "unset";
+      };
     }
+
+    setBackdropReady(false);
+    document.body.style.overflow = "unset";
 
     return () => {
       document.body.style.overflow = "unset";
@@ -51,6 +60,12 @@ export const Modal: React.FC<ModalProps> = ({
   }, [isOpen]);
 
   if (!isOpen) return null;
+
+  const handleBackdropPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!backdropReady) return;
+    if (event.target !== event.currentTarget) return;
+    onClose();
+  };
 
   const isRightPanel = position === "right" && !isFullscreen;
 
@@ -73,7 +88,7 @@ export const Modal: React.FC<ModalProps> = ({
               ? "bg-gray-900/40 backdrop-blur-sm"
               : "bg-gray-400/50 backdrop-blur-[32px]"
           }`}
-          onClick={onClose}
+          onPointerUp={handleBackdropPointerUp}
         ></div>
       )}
       <div

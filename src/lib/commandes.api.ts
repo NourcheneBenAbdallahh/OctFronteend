@@ -49,6 +49,21 @@ function getAuthToken(): string | undefined {
   return token || undefined;
 }
 
+export async function fetchCommandeById(
+  id: string | number,
+  opts?: GraphqlRequestOptions
+) {
+  const query = `
+    query FetchCommande($id: ID!) {
+      commande(id: $id) {
+        ${COMMANDE_FIELDS}
+      }
+    }
+  `;
+
+  return graphqlRequest<{ commande: Commande | null }>(query, { id }, opts);
+}
+
 export async function listCommandes(
   page = 1,
   first = 100,

@@ -41,22 +41,28 @@ export default async function BonLivraisonsPage({
   let entrepots: EntrepotOption[] = [];
   let unitesMesure: UniteMesure[] = [];
 
+  const [emballagesResult, entrepotsResult, unitesMesureResult] = await Promise.all([
+    listEmballages(1, 100, auth),
+    fetchEntrepots(auth),
+    listUnitesMesure(auth),
+  ]);
+
+  emballages = emballagesResult.emballages.data.map((item: any) => ({
+    id: item.id,
+    label: `${item.code} - ${item.name}`,
+    capacity_unit: item.capacity_unit ?? null,
+  }));
+
+  unitesMesure = unitesMesureResult.unitesMesure ?? [];
+
+  entrepots = entrepotsResult.map((item) => ({
+    id: item.id,
+    label: item.nom || `Entrepot #${item.id}`,
+  }));
+
   if (!readOnly) {
-    const [emballagesResult, commandesResult, entrepotsResult, unitesMesureResult] =
-      await Promise.all([
-        listEmballages(1, 100, auth),
-        listCommandes(1, 100, auth),
-        fetchEntrepots(auth),
-        listUnitesMesure(auth),
-      ]);
+    const commandesResult = await listCommandes(1, 100, auth);
 
-    emballages = emballagesResult.emballages.data.map((item: any) => ({
-      id: item.id,
-      label: `${item.code} - ${item.name}`,
-      capacity_unit: item.capacity_unit ?? null,
-    }));
-
-    unitesMesure = unitesMesureResult.unitesMesure ?? [];
     commandes = commandesResult.commandes.data.map((item: any) => ({
       id: item.id,
       numero_commande: item.numero_commande,
@@ -66,11 +72,6 @@ export default async function BonLivraisonsPage({
       emballage_id: item.emballage_id,
       entrepot_id: item.entrepot_id,
       statut: item.statut,
-    }));
-
-    entrepots = entrepotsResult.map((item) => ({
-      id: item.id,
-      label: item.nom || `Entrepot #${item.id}`,
     }));
   }
 

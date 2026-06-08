@@ -5,6 +5,7 @@ import {
   formatDate,
   formatEmballageLabel,
   formatQuantity,
+  getMouvementTypeLabel,
   isMouvementBrouillon,
 } from "@/lib/mouvement.helpers";
 import { MouvementStock } from "@/types/mouvement";
@@ -17,7 +18,10 @@ import type { SortColumn } from "@/lib/tableSort";
 
 const MOUVEMENT_SORT_COLUMNS: Record<string, SortColumn<MouvementStock>> = {
   code: { accessor: (m) => m.code_mouvement ?? m.id, type: "string" },
-  type: { accessor: (m) => m.type_mouvement, type: "string" },
+  typeMouvement: {
+    accessor: (m) => getMouvementTypeLabel(m.type_mouvement),
+    type: "string",
+  },
   statut: { accessor: (m) => m.statut, type: "string" },
   produit: { accessor: (m) => m.emballage?.name ?? m.emballage?.code, type: "string" },
   entrepot: { accessor: (m) => m.entrepotSource?.nom, type: "string" },
@@ -71,7 +75,7 @@ export default function MouvementsTable({
 }: {
   items: MouvementStock[];
   loading: boolean;
-  onValidate: (id: string) => void;
+  onValidate: (item: MouvementStock) => void;
   onDelete: (id: string) => void;
   /** Désactive les boutons pendant validate/delete */
   busyActionId?: string | null;
@@ -112,7 +116,7 @@ export default function MouvementsTable({
             <thead>
               <tr className="border-b border-gray-50 bg-gray-50/30 text-left text-[10px] font-black uppercase tracking-[0.2em] text-[#1C2434]/60">
                 <SortableTh columnKey="code" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-8 py-5">Code & Date_Mvt</SortableTh>
-                <SortableTh columnKey="type" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-5">Type</SortableTh>
+                <SortableTh columnKey="typeMouvement" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-5">Type</SortableTh>
                 <SortableTh columnKey="statut" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-5">Statut</SortableTh>
                 <SortableTh columnKey="produit" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-5">Produit / Lot</SortableTh>
                 <SortableTh columnKey="entrepot" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-5">Entrepots</SortableTh>
@@ -178,6 +182,14 @@ export default function MouvementsTable({
                       <div className="mt-1 inline-flex items-center rounded-md bg-gray-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-tight text-gray-500">
                         Lot: {m.lot?.code_lot ?? "N/A"}
                       </div>
+                      {m.type_mouvement === "PTE" && m.motif && (
+                        <p
+                          className="mt-2 max-w-xs text-xs font-medium leading-snug text-orange-700"
+                          title={m.motif}
+                        >
+                          Motif : {m.motif}
+                        </p>
+                      )}
                     </td>
 
                     <td className="px-6 py-6">
@@ -214,7 +226,7 @@ export default function MouvementsTable({
                         <div className="flex flex-col items-end gap-2 sm:flex-row sm:justify-end">
                           <button
                             type="button"
-                            onClick={() => onValidate(m.id)}
+                            onClick={() => onValidate(m)}
                             disabled={busyActionId != null}
                             aria-label={`Valider le mouvement ${m.code_mouvement ?? m.id}`}
                             className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#00A09D] px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white shadow-sm transition hover:bg-[#008e8b] disabled:opacity-40"

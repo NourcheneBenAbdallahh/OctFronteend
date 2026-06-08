@@ -117,7 +117,8 @@ export function FilterBarSelect({
                 type="button"
                 role="option"
                 aria-selected={value === o.value}
-                onClick={() => {
+                onMouseDown={(e) => {
+                  e.preventDefault();
                   onChange(o.value);
                   setOpen(false);
                 }}

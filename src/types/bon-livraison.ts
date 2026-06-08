@@ -1,5 +1,25 @@
 export type BonLivraisonStatut = "VALIDE" | "ANNULE";
 
+export type BonLivraisonCommandeRef = {
+  id: string | number;
+  numero_commande: string;
+  quantite?: number;
+  quantite_recue_total?: number;
+  reste?: number;
+  statut?: string;
+  fournisseur_id?: string | number;
+  contrat_id?: string | number;
+  emballage_id?: string | number;
+  fournisseur?: { id: string | number; raison_sociale: string };
+  contrat?: { id: string | number; numero_contrat: string };
+  emballage?: {
+    id: string | number;
+    code?: string;
+    name?: string;
+    capacity_unit?: string | null;
+  };
+};
+
 export type BonLivraison = {
   id: string;
   numero_bl: string;
@@ -17,6 +37,7 @@ export type BonLivraison = {
   date_validation?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
+  commande?: BonLivraisonCommandeRef | null;
 };
 
 export type TableBonLivraison = Omit<BonLivraison, "statut"> & {

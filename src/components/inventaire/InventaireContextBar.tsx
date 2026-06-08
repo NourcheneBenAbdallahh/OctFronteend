@@ -3,6 +3,7 @@
 import { Calendar, CalendarRange, Layers, Warehouse } from "lucide-react";
 import type { InventaireDateMode, InventaireFilters } from "@/types/inventaire";
 import { describeInventaireScope, yearOptions } from "@/lib/inventaire.dates";
+import { FilterBarSelect } from "@/components/ui/FilterBarSelect";
 
 type EntrepotOption = { id: string; label: string };
 
@@ -62,31 +63,25 @@ export default function InventaireContextBar({
           <button
             type="button"
             onClick={onGenerer}
-            disabled={loading || !filters.entrepot}
+            disabled={loading || !filters.entrepot || filters.date_mode === "all"}
             className="h-12 px-6 inline-flex items-center gap-2 rounded-full bg-[#00A09D] text-white text-[10px] font-black uppercase tracking-widest hover:bg-[#008f8c] disabled:opacity-40 transition-all"
           >
             <Layers size={16} />
-            Générer campagne
+            {loading ? "Génération…" : "Générer campagne"}
           </button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="relative">
-          <Warehouse size={14} className="absolute left-5 top-1/2 -translate-y-1/2 text-[#00A09D] z-10" />
-          <select
-            value={filters.entrepot}
-            onChange={(e) => patch({ entrepot: e.target.value })}
-            className="appearance-none w-full h-12 pl-12 pr-10 rounded-2xl border border-white bg-white text-[10px] font-black uppercase tracking-widest text-[#1C2434] outline-none focus:border-[#00A09D] shadow-sm cursor-pointer"
-          >
-            <option value="">— Choisir un entrepôt —</option>
-            {entrepots.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        <FilterBarSelect
+          value={filters.entrepot}
+          onChange={(entrepot) => patch({ entrepot })}
+          placeholder="Choisir un entrepôt"
+          ariaLabel="Filtrer par entrepôt"
+          icon={<Warehouse size={14} />}
+          options={entrepots.map((e) => ({ value: e.id, label: e.label }))}
+          triggerClassName="h-12 w-full min-w-0 rounded-2xl border border-white bg-white text-[10px] font-black uppercase tracking-widest text-[#1C2434] shadow-sm"
+        />
 
         <div className="flex rounded-2xl bg-white border border-gray-100 p-1 shadow-sm lg:col-span-2">
           {MODES.map(({ id, label, icon: Icon }) => (

@@ -16,6 +16,7 @@ import {
 import type { InventaireFilters, TableInventaire } from "@/types/inventaire";
 import { EMPTY_INVENTAIRE_FILTERS } from "@/lib/inventaire.filters";
 import { tourPageAttrs } from "@/lib/tourPageAttrs";
+import { FilterBarSelect } from "@/components/ui/FilterBarSelect";
 
 const tour = tourPageAttrs("/stock-inventaire");
 
@@ -133,22 +134,15 @@ export default function InventaireFiltersBar({
               <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none" />
             </div>
 
-            <div className="relative min-w-[200px]">
-              <Warehouse size={14} className="absolute left-5 top-1/2 -translate-y-1/2 text-[#00A09D]" />
-              <select
-                value={filters.entrepot}
-                onChange={(e) => onChange({ ...filters, entrepot: e.target.value })}
-                className="appearance-none w-full h-12 pl-12 pr-10 rounded-full border border-white bg-white text-[10px] font-black uppercase tracking-widest text-gray-500 outline-none focus:border-[#00A09D] shadow-sm cursor-pointer"
-              >
-                <option value="">Tous les entrepôts</option>
-                {entrepots.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.label}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none" />
-            </div>
+            <FilterBarSelect
+              value={filters.entrepot}
+              onChange={(entrepot) => onChange({ ...filters, entrepot })}
+              placeholder="Tous les entrepôts"
+              ariaLabel="Filtrer par entrepôt"
+              icon={<Warehouse size={14} />}
+              options={entrepots.map((e) => ({ value: e.id, label: e.label }))}
+              triggerClassName="h-12 min-w-[200px] max-w-full rounded-full border border-white bg-white text-[10px] font-black uppercase tracking-widest text-gray-500 shadow-sm"
+            />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

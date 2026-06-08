@@ -120,6 +120,8 @@ export default function MouvementStepperModal({
 
     if (form.quantite === "" || Number(form.quantite) <= 0) return false;
 
+    if (form.type === "PTE" && !form.motif.trim()) return false;
+
     if (qtyLotError) return false;
 
     return true;
@@ -256,7 +258,7 @@ export default function MouvementStepperModal({
                   <button
                     key={type}
                     type="button"
-                    onClick={() => setForm((prev) => ({ ...prev, type }))}
+                    onClick={() => setForm((prev) => ({ ...prev, type, motif: type === "PTE" ? prev.motif : "" }))}
                     className={`group relative rounded-2xl border-2 bg-white p-5 text-left shadow-sm transition-all active:scale-[0.99] sm:rounded-3xl sm:p-9 min-h-[128px] sm:min-h-[168px] md:min-h-[188px] touch-manipulation ${form.type === type ? "border-[#00A09D] bg-[#00A09D]/5 ring-2 ring-[#00A09D]/10" : "border-gray-100 hover:border-gray-300"}`}
                   >
                     <div className="flex items-start justify-between gap-3 sm:gap-4">
@@ -437,6 +439,26 @@ export default function MouvementStepperModal({
                     {qtyLotError}
                   </p>
                 )}
+
+                {form.type === "PTE" && (
+                  <>
+                    <Label className="mt-4">Motif de la perte</Label>
+                    <textarea
+                      value={form.motif}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, motif: e.target.value }))
+                      }
+                      rows={3}
+                      maxLength={500}
+                      className={`${compactInput} mt-2 resize-y min-h-[5rem]`}
+                      placeholder="Ex. casse lors du transport, péremption, vol, erreur de comptage…"
+                      required
+                    />
+                    <p className="mt-1 text-[11px] text-gray-500">
+                      Obligatoire — décrivez la cause ou la nature de la perte.
+                    </p>
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -488,6 +510,9 @@ export default function MouvementStepperModal({
                 <SummaryRow label="Article" value={summary.emballageLabel} />
                 <SummaryRow label="Lot" value={summary.lotLabel} />
                 <SummaryRow label="Volume" value={summary.quantiteLabel} />
+                {form.type === "PTE" && summary.motifLabel && (
+                  <SummaryRow label="Motif" value={summary.motifLabel} />
+                )}
                 <SummaryRow label="Trajet" value={`${summary.sourceLabel} → ${summary.destLabel}`} />
               </div>
             </div>

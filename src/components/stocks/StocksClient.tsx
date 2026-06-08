@@ -240,8 +240,8 @@ export default function StocksClient({ initialStocks }: Props) {
       <StocksHeader />
       <StocksStats stats={stats} />
 
-      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-        <div className="flex-1">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <div className="min-w-0 flex-1">
           <StocksFilters rows={rows} filters={filters} onChange={handleFiltersChange} />
         </div>
 

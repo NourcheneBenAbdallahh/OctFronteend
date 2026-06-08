@@ -1,7 +1,10 @@
 # Surcharge pour accès Internet via Cloudflare Tunnel (gratuit).
 # Rebuild obligatoire : NEXT_PUBLIC_GRAPHQL_ENDPOINT est figé au build.
+# OCT_PUBLIC_GRAPHQL_ENDPOINT : meta runtime (secours si cache build obsolète).
 services:
   frontend:
     build:
       args:
         NEXT_PUBLIC_GRAPHQL_ENDPOINT: ${TUNNEL_BACKEND_GRAPHQL}
+    environment:
+      OCT_PUBLIC_GRAPHQL_ENDPOINT: ${TUNNEL_BACKEND_GRAPHQL}

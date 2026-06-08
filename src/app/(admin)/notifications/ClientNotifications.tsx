@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { SortableTh } from '@/components/ui/SortableTableHeader';
 import { useTableSort } from '@/hooks/useTableSort';
 import type { SortColumn } from '@/lib/tableSort';
 import PageBreadcrumb from '@/components/common/PageBreadCrumb';
 import { getAlerts, getUnreadAlertsCount, markAlertAsRead, markAllAlertsAsRead, archiveAlert, Alert, AlertSeverity, AlertStatus } from '@/lib/notifications.api';
+import { hasAlertTarget, navigateToAlert } from '@/lib/notifications.helpers';
 import { useAuthStore } from '@/store/useAuthStore';
 import { ResponsiveTableWrap } from '@/components/ui/ResponsiveTableWrap';
 
@@ -78,6 +80,7 @@ function formatRelativeDate(dateString: string): string {
 }
 
 export default function ClientNotifications({}: ClientNotificationsProps) {
+  const router = useRouter();
   const token = useAuthStore((state) => state.token);
   const userId = useAuthStore((state) => state.user?.id);
   const [alerts, setAlerts] = useState<Alert[]>([]);
@@ -150,6 +153,14 @@ export default function ClientNotifications({}: ClientNotificationsProps) {
     } catch (error) {
       console.error('Failed to archive:', error);
     }
+  };
+
+  const handleOpenAlert = async (alert: Alert) => {
+    if (!hasAlertTarget(alert)) return;
+    if (alert.status === 'unread') {
+      await handleMarkRead(alert.id);
+    }
+    navigateToAlert(alert, router);
   };
 
   const { sortKey, sortDirection, toggleSort, sortRows } = useTableSort(ALERT_SORT_COLUMNS);
@@ -254,7 +265,11 @@ export default function ClientNotifications({}: ClientNotificationsProps) {
                   </thead>
                   <tbody className='divide-y divide-gray-200 text-sm dark:divide-gray-800'>
                     {paginatedAlerts.map((alert) => (
-                      <tr key={alert.id} className={`hover:bg-gray-50 dark:hover:bg-white/[0.03] ${alert.status === 'unread' ? 'bg-blue-50/30 dark:bg-blue-900/5' : ''}`}>
+                      <tr
+                        key={alert.id}
+                        onClick={() => void handleOpenAlert(alert)}
+                        className={`${hasAlertTarget(alert) ? 'cursor-pointer' : ''} hover:bg-gray-50 dark:hover:bg-white/[0.03] ${alert.status === 'unread' ? 'bg-blue-50/30 dark:bg-blue-900/5' : ''}`}
+                      >
                         <td className='px-6 py-4'>
                           <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${severityColors[alert.severity]}`}>
                             {severityLabels[alert.severity]}
@@ -276,16 +291,33 @@ export default function ClientNotifications({}: ClientNotificationsProps) {
                         </td>
                         <td className='px-6 py-4 text-right'>
                           <div className='flex items-center justify-end gap-2'>
+                            {hasAlertTarget(alert) && (
+                              <button
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void handleOpenAlert(alert);
+                                }}
+                                className='rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-300'
+                              >
+                                Voir
+                              </button>
+                            )}
                             {alert.status === 'unread' && (
                               <button
-                                onClick={() => handleMarkRead(alert.id)}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void handleMarkRead(alert.id);
+                                }}
                                 className='rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300'
                               >
                                 Marquer lu
                               </button>
                             )}
                             <button
-                              onClick={() => handleArchive(alert.id)}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void handleArchive(alert.id);
+                              }}
                               className='rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300'
                             >
                               Archiver

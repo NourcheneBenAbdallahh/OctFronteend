@@ -74,6 +74,13 @@ function EntrepotsPageContent() {
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
+  const [focusPinned, setFocusPinned] = useState(Boolean(focusId));
+  const [prevFocusId, setPrevFocusId] = useState(focusId);
+
+  if (focusId !== prevFocusId) {
+    setPrevFocusId(focusId);
+    setFocusPinned(Boolean(focusId));
+  }
   const itemsPerPage = 8;
   const { feedback, showSuccess, showError, clearFeedback } = useAppFeedback();
 
@@ -90,18 +97,6 @@ function EntrepotsPageContent() {
   useEffect(() => {
     loadData();
   }, []);
-
-  useEffect(() => {
-    if (!focusId || items.length === 0) return;
-    const target = items.find((it) => String(it.id) === String(focusId));
-    if (!target) return;
-
-    const timer = window.setTimeout(() => {
-      const el = document.getElementById(`entrepot-card-${target.id}`);
-      el?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 180);
-    return () => window.clearTimeout(timer);
-  }, [focusId, items]);
 
   const filteredItems = useMemo(() => {
     return items.filter((it) => {
@@ -121,15 +116,38 @@ function EntrepotsPageContent() {
     });
   }, [items, search, filterType]);
 
+  const focusTargetPage = useMemo(() => {
+    if (!focusId) return null;
+    const targetIndex = filteredItems.findIndex(
+      (it) => String(it.id) === String(focusId)
+    );
+    if (targetIndex === -1) return null;
+    return Math.floor(targetIndex / itemsPerPage) + 1;
+  }, [focusId, filteredItems, itemsPerPage]);
+
+  const activePage =
+    focusPinned && focusTargetPage !== null ? focusTargetPage : currentPage;
+
+  useEffect(() => {
+    if (!focusId || focusTargetPage === null) return;
+
+    const timer = window.setTimeout(() => {
+      const el = document.getElementById(`entrepot-card-${focusId}`);
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 180);
+    return () => window.clearTimeout(timer);
+  }, [focusId, focusTargetPage, activePage]);
+
   const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
 
   const paginatedItems = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
+    const start = (activePage - 1) * itemsPerPage;
     return filteredItems.slice(start, start + itemsPerPage);
-  }, [filteredItems, currentPage]);
+  }, [filteredItems, activePage, itemsPerPage]);
 
   // Reset pagination quand filtre/recherche change
   useEffect(() => {
+    setFocusPinned(false);
     setCurrentPage(1);
   }, [search, filterType]);
 
@@ -234,9 +252,12 @@ function EntrepotsPageContent() {
       {!loading && filteredItems.length > 0 && totalPages > 1 ? (
         <div className="shrink-0 mx-2 mb-2 flex items-center justify-center rounded-[2rem] border border-gray-50 bg-white py-4 shadow-sm">
           <LocalPagination
-            currentPage={currentPage}
+            currentPage={activePage}
             totalPages={totalPages}
-            onPageChange={setCurrentPage}
+            onPageChange={(page) => {
+              setFocusPinned(false);
+              setCurrentPage(page);
+            }}
           />
         </div>
       ) : null}

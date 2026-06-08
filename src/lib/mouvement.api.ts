@@ -9,6 +9,7 @@ export async function fetchMouvements(filters: {
   search?: string;
   type?: string;
   statut?: string;
+  sort?: "recent" | "oldest";
   page?: number;
   first?: number;
 } = {}) {
@@ -17,6 +18,7 @@ export async function fetchMouvements(filters: {
     $search: String,
     $type: MouvementType,
     $statut: MouvementStatut,
+    $orderBy: [QueryMouvementStocksOrderByOrderByClause!],
     $first: Int!,
     $page: Int!
   ) {
@@ -24,6 +26,7 @@ export async function fetchMouvements(filters: {
       search: $search,
       type_mouvement: $type,
       statut: $statut,
+      orderBy: $orderBy,
       first: $first,
       page: $page
     ) {
@@ -33,6 +36,7 @@ export async function fetchMouvements(filters: {
         type_mouvement
         statut
         quantite
+        motif
         date_mouvement   
          entrepot_source_id
       entrepot_destination_id
@@ -73,6 +77,12 @@ export async function fetchMouvements(filters: {
   const variables: Record<string, any> = {
     first: filters.first ?? 10,
     page: filters.page ?? 1,
+    orderBy: [
+      {
+        column: "DATE_MOUVEMENT",
+        order: filters.sort === "oldest" ? "ASC" : "DESC",
+      },
+    ],
   };
 
   if (filters.search?.trim()) {
@@ -114,6 +124,7 @@ export async function fetchMouvementById(id: string | number): Promise<Mouvement
         type_mouvement
         statut
         quantite
+        motif
         date_mouvement
         entrepot_source_id
         entrepot_destination_id
@@ -210,6 +221,7 @@ export async function createMouvementDraft(input: {
   entrepot_destination_id?: string | null;
   quantite: number;
   date_mouvement?: string | null;
+  motif?: string | null;
 }) {
   const mutation = `
     mutation ($input: CreateMouvementDraftInput!) {

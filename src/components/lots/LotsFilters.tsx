@@ -1,19 +1,21 @@
 "use client";
 
-import { useState } from "react";
-import { 
-  Search, 
-  Package, 
-  User, 
-  ArrowDownUp, 
-  CalendarDays, 
-  RotateCcw, 
-  ChevronDown, 
-  Filter, 
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Search,
+  Package,
+  User,
+  ArrowDownUp,
+  CalendarDays,
+  RotateCcw,
+  ChevronDown,
+  Filter,
   ChevronUp,
-  MessageSquare
+  MessageSquare,
 } from "lucide-react";
 import type { Lot, LotFiltersState } from "@/types/lot";
+import { FilterBarSelect } from "@/components/ui/FilterBarSelect";
+import { countActiveLotFilters, EMPTY_LOT_FILTERS } from "@/lib/lot.filters";
 
 interface Props {
   rows: Lot[];
@@ -21,116 +23,196 @@ interface Props {
   onChange: (filters: LotFiltersState) => void;
 }
 
+const SORT_OPTIONS = [
+  { value: "recent", label: "Plus récent" },
+  { value: "oldest", label: "Plus ancien" },
+  { value: "qty_desc", label: "Qté décroissante" },
+  { value: "qty_asc", label: "Qté croissante" },
+] as const;
+
 export default function LotsFilters({ rows, filters, onChange }: Props) {
   const [showFilters, setShowFilters] = useState(false);
+  const barRef = useRef<HTMLDivElement>(null);
+  const activeCount = countActiveLotFilters(filters);
 
-  // --- Extraction des données pour les selects ---
-  const emballages = Array.from(new Map(rows.filter((r) => r.emballage).map((r) => [String(r.emballage?.id), { id: String(r.emballage?.id), label: r.emballage?.name || `Emballage #${r.emballage_id}` }])).values());
-  const users = Array.from(new Map(rows.filter((r) => r.user).map((r) => [String(r.user?.id), { id: String(r.user?.id), label: r.user?.name || `User #${r.user_id}` }])).values());
+  const emballages = useMemo(
+    () =>
+      Array.from(
+        new Map(
+          rows
+            .filter((r) => r.emballage)
+            .map((r) => [
+              String(r.emballage?.id),
+              {
+                value: String(r.emballage?.id),
+                label:
+                  r.emballage?.name ||
+                  r.emballage?.code ||
+                  `Emballage #${r.emballage_id}`,
+              },
+            ])
+        ).values()
+      ),
+    [rows]
+  );
+
+  const users = useMemo(
+    () =>
+      Array.from(
+        new Map(
+          rows
+            .filter((r) => r.user)
+            .map((r) => [
+              String(r.user?.id),
+              {
+                value: String(r.user?.id),
+                label: r.user?.name || r.user?.email || `User #${r.user_id}`,
+              },
+            ])
+        ).values()
+      ),
+    [rows]
+  );
+
+  useEffect(() => {
+    if (!showFilters) return;
+    const onDocClick = (e: MouseEvent) => {
+      const target = e.target;
+      if (!(target instanceof Node)) return;
+      if (barRef.current?.contains(target)) return;
+      if (
+        target instanceof Element &&
+        target.closest('[id^="filter-bar-select-"]')
+      ) {
+        return;
+      }
+      setShowFilters(false);
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [showFilters]);
 
   return (
-    <div className="flex flex-col gap-4 mb-10 px-8">
-      
-      {/* LIGNE PRINCIPALE : RECHERCHE + ACTIONS RAPIDES */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 group">
-          <Search size={20} className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-[#00A09D] transition-colors" />
-          <input
-            value={filters.search}
-            onChange={(e) => onChange({ ...filters, search: e.target.value })}
-            placeholder="Rechercher un code lot, un commentaire..."
-            className="w-full h-[64px] bg-white border border-gray-100 rounded-full pl-16 pr-6 text-[14px] font-bold text-gray-800 outline-none focus:border-[#00A09D] focus:ring-4 focus:ring-[#00A09D]/5 shadow-sm transition-all"
-          />
-        </div>
-
-        {/* BOUTON TOGGLE FILTRES */}
+    <div ref={barRef} className="flex w-full min-w-0 flex-col gap-3 px-8">
+      <div className="relative flex min-h-[52px] flex-1 items-center rounded-2xl border border-gray-100 bg-white px-4 py-3 shadow-sm ring-indigo-500/10 transition-all focus-within:ring-2">
+        <Search size={18} className="mr-3 shrink-0 text-gray-300" />
+        <input
+          value={filters.search}
+          onChange={(e) => onChange({ ...filters, search: e.target.value })}
+          placeholder="Rechercher un code lot, emballage, utilisateur ou commentaire…"
+          className="min-w-0 flex-1 outline-none text-sm font-medium placeholder:text-gray-300"
+        />
         <button
-          onClick={() => setShowFilters(!showFilters)}
-          className={`h-[64px] px-8 flex items-center gap-3 rounded-full border transition-all font-black text-[10px] uppercase tracking-[0.2em] shadow-sm ${
-            showFilters 
-            ? "bg-gray-900 border-gray-900 text-white" 
-            : "bg-white border-gray-100 text-gray-500 hover:bg-gray-50"
+          type="button"
+          onClick={() => setShowFilters((v) => !v)}
+          aria-expanded={showFilters}
+          aria-label={showFilters ? "Masquer les filtres" : "Afficher les filtres"}
+          className={`relative ml-3 flex shrink-0 items-center gap-1.5 rounded-xl px-2.5 py-1.5 transition-all ${
+            showFilters || activeCount > 0
+              ? "bg-[#1C2434] text-white"
+              : "text-gray-400 hover:bg-gray-50 hover:text-indigo-600"
           }`}
         >
           <Filter size={18} />
-          {showFilters ? "Fermer" : "Filtres"}
-          {showFilters ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-        </button>
-
-        {/* RESET RAPIDE */}
-        <button
-          onClick={() => onChange({ search: "", emballage: "", user: "", commentOnly: false, sort: "recent", dateFrom: "", dateTo: "" })}
-          className="h-[64px] w-[64px] flex items-center justify-center rounded-full bg-white border border-gray-100 text-gray-400 hover:text-red-500 hover:shadow-md transition-all shadow-sm group"
-        >
-          <RotateCcw size={20} className="group-hover:rotate-[-90deg] transition-transform duration-500" />
+          {activeCount > 0 ? (
+            <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#00A09D] px-1 text-[9px] font-black text-white">
+              {activeCount}
+            </span>
+          ) : showFilters ? (
+            <ChevronUp size={14} />
+          ) : (
+            <ChevronDown size={14} />
+          )}
         </button>
       </div>
 
-      {/* ZONE DES FILTRES DÉPLOYABLE */}
       {showFilters && (
-        <div className="flex flex-wrap items-center gap-4 p-8 bg-[#F0F4F4]/50 rounded-[40px] border border-white animate-in fade-in slide-in-from-top-4 duration-300">
-          
-          {/* TRI CHRONOLOGIQUE */}
-          <div className="relative group">
-            <ArrowDownUp size={14} className="absolute left-5 top-1/2 -translate-y-1/2 text-[#00A09D]" />
-            <select
-              value={filters.sort}
-              onChange={(e) => onChange({ ...filters, sort: e.target.value as any })}
-              className="appearance-none h-12 pl-12 pr-12 rounded-full border-2 border-white bg-white text-[10px] font-black uppercase tracking-widest text-gray-600 outline-none focus:border-gray-900 shadow-sm cursor-pointer transition-all"
-            >
-              <option value="recent">Plus récent</option>
-              <option value="oldest">Plus ancien</option>
-              <option value="qty_desc">Qté (Décroissante)</option>
-              <option value="qty_asc">Qté (Croissante)</option>
-            </select>
-            <ChevronDown size={12} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+        <div className="w-full min-w-0 rounded-[1.75rem] border border-gray-100 bg-gradient-to-br from-[#F0F4F4]/80 to-white p-3 shadow-sm animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="flex w-full min-w-0 flex-col gap-2.5">
+            <div className="flex w-full min-w-0 flex-wrap items-center gap-2.5">
+              <span className="shrink-0 rounded-full bg-[#1C2434] px-4 py-2.5 text-[9px] font-black uppercase tracking-[0.2em] text-white shadow-sm">
+                Filtrer les lots
+              </span>
+
+              <button
+                type="button"
+                onClick={() => onChange({ ...filters, commentOnly: !filters.commentOnly })}
+                className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-4 py-2.5 text-[10px] font-black uppercase tracking-wider transition-all ${
+                  filters.commentOnly
+                    ? "bg-[#00A09D] text-white shadow-md shadow-[#00A09D]/25"
+                    : "border border-gray-100 bg-white text-gray-500 hover:border-[#00A09D]/40 hover:text-[#00A09D]"
+                }`}
+              >
+                <MessageSquare size={14} className="shrink-0" />
+                Notes uniquement
+              </button>
+            </div>
+
+            <div className="flex w-full min-w-0 flex-wrap items-center gap-2.5">
+              <FilterBarSelect
+                value={filters.sort}
+                onChange={(sort) =>
+                  onChange({ ...filters, sort: sort as LotFiltersState["sort"] })
+                }
+                placeholder="Tri par défaut"
+                ariaLabel="Trier les lots"
+                icon={<ArrowDownUp size={14} />}
+                options={SORT_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+                triggerClassName="min-w-[148px] max-w-full"
+              />
+
+              <FilterBarSelect
+                value={filters.emballage}
+                onChange={(emballage) => onChange({ ...filters, emballage })}
+                placeholder="Tous les emballages"
+                ariaLabel="Filtrer par emballage"
+                icon={<Package size={14} />}
+                options={emballages}
+                triggerClassName="min-w-[148px] max-w-full"
+              />
+
+              <FilterBarSelect
+                value={filters.user}
+                onChange={(user) => onChange({ ...filters, user })}
+                placeholder="Tous les utilisateurs"
+                ariaLabel="Filtrer par utilisateur"
+                icon={<User size={14} />}
+                options={users}
+                triggerClassName="min-w-[148px] max-w-full"
+              />
+
+              <div className="flex h-11 min-w-0 max-w-full shrink-0 items-center gap-2 rounded-full border border-gray-100 bg-white px-4 shadow-sm">
+                <CalendarDays size={14} className="shrink-0 text-[#00A09D]" aria-hidden />
+                <input
+                  type="date"
+                  value={filters.dateFrom || ""}
+                  onChange={(e) => onChange({ ...filters, dateFrom: e.target.value })}
+                  aria-label="Date de début"
+                  className="min-w-0 w-[6.5rem] bg-transparent text-[10px] font-bold text-gray-500 outline-none"
+                />
+                <span className="text-gray-200" aria-hidden>
+                  —
+                </span>
+                <input
+                  type="date"
+                  value={filters.dateTo || ""}
+                  onChange={(e) => onChange({ ...filters, dateTo: e.target.value })}
+                  aria-label="Date de fin"
+                  className="min-w-0 w-[6.5rem] bg-transparent text-[10px] font-bold text-gray-500 outline-none"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => onChange(EMPTY_LOT_FILTERS)}
+                disabled={!filters.search && activeCount === 0}
+                className="flex h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-gray-100 bg-white px-4 text-[10px] font-black uppercase tracking-widest text-gray-500 shadow-sm transition-all hover:border-red-200 hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <RotateCcw size={15} />
+                Réinitialiser
+              </button>
+            </div>
           </div>
-
-          {/* FILTRE EMBALLAGE */}
-          <div className="relative group">
-            <Package size={14} className="absolute left-5 top-1/2 -translate-y-1/2 text-[#00A09D]" />
-            <select
-              value={filters.emballage}
-              onChange={(e) => onChange({ ...filters, emballage: e.target.value })}
-              className="appearance-none h-12 pl-12 pr-12 rounded-full border-2 border-white bg-white text-[10px] font-black uppercase tracking-widest text-gray-600 outline-none focus:border-gray-900 shadow-sm cursor-pointer transition-all"
-            >
-              <option value="">Tous les emballages</option>
-              {emballages.map((e) => ( <option key={e.id} value={e.id}>{e.label}</option> ))}
-            </select>
-            <ChevronDown size={12} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-          </div>
-
-          {/* FILTRE COMMENTAIRES (BOUTON TOGGLE) */}
-          <button
-            onClick={() => onChange({ ...filters, commentOnly: !filters.commentOnly })}
-            className={`h-12 px-6 rounded-full border-2 transition-all flex items-center gap-2 text-[10px] font-black uppercase tracking-widest ${
-              filters.commentOnly
-              ? "bg-[#00A09D] border-[#00A09D] text-white shadow-[0_0_15px_rgba(0,160,157,0.3)]"
-              : "bg-white border-white text-gray-500 shadow-sm"
-            }`}
-          >
-            <MessageSquare size={14} />
-            Notes uniquement
-          </button>
-
-          {/* SÉLECTEUR DE PÉRIODE */}
-          <div className="flex items-center bg-white border-2 border-white rounded-full h-12 px-6 shadow-sm">
-            <CalendarDays size={14} className="text-[#00A09D] mr-4" />
-            <input
-              type="date"
-              value={filters.dateFrom || ""}
-              onChange={(e) => onChange({ ...filters, dateFrom: e.target.value })}
-              className="text-[10px] font-black text-gray-600 bg-transparent outline-none w-28 uppercase"
-            />
-            <div className="w-[1px] h-4 bg-gray-100 mx-4" />
-            <input
-              type="date"
-              value={filters.dateTo || ""}
-              onChange={(e) => onChange({ ...filters, dateTo: e.target.value })}
-              className="text-[10px] font-black text-gray-600 bg-transparent outline-none w-28 uppercase"
-            />
-          </div>
-
         </div>
       )}
     </div>

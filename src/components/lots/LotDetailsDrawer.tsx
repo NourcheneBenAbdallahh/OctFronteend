@@ -1,6 +1,6 @@
 "use client";
 
-import { X, Package, CalendarDays, User2, MessageSquareText, Hash, Info, History } from "lucide-react";
+import { X, Package, CalendarDays, User2, MessageSquareText, Hash, Info, History, Warehouse } from "lucide-react";
 import type { Lot } from "@/types/lot";
 
 interface Props {
@@ -23,6 +23,11 @@ function formatDate(date?: string | null) {
 function getEmballageLabel(lot: Lot | null) {
   if (!lot) return "-";
   return lot.emballage?.name || lot.emballage?.code || `Emballage #${lot.emballage_id}`;
+}
+
+function getEntrepotLabel(lot: Lot | null) {
+  if (!lot) return "-";
+  return lot.entrepot?.nom || lot.entrepot?.name || "Non défini";
 }
 
 export default function LotDetailsDrawer({ lot, open, onClose }: Props) {
@@ -109,6 +114,18 @@ export default function LotDetailsDrawer({ lot, open, onClose }: Props) {
                   <span className="text-[13px] font-bold text-gray-500 uppercase tracking-wider">Emballage</span>
                 </div>
                 <span className="text-[14px] font-[900] text-[#1C2434] uppercase">{getEmballageLabel(lot)}</span>
+              </div>
+
+              <div className="flex items-center justify-between p-5 bg-white border border-gray-100 rounded-2xl group hover:border-[#DDF2F1] transition-colors">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 group-hover:text-[#00A09D] transition-colors">
+                    <Warehouse size={18} />
+                  </div>
+                  <span className="text-[13px] font-bold text-gray-500 uppercase tracking-wider">Entrepôt</span>
+                </div>
+                <span className="text-[14px] font-[900] text-[#1C2434] uppercase text-right break-words max-w-[55%]">
+                  {getEntrepotLabel(lot)}
+                </span>
               </div>
 
               <div className="flex items-center justify-between p-5 bg-white border border-gray-100 rounded-2xl group hover:border-[#DDF2F1] transition-colors">

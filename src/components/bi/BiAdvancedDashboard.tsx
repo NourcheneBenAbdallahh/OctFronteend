@@ -65,7 +65,6 @@ import {
   topBusyDays,
   uniqueEntrepotNames,
 } from "@/lib/bi.data";
-import { exportBiSummaryPdf } from "@/lib/bi.pdf";
 import { tourPageAttrs } from "@/lib/tourPageAttrs";
 
 const tour = tourPageAttrs("/bi");
@@ -280,7 +279,7 @@ export default function BiAdvancedDashboard() {
       (showCmd && commandes.length === 0) ||
       (showFac && factures.length === 0));
 
-  const handleExportPdf = useCallback(() => {
+  const handleExportPdf = useCallback(async () => {
     if (loading) return;
     setExporting(true);
     try {
@@ -288,6 +287,7 @@ export default function BiAdvancedDashboard() {
         PERIOD_OPTIONS.find((o) => o.key === period)?.label ?? period;
       const entrepotLabel =
         entrepot === "all" ? "Tous les entrepots" : String(entrepot);
+      const { exportBiSummaryPdf } = await import("@/lib/bi.pdf");
       exportBiSummaryPdf({
         periodLabel,
         entrepotLabel,

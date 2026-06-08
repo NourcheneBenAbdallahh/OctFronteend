@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import type {
   Lot,
   LotFiltersState,
@@ -13,8 +13,14 @@ import LotsFilters from "./LotsFilters";
 import LotsTimelineView from "./LotsTimelineView";
 import LotsCardsView from "./LotsCardsView";
 import LotDetailsDrawer from "./LotDetailsDrawer";
-import { deleteLot, getLots } from "@/lib/lot.api";
-import { AppConfirmModal, AppFeedbackBanner } from "@/components/ui/feedback";
+import { getAllLots } from "@/lib/lot.api";
+import {
+  applyLotFilters,
+  EMPTY_LOT_FILTERS,
+  lotTotalPages,
+  paginateLotRows,
+} from "@/lib/lot.filters";
+import { AppFeedbackBanner } from "@/components/ui/feedback";
 import { useAppFeedback } from "@/hooks/useAppFeedback";
 
 interface Props {
@@ -25,7 +31,8 @@ interface Props {
   };
 }
 
-// Utilitaires de date (Gardés de ton code original)
+const ITEMS_PER_PAGE = 12;
+
 const isToday = (dateStr?: string | null) => {
   if (!dateStr) return false;
   const date = new Date(dateStr);
@@ -40,7 +47,7 @@ const isToday = (dateStr?: string | null) => {
 const formatGroupLabel = (dateKey: string) => {
   const date = new Date(dateKey);
   const today = new Date();
-  if (date.toDateString() === today.toDateString()) return "Aujourd’hui";
+  if (date.toDateString() === today.toDateString()) return "Aujourd'hui";
   return date.toLocaleDateString("fr-FR", {
     weekday: "long",
     year: "numeric",
@@ -49,147 +56,137 @@ const formatGroupLabel = (dateKey: string) => {
   });
 };
 
-export default function LotsClient({ initialLots, initialPagination }: Props) {
-  // --- ÉTATS ---
+export default function LotsClient({ initialLots }: Props) {
   const [rows, setRows] = useState<Lot[]>(initialLots);
-  const [pagination, setPagination] = useState(initialPagination);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(initialLots.length === 0);
   const [viewMode, setViewMode] = useState<"timeline" | "cards">("timeline");
-  
-  // UI States
+  const [currentPage, setCurrentPage] = useState(1);
+
   const [selectedLot, setSelectedLot] = useState<Lot | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const {
-    feedback,
-    confirm,
-    showSuccess,
-    clearFeedback,
-    openConfirm,
-    closeConfirm,
-    runConfirmedAction,
-  } = useAppFeedback();
+  const { feedback, clearFeedback } = useAppFeedback();
 
-  const [filters, setFilters] = useState<LotFiltersState>({
-    search: "",
-    emballage: "",
-    user: "",
-    commentOnly: false,
-    sort: "recent",
-    dateFrom: "",
-    dateTo: "",
-  });
+  const [filters, setFilters] = useState<LotFiltersState>(EMPTY_LOT_FILTERS);
 
-  // --- LOGIQUE DE PAGINATION & CHARGEMENT ---
-  const handlePageChange = async (page: number) => {
+  useEffect(() => {
+    let cancelled = false;
     setLoading(true);
-    try {
-      const response = await getLots(page, 12); 
-      setRows(response.data);
-      setPagination({
-        currentPage: response.currentPage,
-        lastPage: response.lastPage
+    void getAllLots()
+      .then((all) => {
+        if (!cancelled && all.length > 0) setRows(all);
+      })
+      .catch((error) => console.error("Erreur chargement lots:", error))
+      .finally(() => {
+        if (!cancelled) setLoading(false);
       });
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch (error) {
-      console.error("Erreur pagination:", error);
-    } finally {
-      setLoading(false);
-    }
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleFiltersChange = (next: LotFiltersState) => {
+    setFilters(next);
+    setCurrentPage(1);
   };
 
-  // --- STATISTIQUES (Basées sur les lignes affichées) ---
-  const stats: LotsStatsType = useMemo(() => ({
-    totalLots: rows.length,
-    totalQuantite: rows.reduce((acc, row) => acc + Number(row.quantite || 0), 0),
-    lotsToday: rows.filter(r => isToday(r.date_mvt)).length,
-    commentedLots: rows.filter(r => Boolean(r.commentaire?.trim())).length,
-  }), [rows]);
-const grouped: LotsGroupedByDate[] = useMemo(() => {
-  const map = new Map<string, Lot[]>();
-
-  // FORCE LE TRI DES LIGNES REÇUES (Au cas où le serveur a envoyé du désordre)
-  const sortedRows = [...rows].sort((a, b) => 
-    new Date(b.date_mvt).getTime() - new Date(a.date_mvt).getTime()
+  const filteredRows = useMemo(
+    () => applyLotFilters(rows, filters),
+    [rows, filters]
   );
 
-  sortedRows.forEach((lot) => {
-    const d = new Date(lot.date_mvt);
-    const dateKey = new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString();
-    
-    if (!map.has(dateKey)) map.set(dateKey, []);
-    map.get(dateKey)!.push(lot);
-  });
+  const totalPages = lotTotalPages(filteredRows.length, ITEMS_PER_PAGE);
 
-  return Array.from(map.entries())
-    .sort(([a], [b]) => new Date(b).getTime() - new Date(a).getTime())
-    .map(([dateKey, items]) => ({
-      dateKey,
-      label: formatGroupLabel(dateKey),
-      items,
-    }));
-}, [rows]);
-  // --- ACTIONS CALLBACKS ---
+  const paginatedRows = useMemo(
+    () => paginateLotRows(filteredRows, currentPage, ITEMS_PER_PAGE),
+    [filteredRows, currentPage]
+  );
+
+  const stats: LotsStatsType = useMemo(
+    () => ({
+      totalLots: filteredRows.length,
+      totalQuantite: filteredRows.reduce(
+        (acc, row) => acc + Number(row.quantite || 0),
+        0
+      ),
+      lotsToday: filteredRows.filter((r) => isToday(r.date_mvt)).length,
+      commentedLots: filteredRows.filter((r) =>
+        Boolean(r.commentaire?.trim())
+      ).length,
+    }),
+    [filteredRows]
+  );
+
+  const grouped: LotsGroupedByDate[] = useMemo(() => {
+    const map = new Map<string, Lot[]>();
+
+    paginatedRows.forEach((lot) => {
+      const d = new Date(lot.date_mvt);
+      const dateKey = new Date(
+        d.getFullYear(),
+        d.getMonth(),
+        d.getDate()
+      ).toISOString();
+
+      if (!map.has(dateKey)) map.set(dateKey, []);
+      map.get(dateKey)!.push(lot);
+    });
+
+    return Array.from(map.entries())
+      .sort(([a], [b]) => new Date(b).getTime() - new Date(a).getTime())
+      .map(([dateKey, items]) => ({
+        dateKey,
+        label: formatGroupLabel(dateKey),
+        items,
+      }));
+  }, [paginatedRows]);
+
   const handleView = useCallback((lot: Lot) => {
     setSelectedLot(lot);
     setDrawerOpen(true);
   }, []);
 
-  const handleDelete = (lot: Lot) => {
-    clearFeedback();
-    openConfirm({
-      title: "Supprimer ce lot ?",
-      detail: lot.code_lot,
-      description: "Cette action est définitive.",
-      variant: "danger",
-      onConfirm: () =>
-        void runConfirmedAction(async () => {
-          await deleteLot(lot.id);
-          setRows((prev) => prev.filter((r) => r.id !== lot.id));
-          showSuccess("Lot supprimé.");
-        }),
-    });
+  const pagination = {
+    currentPage,
+    lastPage: totalPages,
   };
 
   return (
-    <div className={`max-w-[1600px] mx-auto space-y-8 pb-20 transition-opacity duration-300 ${loading ? 'opacity-50' : 'opacity-100'}`}>
-      
+    <div
+      className={`max-w-[1600px] mx-auto space-y-8 pb-20 transition-opacity duration-300 ${loading ? "opacity-50" : "opacity-100"}`}
+    >
       <AppFeedbackBanner feedback={feedback} onDismiss={clearFeedback} />
-      <AppConfirmModal confirm={confirm} onClose={closeConfirm} />
 
-      {/* 1. TON HEADER ORIGINAL */}
-      <LotsHeader viewMode={viewMode} onChangeView={setViewMode} count={rows.length} />
+      <LotsHeader
+        viewMode={viewMode}
+        onChangeView={setViewMode}
+        count={filteredRows.length}
+      />
 
-      {/* 2. TES STATS */}
       <LotsStats stats={stats} />
 
-      {/* 3. TES FILTRES STICKY */}
-      <div className="sticky top-4 z-30">
-        <LotsFilters rows={rows} filters={filters} onChange={setFilters} />
+      <div className="sticky top-4 z-30 min-w-0">
+        <LotsFilters rows={rows} filters={filters} onChange={handleFiltersChange} />
       </div>
 
-      {/* 4. LE CONTENU (TIMELINE OU CARDS) */}
       <main className="min-h-[400px]">
         {viewMode === "timeline" ? (
           <LotsTimelineView
             groups={grouped}
             pagination={pagination}
-            onPageChange={handlePageChange}
+            onPageChange={setCurrentPage}
             onView={handleView}
-            onDelete={handleDelete}
           />
         ) : (
           <LotsCardsView
-            rows={rows}
+            rows={paginatedRows}
             pagination={pagination}
-            onPageChange={handlePageChange}
+            onPageChange={setCurrentPage}
             onView={handleView}
-            onDelete={handleDelete}
           />
         )}
       </main>
 
-      {/* 5. TES DRAWERS */}
       <LotDetailsDrawer
         lot={selectedLot}
         open={drawerOpen}

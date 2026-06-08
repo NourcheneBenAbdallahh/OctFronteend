@@ -62,6 +62,7 @@ describe("mouvement.api", () => {
         search: "MVMT",
         type: "SPL",
         statut: "BROUILLON",
+        orderBy: [{ column: "DATE_MOUVEMENT", order: "DESC" }],
       }
     );
   });
@@ -85,6 +86,30 @@ describe("mouvement.api", () => {
     expect(mockedRequest).toHaveBeenCalledWith(expect.any(String), {
       first: 10,
       page: 2,
+      orderBy: [{ column: "DATE_MOUVEMENT", order: "DESC" }],
+    });
+  });
+
+  it("fetchMouvements envoie ASC quand sort oldest", async () => {
+    mockedRequest.mockResolvedValue({
+      mouvementStocks: {
+        data: [],
+        paginatorInfo: {
+          currentPage: 1,
+          lastPage: 1,
+          total: 0,
+          perPage: 10,
+          hasMorePages: false,
+        },
+      },
+    });
+
+    await fetchMouvements({ sort: "oldest", page: 1, first: 10 });
+
+    expect(mockedRequest).toHaveBeenCalledWith(expect.any(String), {
+      first: 10,
+      page: 1,
+      orderBy: [{ column: "DATE_MOUVEMENT", order: "ASC" }],
     });
   });
 

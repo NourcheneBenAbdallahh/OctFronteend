@@ -14,7 +14,6 @@ interface Props {
   };
   onPageChange?: (page: number) => void;
   onView?: (lot: Lot) => void;
-  onDelete?: (lot: Lot) => void;
 }
 
 export default function LotsCardsView({
@@ -22,7 +21,6 @@ export default function LotsCardsView({
   pagination,
   onPageChange,
   onView,
-  onDelete,
 }: Props) {
   
   // ÉTAT VIDE : Si aucune donnée n'est trouvée
@@ -70,7 +68,6 @@ export default function LotsCardsView({
               lot={lot}
               compact
               onView={onView}
-              onDelete={onDelete}
             />
           </div>
         ))}

@@ -27,6 +27,7 @@ import {
 import { CommandeSearchablePicker } from "@/components/bon-livraisons/CommandeSearchablePicker";
 import { formatNumber } from "@/lib/utils";
 import { BonLivraisonDocumentModal } from "@/components/bon-livraisons/BonLivraisonDocumentModal";
+import BonLivraisonDetailDrawer from "@/components/bon-livraisons/BonLivraisonDetailDrawer";
 import {
   downloadBlob,
   fetchBonLivraisonDocument,
@@ -208,6 +209,7 @@ export default function BonLivraisonsTable({
 
   const [currentPage, setCurrentPage] = useState(1);
   const [documentViewerBl, setDocumentViewerBl] = useState<TableBonLivraison | null>(null);
+  const [detailBl, setDetailBl] = useState<TableBonLivraison | null>(null);
   const [documentDownloadLoadingId, setDocumentDownloadLoadingId] = useState<string | null>(null);
 
   useEffect(() => setRows(data), [data]);
@@ -564,6 +566,47 @@ export default function BonLivraisonsTable({
     }
   }
 
+  function openEdit(bl: TableBonLivraison) {
+    setEditing(bl);
+    const cmd = commandes.find((c) => c.numero_commande === bl.numero_commande);
+    const emb = cmd
+      ? emballages.find((e) => String(e.id) === String(cmd.emballage_id))
+      : null;
+    setQuantiteUniteSaisie(
+      resolvePrincipalUnitCode(emb?.capacity_unit ?? null, unitesMesure)
+    );
+    setForm({
+      date_reception: bl.date_reception?.split("T")[0] || "",
+      emballage_id: String(bl.emballage_id),
+      quantite_recue: String(bl.quantite_recue),
+      numero_commande: bl.numero_commande,
+      entrepot_id: String(bl.entrepot_id),
+      statut: bl.statut || "VALIDE",
+    });
+    setIsDrawerOpen(true);
+  }
+
+  function getEmballageLabel(bl: TableBonLivraison) {
+    const fromCmd = bl.commande?.emballage;
+    if (fromCmd?.code || fromCmd?.name) {
+      return `${fromCmd.code ?? ""} — ${fromCmd.name ?? ""}`.trim();
+    }
+    const emb = emballages.find((e) => String(e.id) === String(bl.emballage_id));
+    return emb?.label ?? "";
+  }
+
+  function getEntrepotLabel(bl: TableBonLivraison) {
+    return entrepots.find((e) => String(e.id) === String(bl.entrepot_id))?.label ?? "";
+  }
+
+  function getUnitCode(bl: TableBonLivraison) {
+    const fromCmd = bl.commande?.emballage?.capacity_unit;
+    if (fromCmd) {
+      return resolvePrincipalUnitCode(fromCmd, unitesMesure);
+    }
+    return commandeUnitByNumero.get(bl.numero_commande) ?? "";
+  }
+
   function handleDelete(id: Id) {
     const row = rows.find((r) => String(r.id) === String(id));
     clearFeedback();
@@ -716,9 +759,7 @@ export default function BonLivraisonsTable({
               <SortableTh columnKey="commande" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400" align="center">Commande</SortableTh>
               <SortableTh columnKey="quantite" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400" align="center">Quantité Reçue</SortableTh>
               <SortableTh columnKey="statut" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400" align="center">Justificatif</SortableTh>
-              {!readOnly ? (
-                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400 text-right">Actions</th>
-              ) : null}
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
@@ -789,36 +830,29 @@ export default function BonLivraisonsTable({
                     </span>
                   )}
                 </td>
-                {!readOnly ? (
-                  <td className="px-6 py-5">
-                    <div className="flex justify-end gap-1">
+                <td className="px-6 py-5">
+                  <div className="flex justify-end gap-1">
+                    <button
+                      type="button"
+                      title="Voir le détail"
+                      aria-label={`Voir le détail du BL ${bl.numero_bl || bl.id}`}
+                      onClick={() => setDetailBl(bl)}
+                      className="p-2.5 text-gray-400 hover:text-indigo-600 hover:bg-white rounded-xl transition-all"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </button>
+                    {!readOnly ? (
                       <button
-                        onClick={() => {
-                          setEditing(bl);
-                          const cmd = commandes.find((c) => c.numero_commande === bl.numero_commande);
-                          const emb = cmd
-                            ? emballages.find((e) => String(e.id) === String(cmd.emballage_id))
-                            : null;
-                          setQuantiteUniteSaisie(
-                            resolvePrincipalUnitCode(emb?.capacity_unit ?? null, unitesMesure)
-                          );
-                          setForm({
-                            date_reception: bl.date_reception?.split("T")[0] || "",
-                            emballage_id: String(bl.emballage_id),
-                            quantite_recue: String(bl.quantite_recue),
-                            numero_commande: bl.numero_commande,
-                            entrepot_id: String(bl.entrepot_id),
-                            statut: bl.statut || "VALIDE",
-                          });
-                          setIsDrawerOpen(true);
-                        }}
+                        type="button"
+                        title="Modifier"
+                        onClick={() => openEdit(bl)}
                         className="p-2.5 text-gray-400 hover:text-indigo-600 hover:bg-white rounded-xl transition-all"
                       >
                         <Edit2 className="h-4 w-4" />
                       </button>
-                    </div>
-                  </td>
-                ) : null}
+                    ) : null}
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -841,6 +875,36 @@ export default function BonLivraisonsTable({
         onClose={() => setDocumentViewerBl(null)}
         bonLivraisonId={documentViewerBl?.id ?? null}
         numeroBl={documentViewerBl?.numero_bl}
+      />
+
+      <BonLivraisonDetailDrawer
+        bl={detailBl}
+        open={Boolean(detailBl)}
+        onClose={() => setDetailBl(null)}
+        emballageLabel={detailBl ? getEmballageLabel(detailBl) : ""}
+        entrepotLabel={detailBl ? getEntrepotLabel(detailBl) : ""}
+        unitCode={detailBl ? getUnitCode(detailBl) : ""}
+        userNamesById={userNamesById}
+        documentDownloadLoading={
+          detailBl != null && documentDownloadLoadingId === String(detailBl.id)
+        }
+        onViewDocument={
+          detailBl?.document_bl
+            ? () => setDocumentViewerBl(detailBl)
+            : undefined
+        }
+        onDownloadDocument={
+          detailBl?.document_bl ? () => handleDownloadDocument(detailBl) : undefined
+        }
+        onEdit={
+          !readOnly && detailBl
+            ? () => {
+                const target = detailBl;
+                setDetailBl(null);
+                openEdit(target);
+              }
+            : undefined
+        }
       />
 
       {/* DRAWER DESIGN */}
