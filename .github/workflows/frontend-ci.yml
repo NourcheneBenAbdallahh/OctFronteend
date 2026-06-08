@@ -152,7 +152,12 @@ jobs:
         run: npm ci
 
       - name: Run Vitest with coverage
-        run: npm run test:coverage 2>&1 | tee coverage.txt
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run test:coverage 2>&1 | tee coverage.txt
+          test -f coverage/lcov.info || { echo "::error::coverage/lcov.info manquant après Vitest"; exit 1; }
+          test -f sonar-report.xml || { echo "::error::sonar-report.xml manquant après Vitest"; exit 1; }
 
       - name: Publish coverage summary
         run: node scripts/ci-coverage-summary.js
