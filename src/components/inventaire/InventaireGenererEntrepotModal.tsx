@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Calendar, CalendarRange, Layers, Warehouse } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import {
@@ -32,8 +32,9 @@ interface Props {
   }) => void;
 }
 
-export default function InventaireGenererEntrepotModal({
-  open,
+type FormProps = Omit<Props, "open">;
+
+function InventaireGenererForm({
   entrepots,
   initialEntrepotId = "",
   initialMode = "day",
@@ -42,19 +43,13 @@ export default function InventaireGenererEntrepotModal({
   loading = false,
   onClose,
   onConfirm,
-}: Props) {
+}: FormProps) {
   const [entrepotId, setEntrepotId] = useState(initialEntrepotId);
-  const [mode, setMode] = useState<"day" | "year">(initialMode === "year" ? "year" : "day");
+  const [mode, setMode] = useState<"day" | "year">(
+    initialMode === "year" ? "year" : "day"
+  );
   const [pivotDay, setPivotDay] = useState(initialDay || todayIsoDay());
   const [pivotYear, setPivotYear] = useState(initialYear || currentYear());
-
-  useEffect(() => {
-    if (!open) return;
-    setEntrepotId(initialEntrepotId);
-    setMode(initialMode === "year" ? "year" : "day");
-    setPivotDay(initialDay || todayIsoDay());
-    setPivotYear(initialYear || currentYear());
-  }, [open, initialEntrepotId, initialMode, initialDay, initialYear]);
 
   const entrepotLabel = entrepots.find((e) => e.id === entrepotId)?.label;
 
@@ -80,7 +75,7 @@ export default function InventaireGenererEntrepotModal({
   };
 
   return (
-    <Modal isOpen={open} onClose={onClose} className="max-w-lg rounded-[32px] p-8" showCloseButton>
+    <>
       <div className="text-center mb-6">
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#00A09D]/10 text-[#00A09D]">
           <Layers size={26} />
@@ -202,6 +197,38 @@ export default function InventaireGenererEntrepotModal({
           {loading ? "Génération…" : "Générer les lignes"}
         </button>
       </div>
+    </>
+  );
+}
+
+export default function InventaireGenererEntrepotModal({
+  open,
+  entrepots,
+  initialEntrepotId = "",
+  initialMode = "day",
+  initialDay,
+  initialYear,
+  loading = false,
+  onClose,
+  onConfirm,
+}: Props) {
+  const formKey = `${initialEntrepotId}-${initialMode}-${initialDay ?? ""}-${initialYear ?? ""}`;
+
+  return (
+    <Modal isOpen={open} onClose={onClose} className="max-w-lg rounded-[32px] p-8" showCloseButton>
+      {open ? (
+        <InventaireGenererForm
+          key={formKey}
+          entrepots={entrepots}
+          initialEntrepotId={initialEntrepotId}
+          initialMode={initialMode}
+          initialDay={initialDay}
+          initialYear={initialYear}
+          loading={loading}
+          onClose={onClose}
+          onConfirm={onConfirm}
+        />
+      ) : null}
     </Modal>
   );
 }

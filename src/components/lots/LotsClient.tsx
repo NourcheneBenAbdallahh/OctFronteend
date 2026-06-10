@@ -71,7 +71,6 @@ export default function LotsClient({ initialLots }: Props) {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
     void getAllLots()
       .then((all) => {
         if (!cancelled && all.length > 0) setRows(all);

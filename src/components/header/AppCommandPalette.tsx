@@ -12,7 +12,11 @@ type Props = {
   onClose: () => void;
 };
 
-export default function AppCommandPalette({ open, onClose }: Props) {
+type PaletteBodyProps = {
+  onClose: () => void;
+};
+
+function CommandPaletteBody({ onClose }: PaletteBodyProps) {
   const router = useRouter();
   const role = useAuthStore((s) => s.user?.role);
   const [query, setQuery] = useState("");
@@ -25,26 +29,23 @@ export default function AppCommandPalette({ open, onClose }: Props) {
     () => filterNavSearchItems(allItems, query),
     [allItems, query]
   );
+  const safeActiveIndex = Math.min(
+    activeIndex,
+    Math.max(filtered.length - 1, 0)
+  );
 
   useEffect(() => {
-    if (!open) return;
-    setQuery("");
-    setActiveIndex(0);
     const t = window.setTimeout(() => inputRef.current?.focus(), 0);
     return () => window.clearTimeout(t);
-  }, [open]);
+  }, []);
 
   useEffect(() => {
-    setActiveIndex(0);
-  }, [query]);
-
-  useEffect(() => {
-    if (!open || !listRef.current) return;
+    if (!listRef.current) return;
     const active = listRef.current.querySelector<HTMLElement>(
-      `[data-cmd-index="${activeIndex}"]`
+      `[data-cmd-index="${safeActiveIndex}"]`
     );
     active?.scrollIntoView({ block: "nearest" });
-  }, [activeIndex, open, filtered.length]);
+  }, [safeActiveIndex, filtered.length]);
 
   const navigate = (path: string) => {
     onClose();
@@ -62,19 +63,14 @@ export default function AppCommandPalette({ open, onClose }: Props) {
       setActiveIndex((i) => Math.max(i - 1, 0));
       return;
     }
-    if (event.key === "Enter" && filtered[activeIndex]) {
+    if (event.key === "Enter" && filtered[safeActiveIndex]) {
       event.preventDefault();
-      navigate(filtered[activeIndex].path);
+      navigate(filtered[safeActiveIndex].path);
     }
   };
 
   return (
-    <Modal
-      isOpen={open}
-      onClose={onClose}
-      showCloseButton={false}
-      className="w-full max-w-2xl overflow-hidden rounded-[28px] border border-gray-100 p-0 shadow-2xl dark:border-gray-800"
-    >
+    <>
       <div className="border-b border-gray-100 px-4 py-4 dark:border-gray-800">
         <div className="relative">
           <Search
@@ -85,7 +81,10 @@ export default function AppCommandPalette({ open, onClose }: Props) {
             ref={inputRef}
             type="text"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setActiveIndex(0);
+            }}
             onKeyDown={handleKeyDown}
             placeholder="Rechercher une page ou une section…"
             className="h-12 w-full rounded-2xl border border-gray-200 bg-gray-50 pl-11 pr-4 text-sm font-medium text-[#1C2434] outline-none transition-colors placeholder:text-gray-400 focus:border-[#00A09D] focus:bg-white focus:ring-2 focus:ring-[#00A09D]/15 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
@@ -106,7 +105,7 @@ export default function AppCommandPalette({ open, onClose }: Props) {
           </div>
         ) : (
           filtered.map((item, index) => {
-            const isActive = index === activeIndex;
+            const isActive = index === safeActiveIndex;
             return (
               <button
                 key={item.path}
@@ -139,6 +138,19 @@ export default function AppCommandPalette({ open, onClose }: Props) {
           })
         )}
       </div>
+    </>
+  );
+}
+
+export default function AppCommandPalette({ open, onClose }: Props) {
+  return (
+    <Modal
+      isOpen={open}
+      onClose={onClose}
+      showCloseButton={false}
+      className="w-full max-w-2xl overflow-hidden rounded-[28px] border border-gray-100 p-0 shadow-2xl dark:border-gray-800"
+    >
+      {open ? <CommandPaletteBody key="command-palette" onClose={onClose} /> : null}
     </Modal>
   );
 }
