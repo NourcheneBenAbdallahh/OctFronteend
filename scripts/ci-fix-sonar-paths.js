@@ -33,9 +33,14 @@ function fixLcov(filePath) {
     return normalized;
   });
   fs.writeFileSync(filePath, out.join("\n"));
-  const sample = out.find((l) => l.startsWith("SF:"));
-  console.log(`Fixed ${fixed} path(s) in ${filePath}`);
+  const sfLines = out.filter((l) => l.startsWith("SF:"));
+  const sample = sfLines[0];
+  console.log(`Fixed ${fixed} path(s) in ${filePath} (${sfLines.length} source file(s))`);
   if (sample) console.log(`Sample: ${sample}`);
+  if (sfLines.length === 0) {
+    console.error("::error::lcov.info ne contient aucune entrée SF:");
+    process.exit(1);
+  }
 }
 
 function fixSonarReport(filePath) {
