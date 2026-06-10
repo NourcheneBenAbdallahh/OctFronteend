@@ -1,5 +1,5 @@
 "use client";
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect } from "react";
 
 interface ModalProps {
   isOpen: boolean;
@@ -22,7 +22,7 @@ export const Modal: React.FC<ModalProps> = ({
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
   /** Ignore backdrop clicks right after open (same pointer event that opened the modal). */
-  const [backdropReady, setBackdropReady] = useState(false);
+  const backdropReadyRef = useRef(false);
 
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
@@ -43,15 +43,17 @@ export const Modal: React.FC<ModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
-      setBackdropReady(false);
-      const timer = window.setTimeout(() => setBackdropReady(true), 0);
+      backdropReadyRef.current = false;
+      const timer = window.setTimeout(() => {
+        backdropReadyRef.current = true;
+      }, 0);
       return () => {
         window.clearTimeout(timer);
         document.body.style.overflow = "unset";
       };
     }
 
-    setBackdropReady(false);
+    backdropReadyRef.current = false;
     document.body.style.overflow = "unset";
 
     return () => {
@@ -62,7 +64,7 @@ export const Modal: React.FC<ModalProps> = ({
   if (!isOpen) return null;
 
   const handleBackdropPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!backdropReady) return;
+    if (!backdropReadyRef.current) return;
     if (event.target !== event.currentTarget) return;
     onClose();
   };

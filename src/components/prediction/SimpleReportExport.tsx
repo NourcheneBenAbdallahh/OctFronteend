@@ -23,11 +23,11 @@ export const SimpleReportExport = ({ data, id }: { data: any; id: string }) => {
           marginBottom: '20px',
         }}
       >
-        Rapport d'Analyse : {data.name}
+        Rapport d&apos;Analyse : {data.name}
       </h1>
 
       <p style={{ fontSize: '14px', color: '#64748b' }}>
-        Date d'extraction : {new Date().toLocaleDateString('fr-FR')}
+        Date d&apos;extraction : {new Date().toLocaleDateString('fr-FR')}
       </p>
 
       <div style={{ display: 'flex', gap: '20px', marginTop: '30px' }}>

@@ -18,7 +18,7 @@ export default function RecentStockMovements({ stocks }: { stocks: Stock[] }) {
           </p>
         </div>
         <Link href="/stock" className="text-[10px] font-black text-[#00A09D] border border-[#00A09D]/20 px-4 py-2 rounded-full uppercase hover:bg-[#00A09D] hover:text-white transition-all">
-          Voir l'historique
+          Voir l&apos;historique
         </Link>
       </div>
 

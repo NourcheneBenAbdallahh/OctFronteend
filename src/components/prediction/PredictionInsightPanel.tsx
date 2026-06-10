@@ -155,7 +155,7 @@ export default function PredictionInsightPanel({
           href="/mouvements"
           className="text-sm font-semibold underline underline-offset-2 hover:opacity-80"
         >
-          Voir l'historique des sorties →
+          Voir l&apos;historique des sorties →
         </Link>
       </p>
     </div>

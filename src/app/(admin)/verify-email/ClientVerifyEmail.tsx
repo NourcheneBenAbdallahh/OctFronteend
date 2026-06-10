@@ -14,10 +14,7 @@ export default function ClientVerifyEmail() {
   const [isSuccess, setIsSuccess] = useState(false);
 
   useEffect(() => {
-    if (!token) {
-      setMessage('Lien invalide ou manquant.');
-      return;
-    }
+    if (!token) return;
 
     verifyEmail(token)
       .then((res) => {

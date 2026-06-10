@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   hasCompletedOnboarding,
   isOnboardingPendingForUser,
@@ -10,23 +10,20 @@ import { useAuthStore } from "@/store/useAuthStore";
 export function useFirstLoginOnboarding() {
   const userId = useAuthStore((s) => s.user?.id);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const [isOpen, setIsOpen] = useState(false);
+  const [dismissedForUserId, setDismissedForUserId] = useState<string | null>(
+    null
+  );
 
-  useEffect(() => {
-    if (!isAuthenticated || !userId) {
-      setIsOpen(false);
-      return;
-    }
-    if (hasCompletedOnboarding(userId)) {
-      setIsOpen(false);
-      return;
-    }
-    if (isOnboardingPendingForUser(userId)) {
-      setIsOpen(true);
-    }
-  }, [isAuthenticated, userId]);
+  const shouldShow =
+    Boolean(isAuthenticated && userId) &&
+    !hasCompletedOnboarding(userId!) &&
+    isOnboardingPendingForUser(userId!);
+  const isOpen = shouldShow && dismissedForUserId !== userId;
 
-  const close = useCallback(() => setIsOpen(false), []);
+  const close = useCallback(
+    () => setDismissedForUserId(userId ?? null),
+    [userId]
+  );
 
   return { isOpen, close };
 }
