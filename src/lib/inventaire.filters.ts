@@ -55,18 +55,16 @@ export function applyInventaireFilters(
     rows = rows.filter((r) => r.entrepot_id === filters.entrepot);
   }
 
-  if (filters.date_mode !== "all") {
-    rows = rows.filter((r) =>
-      rowMatchesDateMode(
-        r.date_inventaire,
-        r.periode_debut,
-        r.periode_fin,
-        filters.date_mode,
-        filters.pivot_day,
-        filters.pivot_year
-      )
-    );
-  }
+  rows = rows.filter((r) =>
+    rowMatchesDateMode(
+      r.date_inventaire,
+      r.periode_debut,
+      r.periode_fin,
+      filters.date_mode,
+      filters.pivot_day,
+      filters.pivot_year
+    )
+  );
 
   if (filters.code_session) {
     rows = rows.filter((r) => r.code_session === filters.code_session);
@@ -126,7 +124,7 @@ export const EMPTY_INVENTAIRE_FILTERS: InventaireFilters = {
   status: "all",
   entrepot: "",
   code_session: "",
-  date_mode: "all",
+  date_mode: "day",
   pivot_day: "",
   pivot_year: "",
   date_inventaire_from: "",

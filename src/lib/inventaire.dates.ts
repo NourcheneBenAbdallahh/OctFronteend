@@ -53,8 +53,6 @@ export function rowMatchesDateMode(
   pivotDay: string,
   pivotYear: string
 ): boolean {
-  if (mode === "all") return true;
-
   const rowMs = new Date(dateInventaire.replace(" ", "T")).getTime();
   if (!Number.isFinite(rowMs)) return false;
 
@@ -98,5 +96,5 @@ export function describeInventaireScope(
   if (mode === "year" && pivotYear) {
     return `Inventaire année ${pivotYear}${wh}`;
   }
-  return `Tous les inventaires${wh}`;
+  return `Inventaire${wh}`;
 }

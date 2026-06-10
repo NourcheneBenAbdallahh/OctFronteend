@@ -73,14 +73,14 @@ export type TableInventaire = Omit<StockInventaire, "entrepot" | "emballage"> & 
   emballage_name: string;
 };
 
-export type InventaireDateMode = "all" | "day" | "year";
+export type InventaireDateMode = "day" | "year";
 
 export type InventaireFilters = {
   search: string;
   status: "all" | "perfect" | "negative" | "positive" | "non_regularise";
   entrepot: string;
   code_session: string;
-  /** Vue principale : par jour, par année ou tout */
+  /** Vue principale : par jour ou par année */
   date_mode: InventaireDateMode;
   pivot_day: string;
   pivot_year: string;

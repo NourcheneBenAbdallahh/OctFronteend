@@ -45,6 +45,7 @@ import {
   normalizeUnitCode,
   unitCodesEqual,
   resolvePrincipalUnitCode,
+  unitesCompatibleQuantiteCommande,
   formatQuantitePrincipale,
 } from "@/lib/unite-conversion";
 import type { UniteMesure } from "@/types/unite-mesure";
@@ -451,10 +452,10 @@ const goToPage = (page: number) => {
 
   const unitesSaisieOptions = useMemo(
     () =>
-      [...unitesMesure].sort(
-        (a, b) => a.sort_order - b.sort_order || a.label.localeCompare(b.label, "fr")
-      ),
-    [unitesMesure]
+      form.emballage_id
+        ? unitesCompatibleQuantiteCommande(principalUnitCode, unitesMesure)
+        : [],
+    [form.emballage_id, principalUnitCode, unitesMesure]
   );
 
   const principalUnitLabel = useMemo(() => {

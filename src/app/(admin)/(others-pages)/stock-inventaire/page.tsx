@@ -119,9 +119,14 @@ export default function InventairePage() {
 
     const isVisible = filtered.some((item) => String(item.id) === String(focusId));
     if (!isVisible) {
+      const dateStr = target.date_inventaire.slice(0, 10);
       setFilters({
         ...EMPTY_INVENTAIRE_FILTERS,
-        date_mode: "all",
+        date_mode: "day",
+        pivot_day: dateStr,
+        pivot_year: dateStr.slice(0, 4),
+        entrepot: target.entrepot_id,
+        code_session: target.code_session || "",
       });
       return;
     }
@@ -218,14 +223,6 @@ export default function InventairePage() {
       showFeedback("error", "Choisissez d'abord un entrepôt dans le panneau ci-dessus.");
       return;
     }
-    if (filters.date_mode === "all") {
-      showFeedback(
-        "error",
-        "Choisissez le mode Par jour ou Par année avant de générer une campagne."
-      );
-      return;
-    }
-
     const payload =
       filters.date_mode === "year"
         ? (() => {

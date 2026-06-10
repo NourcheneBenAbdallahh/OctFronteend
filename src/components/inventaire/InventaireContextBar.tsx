@@ -20,7 +20,6 @@ interface Props {
 const MODES: { id: InventaireDateMode; label: string; icon: typeof Calendar }[] = [
   { id: "day", label: "Par jour", icon: Calendar },
   { id: "year", label: "Par année", icon: CalendarRange },
-  { id: "all", label: "Tout", icon: Layers },
 ];
 
 export default function InventaireContextBar({
@@ -63,7 +62,7 @@ export default function InventaireContextBar({
           <button
             type="button"
             onClick={onGenerer}
-            disabled={loading || !filters.entrepot || filters.date_mode === "all"}
+            disabled={loading || !filters.entrepot}
             className="h-12 px-6 inline-flex items-center gap-2 rounded-full bg-[#00A09D] text-white text-[10px] font-black uppercase tracking-widest hover:bg-[#008f8c] disabled:opacity-40 transition-all"
           >
             <Layers size={16} />
@@ -121,11 +120,6 @@ export default function InventaireContextBar({
               </option>
             ))}
           </select>
-        )}
-        {filters.date_mode === "all" && (
-          <div className="h-12 flex items-center px-4 rounded-2xl bg-white/60 text-xs font-bold text-gray-400 border border-dashed border-gray-200">
-            Toutes dates et entrepôts (filtres avancés ci-dessous)
-          </div>
         )}
       </div>
     </div>
