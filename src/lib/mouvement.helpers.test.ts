@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { MouvementFormState, MouvementStock } from "@/types/mouvement";
 import {
   buildSummary,
+  formatMouvementTrajetLabel,
   computeStats,
   emptyForm,
   filterMouvements,
@@ -12,6 +13,8 @@ import {
   getMouvementTypeLabel,
   getSelectedLotAvailable,
   isMouvementBrouillon,
+  mouvementHasLot,
+  resolveMouvementLotId,
   validateForm,
   validateQuantityAgainstLot,
 } from "./mouvement.helpers";
@@ -49,6 +52,7 @@ describe("mouvement.helpers", () => {
   it("getMouvementTypeLabel retourne le libellé affiché", () => {
     expect(getMouvementTypeLabel("PRD")).toBe("Production");
     expect(getMouvementTypeLabel("CDD")).toBe("Transfert");
+    expect(getMouvementTypeLabel("EMC")).toBe("EMC");
     expect(getMouvementTypeLabel(null)).toBe("");
   });
 
@@ -141,9 +145,11 @@ describe("mouvement.helpers", () => {
     expect(validateForm(cdd)).toContain("différentes");
 
     const emc: MouvementFormState = {
-      ...cdd,
+      ...empty,
       type: "EMC",
-      destId: "",
+      emballageId: "1",
+      quantite: 5,
+      destId: "2",
     };
     expect(validateForm(emc)).toBeNull();
 
@@ -164,6 +170,20 @@ describe("mouvement.helpers", () => {
     expect(form.type).toBe("PRD");
     expect(getEntrepotIdForLots("PRD", { ...form, sourceId: "5" })).toBe("5");
     expect(getEntrepotIdForLots("SPL", { ...form, destId: "9" })).toBe("9");
+  });
+
+  it("resolveMouvementLotId lit lot_id ou relation lot", () => {
+    expect(resolveMouvementLotId({ lot_id: "42", lot: null })).toBe("42");
+    expect(
+      resolveMouvementLotId({
+        lot_id: null,
+        lot: { id: "7", code_lot: "LOT-7", emballage_id: "1" },
+      })
+    ).toBe("7");
+    expect(resolveMouvementLotId({ lot_id: null, lot: null })).toBeNull();
+    expect(
+      mouvementHasLot({ lot_id: null, lot: { id: "3", code_lot: "X", emballage_id: "1" } })
+    ).toBe(true);
   });
 
   it("getSelectedLotAvailable retourne le stock du lot", () => {
@@ -202,6 +222,14 @@ describe("mouvement.helpers", () => {
     );
     expect(summary.emballageLabel).toContain("SAC");
     expect(summary.lotLabel).toBe("LOT-1");
+    expect(summary.trajetLabel).toBe("Rue A");
+  });
+
+  it("formatMouvementTrajetLabel n'affiche pas la flèche sans destination", () => {
+    expect(formatMouvementTrajetLabel("PRD", "Rue A", null)).toBe("Rue A");
+    expect(formatMouvementTrajetLabel("EMC", null, "Rue B")).toBe("Rue B");
+    expect(formatMouvementTrajetLabel("CDD", "Rue A", "Rue B")).toBe("Rue A → Rue B");
+    expect(formatMouvementTrajetLabel("PRD", null, null)).toBeNull();
   });
 
   it("validateQuantityAgainstLot refuse quantité trop élevée", () => {

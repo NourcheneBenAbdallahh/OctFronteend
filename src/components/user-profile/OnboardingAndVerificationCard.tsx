@@ -88,25 +88,16 @@ export default function OnboardingAndVerificationCard() {
 
   return (
     <section className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
-      <h3 className="text-lg font-black text-gray-900">Guidage de démarrage</h3>
+      <h3 className="text-lg font-black text-gray-900">Vérification du compte</h3>
       <p className="mt-1 text-sm font-semibold text-gray-500">
-        Suivez ces étapes pour utiliser l&apos;application plus facilement.
+        Complétez ces étapes pour sécuriser et finaliser votre compte.
       </p>
 
       <ol className="mt-4 space-y-2 text-sm text-gray-700">
         <li>1. Complétez vos informations personnelles dans cette page profil.</li>
         <li>2. Vérifiez votre email (recommandé) pour sécuriser votre compte.</li>
         <li>3. Vérifiez votre numéro (code reçu par email).</li>
-        <li>4. Lancez la visite guidée pour découvrir menus, tableaux et actions.</li>
       </ol>
-
-      <button
-        type="button"
-        onClick={() => window.dispatchEvent(new Event("oct-start-app-tour"))}
-        className="mt-4 w-full rounded-xl bg-[#00A09D] px-4 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-[#008f8c]"
-      >
-        Relancer la visite guidée
-      </button>
 
       <div className="mt-5 rounded-2xl border border-gray-100 bg-gray-50 p-4">
         <p className="text-xs font-black uppercase tracking-widest text-gray-500">

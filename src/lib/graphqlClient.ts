@@ -112,7 +112,18 @@ export function friendlyGraphqlMessage(raw: string, fieldHint?: string): string 
   if (/analyse prédictive|service d'analyse/i.test(m)) {
     return m;
   }
-  if (/internal server error|500|502|503|504/i.test(m)) {
+  if (/déjà rattaché|deja rattaché|already rattach/i.test(m)) {
+    return m.length > 220 ? "Un ou plusieurs bons de livraison sont déjà facturés." : m;
+  }
+  if (
+    /stock insuffisant|quantité insuffisante|lot_id requis|lot introuvable|entrepot_source_id requis|entrepot_destination_id requis/i.test(
+      m
+    )
+  ) {
+    return m.length > 220 ? m.slice(0, 217) + "…" : m;
+  }
+  // Ne pas matcher un simple "500" (ex. Disponible=500) — ça masquait les erreurs métier.
+  if (/internal server error|\bHTTP\s*50[0-4]\b|\b502\b|\b503\b|\b504\b/i.test(m)) {
     return "Le service est momentanément indisponible. Réessayez plus tard.";
   }
   if (
@@ -130,6 +141,17 @@ export function friendlyGraphqlMessage(raw: string, fieldHint?: string): string 
   }
   if (/must be (at least|greater|numeric|a number)/i.test(m)) {
     return "Certaines valeurs numériques ne sont pas valides.";
+  }
+  if (
+    /Variable "\$/i.test(m) ||
+    /got invalid value/i.test(m) ||
+    /Unexpected data found/i.test(m) ||
+    /Not enough data available to satisfy format/i.test(m)
+  ) {
+    if (/date_inventaire|date inventaire/i.test(m)) {
+      return "La date d'inventaire n'est pas valide. Choisissez un jour dans le calendrier.";
+    }
+    return "Certaines informations ne sont pas valides. Vérifiez les champs du formulaire.";
   }
   if (/required/i.test(m)) {
     return "Un ou plusieurs champs obligatoires sont manquants.";

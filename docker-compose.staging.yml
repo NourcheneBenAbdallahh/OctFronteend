@@ -11,6 +11,7 @@ services:
       NODE_ENV: production
       # SSR depuis le conteneur : le backend est sur la machine hôte (port 8000 publié)
       GRAPHQL_ENDPOINT: ${GRAPHQL_ENDPOINT:-http://host.docker.internal:8000/graphql}
+      NEXT_PUBLIC_MERCURE_HUB_URL: ${NEXT_PUBLIC_MERCURE_HUB_URL:-http://localhost:8080/.well-known/mercure}
     healthcheck:
       test:
         [

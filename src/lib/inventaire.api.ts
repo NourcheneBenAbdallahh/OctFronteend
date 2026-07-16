@@ -41,6 +41,9 @@ export const INVENTAIRE_FIELDS = `
 export function normalizeInventaire(inv: StockInventaire): TableInventaire {
   return {
     ...inv,
+    id: String(inv.id),
+    entrepot_id: String(inv.entrepot_id),
+    emballage_id: String(inv.emballage_id),
     entrepot_name: inv.entrepot?.nom || `Entrepôt #${inv.entrepot_id}`,
     emballage_name: inv.emballage?.name || `Emballage #${inv.emballage_id}`,
   };
@@ -130,7 +133,7 @@ export async function listInventaires(
     return data.stockInventaires;
   } catch (error) {
     console.error("[API Inventaire] Erreur lors de la récupération de la liste :", error);
-    return [];
+    throw error;
   }
 }
 
@@ -212,7 +215,8 @@ export type GenererInventaireEntrepotParams = {
 };
 
 export async function genererInventaireEntrepot(
-  params: GenererInventaireEntrepotParams
+  params: GenererInventaireEntrepotParams,
+  opts?: GraphqlRequestOptions
 ): Promise<StockInventaire[]> {
   const data = await graphqlRequest<{ genererInventaireEntrepot: StockInventaire[] }>(
     GENERER_ENTREPOT,
@@ -225,7 +229,8 @@ export async function genererInventaireEntrepot(
         periode_debut: params.periodeDebut,
         periode_fin: params.periodeFin,
       },
-    }
+    },
+    opts
   );
   return data.genererInventaireEntrepot;
 }

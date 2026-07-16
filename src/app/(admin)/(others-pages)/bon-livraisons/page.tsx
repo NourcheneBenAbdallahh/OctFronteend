@@ -5,7 +5,7 @@ import {
 } from "@/lib/bon-livraisons.api";
 import { me } from "@/lib/auth.api";
 import { listEmballages } from "@/lib/emballages.api";
-import { listCommandes } from "@/lib/commandes.api";
+import { listAllCommandes } from "@/lib/commandes.api";
 import { fetchEntrepots } from "@/lib/entrepot.api";
 import { listUnitesMesure } from "@/lib/unites-mesure.api";
 import { canManageBonLivraisons } from "@/lib/access";
@@ -61,9 +61,9 @@ export default async function BonLivraisonsPage({
   }));
 
   if (!readOnly) {
-    const commandesResult = await listCommandes(1, 100, auth);
+    const allCommandes = await listAllCommandes(auth);
 
-    commandes = commandesResult.commandes.data.map((item: any) => ({
+    commandes = allCommandes.map((item) => ({
       id: item.id,
       numero_commande: item.numero_commande,
       quantite: item.quantite,

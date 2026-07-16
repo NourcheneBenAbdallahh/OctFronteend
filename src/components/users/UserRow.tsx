@@ -1,5 +1,6 @@
 import React from "react";
-import { AdminUser, UserRole } from "@/lib/users.api";
+import { AdminUser, AssignableUserRole } from "@/lib/users.api";
+import { toAccessRole } from "@/lib/access";
 import { KeyRound, Pencil, Power, Trash2 } from "lucide-react";
 import { RoleSearchableDropdown } from "./RoleSearchableDropdown";
 
@@ -7,23 +8,34 @@ interface UserRowProps {
   user: AdminUser;
   isMe: boolean;
   savingId: string | null;
-  onUpdateRole: (id: string, role: UserRole) => void;
+  focusedId?: string | number | null;
+  onUpdateRole: (id: string, role: AssignableUserRole) => void;
   onToggleActive: (u: AdminUser) => void;
   onEdit: (u: AdminUser) => void;
   onPwd: (u: AdminUser) => void;
   onDelete: (id: string, name: string) => void;
   roleFr: (r: string) => string;
-  roleOptions: UserRole[];
+  roleOptions: AssignableUserRole[];
 }
 
 export const UserRow = ({ 
-  user, isMe, savingId, onUpdateRole, onToggleActive, 
+  user, isMe, savingId, focusedId, onUpdateRole, onToggleActive, 
   onEdit, onPwd, onDelete, roleFr, roleOptions 
 }: UserRowProps) => {
   const isSaving = !!savingId && (savingId.includes(String(user.id)) || savingId === "reset-password");
+  const isFocused = String(focusedId ?? "") === String(user.id);
 
   return (
-    <tr className="group align-middle transition-all hover:bg-gray-50/50 dark:hover:bg-gray-800/50">
+    <tr
+      id={`user-row-${user.id}`}
+      className={`group align-middle transition-all ${
+        isFocused
+          ? user.isActive
+            ? "bg-indigo-50 ring-2 ring-inset ring-indigo-300"
+            : "bg-amber-50 ring-2 ring-inset ring-amber-400"
+          : "hover:bg-gray-50/50 dark:hover:bg-gray-800/50"
+      }`}
+    >
       <td className="px-8 py-6">
         {user.photo ? (
           <img src={user.photo} alt={user.name} className="h-9 w-9 rounded-full border border-gray-200 object-cover dark:border-gray-700" />
@@ -45,8 +57,8 @@ export const UserRow = ({
       <td className="px-4 py-6 sm:px-8">
         <div className="min-w-[140px] max-w-[200px]">
           <RoleSearchableDropdown
-            value={String(user.role).toUpperCase()}
-            onChange={(r) => onUpdateRole(String(user.id), r as UserRole)}
+            value={toAccessRole(user.role) ?? String(user.role).toUpperCase()}
+            onChange={(r) => onUpdateRole(String(user.id), r as AssignableUserRole)}
             options={roleOptions}
             roleFr={roleFr}
             disabled={isSaving}

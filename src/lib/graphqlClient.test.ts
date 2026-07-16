@@ -47,11 +47,31 @@ describe("friendlyGraphqlMessage", () => {
     expect(friendlyGraphqlMessage("Email invalide")).toBe("Email invalide");
   });
 
+  it("ne masque pas une quantité Disponible=500 en erreur métier", () => {
+    const msg =
+      "Quantité insuffisante pour ce lot. Disponible=500.00, demandé=1000.";
+    expect(friendlyGraphqlMessage(msg)).toBe(msg);
+    expect(friendlyGraphqlMessage(msg)).not.toContain("momentanément");
+  });
+
+  it("masque vraiment Internal server error", () => {
+    expect(friendlyGraphqlMessage("Internal server error")).toContain(
+      "momentanément"
+    );
+  });
+
   it("traduit capacity_unit et champs requis", () => {
     expect(friendlyGraphqlMessage("The selected capacity unit is invalid")).toContain(
       "unité"
     );
     expect(friendlyGraphqlMessage("The field is required")).toContain("obligatoires");
+  });
+
+  it("masque les erreurs GraphQL de variable invalide", () => {
+    const raw =
+      'Variable "$input" got invalid value "12:00:00" at "input.date_inventaire"; Unexpected data found.';
+    expect(friendlyGraphqlMessage(raw)).toContain("date d'inventaire");
+    expect(friendlyGraphqlMessage(raw)).not.toContain("Variable");
   });
 });
 

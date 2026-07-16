@@ -26,9 +26,9 @@ describe("mouvement.config", () => {
     expect(needsLot("PTE")).toBe(true);
   });
 
-  it("EMC nécessite source et lot, pas de destination séparée", () => {
-    expect(needsSource("EMC")).toBe(true);
-    expect(needsDestination("EMC")).toBe(false);
-    expect(needsLot("EMC")).toBe(true);
+  it("EMC est réservé aux réceptions BL (destination sans source)", () => {
+    expect(needsSource("EMC")).toBe(false);
+    expect(needsDestination("EMC")).toBe(true);
+    expect(needsLot("EMC")).toBe(false);
   });
 });

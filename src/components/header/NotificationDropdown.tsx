@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import React, { useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
 import { useLiveAlertsContext } from "@/context/LiveAlertsContext";
@@ -80,18 +80,19 @@ export default function NotificationDropdown() {
   };
 
   return (
-    <div className="relative" data-tour="header-notifications">
+    <div className="relative">
       <button
         className="relative dropdown-toggle flex items-center justify-center text-gray-500 transition-colors bg-white border border-gray-200 rounded-full hover:text-gray-700 h-11 w-11 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
         onClick={toggleDropdown}
       >
-        <span
-          className={`absolute right-0 top-0.5 z-10 h-2 w-2 rounded-full bg-orange-400 ${
-            unreadCount === 0 ? "hidden" : "flex"
-          }`}
-        >
-          <span className="absolute inline-flex w-full h-full bg-orange-400 rounded-full opacity-75 animate-ping"></span>
-        </span>
+        {unreadCount > 0 && (
+          <span
+            className="absolute -right-1 -top-1 z-10 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-white bg-orange-500 px-1 text-[10px] font-bold leading-none text-white dark:border-gray-900"
+            aria-label={`${unreadCount} alerte${unreadCount > 1 ? "s" : ""} non lue${unreadCount > 1 ? "s" : ""}`}
+          >
+            {unreadCount > 99 ? "99+" : unreadCount}
+          </span>
+        )}
         <svg
           className="fill-current"
           width="20"

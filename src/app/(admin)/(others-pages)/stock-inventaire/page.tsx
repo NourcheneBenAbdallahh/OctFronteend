@@ -12,7 +12,7 @@ import {
   regulariserInventaireSession,
   updateInventaire,
 } from "@/lib/inventaire.api";
-import { TableInventaire, InventaireFilters } from "@/types/inventaire";
+import { TableInventaire, InventaireFilters, InventaireCampaignContext } from "@/types/inventaire";
 import {
   applyInventaireFilters,
   EMPTY_INVENTAIRE_FILTERS,
@@ -23,7 +23,6 @@ import InventaireStats from "@/components/inventaire/InventaireStats";
 import InventaireFiltersBar from "@/components/inventaire/InventaireFilters";
 import InventaireCriticalPanel from "@/components/inventaire/InventaireCriticalPanel";
 import InventaireAuditCards from "@/components/inventaire/InventaireAuditCards";
-import InventaireDetailDrawer from "@/components/inventaire/InventaireDetailDrawer";
 import InventaireFormDrawer from "@/components/inventaire/InventaireFormDrawer";
 import InventaireContextBar from "@/components/inventaire/InventaireContextBar";
 import {
@@ -37,7 +36,13 @@ import { getInventaireErrorMessage } from "@/lib/inventaire.errors";
 
 import { listEmballages } from "@/lib/emballages.api";
 import { fetchEntrepots } from "@/lib/entrepot.api";
-import { currentYear, dayScopeBounds, todayIsoDay, yearScopeBounds } from "@/lib/inventaire.dates";
+import {
+  currentYear,
+  dayScopeBounds,
+  normalizeIsoDay,
+  todayIsoDay,
+  yearScopeBounds,
+} from "@/lib/inventaire.dates";
 import { useAuthStore } from "@/store/useAuthStore";
 
 export default function InventairePage() {
@@ -46,22 +51,22 @@ export default function InventairePage() {
   const token = useAuthStore((state) => state.token);
   const [data, setData] = useState<TableInventaire[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeSession, setActiveSession] = useState<string>("");
+
+  const [campaign, setCampaign] = useState<InventaireCampaignContext>({
+    entrepot: "",
+    date_mode: "day",
+    pivot_day: todayIsoDay(),
+    pivot_year: currentYear(),
+  });
 
   const [allEntrepots, setAllEntrepots] = useState<{ id: string; label: string }[]>([]);
   const [allEmballages, setAllEmballages] = useState<{ id: string; label: string }[]>([]);
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<TableInventaire | null>(null);
-  const [selected, setSelected] = useState<TableInventaire | null>(null);
-  const [detailOpen, setDetailOpen] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const [filters, setFilters] = useState<InventaireFilters>({
-    ...EMPTY_INVENTAIRE_FILTERS,
-    date_mode: "day",
-    pivot_day: todayIsoDay(),
-    pivot_year: currentYear(),
-  });
+  const [filters, setFilters] = useState<InventaireFilters>(EMPTY_INVENTAIRE_FILTERS);
   const [exporting, setExporting] = useState(false);
   const [feedback, setFeedback] = useState<InventaireFeedback>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
@@ -97,6 +102,10 @@ export default function InventairePage() {
       setAllEmballages(resEmballages.emballages.data.map((e) => ({ id: String(e.id), label: e.name })));
     } catch (err) {
       console.error("Erreur chargement inventaire:", err);
+      showFeedback(
+        "error",
+        getInventaireErrorMessage(err, "Impossible de charger les lignes d'inventaire.")
+      );
     } finally {
       setLoading(false);
     }
@@ -119,20 +128,14 @@ export default function InventairePage() {
 
     const isVisible = filtered.some((item) => String(item.id) === String(focusId));
     if (!isVisible) {
-      const dateStr = target.date_inventaire.slice(0, 10);
       setFilters({
         ...EMPTY_INVENTAIRE_FILTERS,
-        date_mode: "day",
-        pivot_day: dateStr,
-        pivot_year: dateStr.slice(0, 4),
         entrepot: target.entrepot_id,
-        code_session: target.code_session || "",
       });
       return;
     }
 
-    setSelected(target);
-    setDetailOpen(true);
+    setExpandedId(String(target.id));
 
     const timer = window.setTimeout(() => {
       document
@@ -210,25 +213,32 @@ export default function InventairePage() {
   };
 
   const sessionCodes = useMemo(() => {
-    const base = filters.entrepot
-      ? data.filter((d) => d.entrepot_id === filters.entrepot)
+    const base = campaign.entrepot
+      ? data.filter((d) => String(d.entrepot_id) === String(campaign.entrepot))
       : data;
     return Array.from(
       new Set(base.map((d) => d.code_session).filter(Boolean) as string[])
     );
-  }, [data, filters.entrepot]);
+  }, [data, campaign.entrepot]);
 
   const handleGenererCampagne = async () => {
-    if (!filters.entrepot) {
+    if (!campaign.entrepot) {
       showFeedback("error", "Choisissez d'abord un entrepôt dans le panneau ci-dessus.");
       return;
     }
+    if (campaign.date_mode === "day" && !campaign.pivot_day?.trim()) {
+      showFeedback(
+        "error",
+        "Choisissez une date d'inventaire avant de générer la campagne."
+      );
+      return;
+    }
     const payload =
-      filters.date_mode === "year"
+      campaign.date_mode === "year"
         ? (() => {
-            const b = yearScopeBounds(filters.pivot_year);
+            const b = yearScopeBounds(campaign.pivot_year);
             return {
-              entrepotId: filters.entrepot,
+              entrepotId: campaign.entrepot,
               scope: "YEAR" as const,
               dateInventaire: b.dateInventaire,
               periodeDebut: b.periodeDebut,
@@ -236,9 +246,9 @@ export default function InventairePage() {
             };
           })()
         : (() => {
-            const b = dayScopeBounds(filters.pivot_day);
+            const b = dayScopeBounds(campaign.pivot_day);
             return {
-              entrepotId: filters.entrepot,
+              entrepotId: campaign.entrepot,
               scope: "DAY" as const,
               dateInventaire: b.dateInventaire,
             };
@@ -256,27 +266,35 @@ export default function InventairePage() {
   }) => {
     setGenerating(true);
     try {
-      const lignes = await genererInventaireEntrepot({
-        entrepotId: payload.entrepotId,
-        dateInventaire: payload.dateInventaire,
-        scope: payload.scope,
-        periodeDebut: payload.periodeDebut,
-        periodeFin: payload.periodeFin,
-      });
-      if (lignes.length > 0 && lignes[0].code_session) {
-        const session = lignes[0].code_session!;
-        setActiveSession(session);
-        setFilters((f) => ({
-          ...f,
-          entrepot: payload.entrepotId,
-          code_session: session,
-          date_mode: payload.scope === "YEAR" ? "year" : "day",
-          pivot_day: payload.scope === "DAY" ? payload.dateInventaire.slice(0, 10) : f.pivot_day,
-          pivot_year:
-            payload.scope === "YEAR"
-              ? payload.dateInventaire.slice(0, 4)
-              : f.pivot_year,
-        }));
+      const lignes = await genererInventaireEntrepot(
+        {
+          entrepotId: payload.entrepotId,
+          dateInventaire: payload.dateInventaire,
+          scope: payload.scope,
+          periodeDebut: payload.periodeDebut,
+          periodeFin: payload.periodeFin,
+        },
+        { token }
+      );
+      const session = lignes[0]?.code_session ?? "";
+      if (session) {
+        setFilters((f) => ({ ...f, code_session: session }));
+      }
+      setCampaign((c) => ({
+        ...c,
+        entrepot: payload.entrepotId,
+        date_mode: payload.scope === "YEAR" ? "year" : "day",
+        pivot_day:
+          payload.scope === "DAY" ? normalizeIsoDay(payload.dateInventaire) : c.pivot_day,
+        pivot_year:
+          payload.scope === "YEAR" ? payload.dateInventaire.slice(0, 4) : c.pivot_year,
+      }));
+      if (lignes.length > 0) {
+        const normalized = lignes.map(normalizeInventaire);
+        setData((prev) => {
+          const ids = new Set(normalized.map((l) => l.id));
+          return [...normalized, ...prev.filter((p) => !ids.has(p.id))];
+        });
       }
       await load();
       showFeedback(
@@ -295,7 +313,7 @@ export default function InventairePage() {
     }
   };
 
-  const activeSessionCode = activeSession || filters.code_session;
+  const activeSessionCode = filters.code_session;
 
   const sessionEligibleCount = useMemo(() => {
     if (!activeSessionCode) return 0;
@@ -429,9 +447,8 @@ export default function InventairePage() {
         deletedIds.forEach((id) => next.delete(id));
         return next;
       });
-      if (selected && deletedIds.has(selected.id)) {
-        setDetailOpen(false);
-        setSelected(null);
+      if (expandedId && deletedIds.has(expandedId)) {
+        setExpandedId(null);
       }
       await load();
       showFeedback(
@@ -495,22 +512,19 @@ export default function InventairePage() {
 
       <InventaireHeader
         loading={loading}
-        onRefresh={load}
         onNew={() => {
           setEditing(null);
           setFormOpen(true);
         }}
-        onGenererEntrepot={handleGenererCampagne}
         onRegulariserSession={openRegulariserSessionConfirm}
-        hasActiveSession={!!(activeSession || filters.code_session)}
-        total={filtered.length}
+        hasActiveSession={!!filters.code_session}
         criticalCount={criticalCount}
       />
 
       <InventaireContextBar
         entrepots={allEntrepots}
-        filters={filters}
-        onChange={setFilters}
+        campaign={campaign}
+        onChange={setCampaign}
         scopedCount={filtered.length}
         totalCount={data.length}
         onGenerer={handleGenererCampagne}
@@ -520,17 +534,31 @@ export default function InventairePage() {
       {sessionCodes.length > 0 && (
         <div className="flex flex-wrap gap-2 items-center">
           <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Sessions :</span>
+          <button
+            type="button"
+            onClick={() => setFilters((f) => ({ ...f, code_session: "" }))}
+            className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all ${
+              !filters.code_session
+                ? "bg-[#1C2434] text-white border-[#1C2434]"
+                : "bg-white text-gray-500 border-gray-100 hover:border-gray-200"
+            }`}
+          >
+            Toutes
+          </button>
           {sessionCodes.map((code) => (
             <button
               key={code}
-              onClick={() => {
-                setActiveSession(code);
-                setFilters((f) => ({ ...f, code_session: f.code_session === code ? "" : code }));
-              }}
+              type="button"
+              onClick={() =>
+                setFilters((f) => ({
+                  ...f,
+                  code_session: f.code_session === code ? "" : code,
+                }))
+              }
               className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all ${
                 filters.code_session === code
                   ? "bg-[#1C2434] text-white border-[#1C2434]"
-                  : "bg-white text-gray-500 border-gray-100"
+                  : "bg-white text-gray-500 border-gray-100 hover:border-gray-200"
               }`}
             >
               {code}
@@ -555,14 +583,20 @@ export default function InventairePage() {
       <InventaireCriticalPanel
         data={filtered}
         onSelect={(item) => {
-          setSelected(item);
-          setDetailOpen(true);
+          setExpandedId(String(item.id));
+          window.setTimeout(() => {
+            document
+              .getElementById(`inventaire-row-${item.id}`)
+              ?.scrollIntoView({ behavior: "smooth", block: "center" });
+          }, 120);
         }}
       />
 
       <InventaireAuditCards
         data={filtered}
         focusedId={focusId}
+        expandedId={expandedId}
+        onToggleExpand={(id) => setExpandedId((prev) => (prev === id ? null : id))}
         selectedIds={selectedIds}
         onToggleSelect={toggleSelectRow}
         onToggleSelectAll={toggleSelectAllFiltered}
@@ -572,25 +606,11 @@ export default function InventairePage() {
           await load();
         }}
         onRegulariser={openRegulariserConfirm}
-        onView={(item) => {
-          setSelected(item);
-          setDetailOpen(true);
-        }}
         onEdit={(item) => {
           setEditing(item);
           setFormOpen(true);
         }}
         onDelete={openDeleteConfirm}
-      />
-
-      <InventaireDetailDrawer
-        item={selected}
-        open={detailOpen}
-        onClose={() => {
-          setDetailOpen(false);
-          setSelected(null);
-        }}
-        onRegulariser={selected ? () => openRegulariserConfirm(selected) : undefined}
       />
 
       <InventaireFormDrawer

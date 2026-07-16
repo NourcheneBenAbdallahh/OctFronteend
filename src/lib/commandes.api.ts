@@ -94,6 +94,23 @@ export async function listCommandes(
   }>(query, { page, first }, opts);
 }
 
+/** Charge toutes les pages de commandes (recherche, pickers, stats). */
+export async function listAllCommandes(
+  opts?: GraphqlRequestOptions,
+  pageSize = 150
+): Promise<Commande[]> {
+  const acc: Commande[] = [];
+  let page = 1;
+  for (;;) {
+    const { commandes } = await listCommandes(page, pageSize, opts);
+    acc.push(...commandes.data);
+    if (page >= commandes.paginatorInfo.lastPage) break;
+    page += 1;
+    if (page > 120) break;
+  }
+  return acc;
+}
+
 export async function createCommande(input: CreateCommandeInput) {
   const mutation = `
     mutation CreateCommande($input: CreateCommandeInput!) {

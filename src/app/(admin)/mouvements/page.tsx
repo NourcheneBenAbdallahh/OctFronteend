@@ -12,7 +12,7 @@ import {
   validateMouvement,
   deleteMouvementDraft,
 } from "@/lib/mouvement.api";
-import { emptyForm, formatGraphQLDateTime, validateForm } from "@/lib/mouvement.helpers";
+import { emptyForm, formatGraphQLDateTime, mouvementHasLot, validateForm } from "@/lib/mouvement.helpers";
 import {
   MouvementStock,
   EmballageRef,
@@ -23,6 +23,7 @@ import {
   MouvementFiltersState,
 } from "@/types/mouvement";
 import { EMPTY_MOUVEMENT_FILTERS } from "@/lib/mouvement.filters";
+import { needsLot } from "@/lib/mouvement.config";
 
 import MouvementsHeader from "@/components/mouvements/MouvementsHeader";
 import MouvementsStats from "@/components/mouvements/MouvementsStats";
@@ -156,8 +157,7 @@ export default function MouvementsPage() {
         emballage_id: form.emballageId,
         lot_id: form.lotId || null,
         entrepot_source_id: form.sourceId || null,
-        entrepot_destination_id:
-          form.type === "EMC" ? form.sourceId || null : form.destId || null,
+        entrepot_destination_id: form.destId || null,
         quantite: Number(form.quantite),
         date_mouvement: form.dateMouvement ? formatGraphQLDateTime(form.dateMouvement) : null,
         motif: form.type === "PTE" ? form.motif.trim() : null,
@@ -178,6 +178,23 @@ export default function MouvementsPage() {
       showError(
         "Ce brouillon de perte n'a pas de motif. Supprimez-le et recréez-le en indiquant la cause de la perte."
       );
+      return;
+    }
+
+    if (needsLot(item.type_mouvement) && !mouvementHasLot(item)) {
+      showError(
+        "Ce brouillon n'a pas de lot associé. Supprimez-le et recréez-le en sélectionnant un lot disponible."
+      );
+      return;
+    }
+
+    if (
+      item.type_mouvement === "CDD" &&
+      item.entrepot_source_id &&
+      item.entrepot_destination_id &&
+      item.entrepot_source_id === item.entrepot_destination_id
+    ) {
+      showError("La source et la destination doivent être différentes pour un transfert.");
       return;
     }
 

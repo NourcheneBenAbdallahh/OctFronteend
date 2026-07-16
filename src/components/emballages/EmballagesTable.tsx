@@ -14,7 +14,6 @@ import { canManageEmballagesCatalog } from "@/lib/access";
 import { EmballageConfirmDeleteModal } from "./EmballagesPageAlerts";
 import { AppFeedbackBanner } from "@/components/ui/feedback";
 import { useAppFeedback } from "@/hooks/useAppFeedback";
-import { tourPageAttrs } from "@/lib/tourPageAttrs";
 import { useTableSort } from "@/hooks/useTableSort";
 import type { SortColumn } from "@/lib/tableSort";
 import {
@@ -23,8 +22,6 @@ import {
   countActiveEmballageFilters,
   type EmballagesFiltersState,
 } from "./emballagesFilters";
-
-const tour = tourPageAttrs("/emballages");
 
 const EMBALLAGE_SORT_COLUMNS: Record<string, SortColumn<TableEmballages>> = {
   code: { accessor: (r) => r.code, type: "string" },
@@ -160,7 +157,7 @@ export default function EmballagesTable({
 
       <AppFeedbackBanner feedback={feedback} onDismiss={clearFeedback} />
 
-      <div className="flex-1" {...tour.table}>
+      <div className="flex-1">
         {filteredRows.length > 0 ? (
           <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
             {viewMode === "list" ? (

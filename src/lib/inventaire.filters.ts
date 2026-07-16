@@ -1,4 +1,3 @@
-import { rowMatchesDateMode } from "@/lib/inventaire.dates";
 import type { InventaireFilters, TableInventaire } from "@/types/inventaire";
 
 function parseMs(v: string | null | undefined): number | null {
@@ -52,19 +51,8 @@ export function applyInventaireFilters(
   }
 
   if (filters.entrepot) {
-    rows = rows.filter((r) => r.entrepot_id === filters.entrepot);
+    rows = rows.filter((r) => String(r.entrepot_id) === String(filters.entrepot));
   }
-
-  rows = rows.filter((r) =>
-    rowMatchesDateMode(
-      r.date_inventaire,
-      r.periode_debut,
-      r.periode_fin,
-      filters.date_mode,
-      filters.pivot_day,
-      filters.pivot_year
-    )
-  );
 
   if (filters.code_session) {
     rows = rows.filter((r) => r.code_session === filters.code_session);

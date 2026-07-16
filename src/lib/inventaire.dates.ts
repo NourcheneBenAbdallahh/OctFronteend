@@ -1,11 +1,33 @@
 import type { InventaireDateMode } from "@/types/inventaire";
 
 export function todayIsoDay(): string {
-  return new Date().toISOString().slice(0, 10);
+  return localDayKey(new Date().toISOString());
+}
+
+/** Clé calendaire locale (YYYY-MM-DD) pour une date/heure API. */
+export function localDayKey(isoOrDatetime: string): string {
+  if (!isoOrDatetime?.trim()) return "";
+  const ms = new Date(isoOrDatetime.replace(" ", "T")).getTime();
+  if (!Number.isFinite(ms)) return "";
+  const d = new Date(ms);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 export function currentYear(): string {
   return String(new Date().getFullYear());
+}
+
+/** Normalise une date (YYYY-MM-DD) ; retombe sur aujourd'hui si invalide. */
+export function normalizeIsoDay(isoDay: string): string {
+  const trimmed = isoDay?.trim() ?? "";
+  const head = trimmed.slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(head)) return head;
+  const key = localDayKey(trimmed.replace(" ", "T"));
+  if (key) return key;
+  return todayIsoDay();
 }
 
 /** Bornes du jour pour filtre et API (date_inventaire à midi). */
@@ -14,7 +36,7 @@ export function dayScopeBounds(isoDay: string): {
   filterTo: string;
   dateInventaire: string;
 } {
-  const d = isoDay.slice(0, 10);
+  const d = normalizeIsoDay(isoDay);
   return {
     filterFrom: `${d}T00:00:00`,
     filterTo: `${d}T23:59:59`,
@@ -58,10 +80,7 @@ export function rowMatchesDateMode(
 
   if (mode === "day") {
     if (!pivotDay?.trim()) return true;
-    const { filterFrom, filterTo } = dayScopeBounds(pivotDay);
-    const fromMs = new Date(filterFrom).getTime();
-    const toMs = new Date(filterTo).getTime();
-    return rowMs >= fromMs && rowMs <= toMs;
+    return localDayKey(dateInventaire) === pivotDay.slice(0, 10);
   }
 
   if (!pivotYear?.trim()) return true;

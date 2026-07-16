@@ -1,4 +1,5 @@
 import { MOUVEMENT_TYPES } from "@/lib/mouvement.config";
+import { getMouvementTypeLabel } from "@/lib/mouvement.helpers";
 import { MouvementStatut, MouvementType } from "@/types/mouvement";
 import { ReactNode } from "react";
 import { clsx, type ClassValue } from 'clsx';
@@ -11,14 +12,14 @@ function cn(...inputs: ClassValue[]) {
 
 export function TypeBadge({ type }: { type: MouvementType }) {
   const meta = MOUVEMENT_TYPES[type];
+  const label = getMouvementTypeLabel(type);
 
   return (
     <span className={cn(
       "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-wider border",
       meta.badgeClass // Utilise les classes de ton config (ex: bg-blue-50 text-blue-700 border-blue-100)
     )}>
-      <span className="text-xs">{meta.icon}</span>
-      {meta.label}
+      {label}
     </span>
   );
 }

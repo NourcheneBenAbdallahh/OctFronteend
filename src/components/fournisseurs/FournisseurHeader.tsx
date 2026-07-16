@@ -6,9 +6,8 @@ import {
   XCircle,
   type LucideIcon,
 } from "lucide-react";
-import { tourPageAttrs } from "@/lib/tourPageAttrs";
-
-const tour = tourPageAttrs("/fournisseurs");
+import { BreadcrumbNav } from "@/components/common/BreadcrumbNav";
+import { BREADCRUMBS } from "@/lib/breadcrumbs";
 
 export type FournisseurStats = {
   total: number;
@@ -66,10 +65,7 @@ export const FournisseurHeader = ({
   <div className="mb-8 space-y-8">
     <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
       <div className="space-y-2">
-        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-[#00A09D]">
-          <div className="h-[2px] w-8 bg-[#00A09D]" />
-          Gestion Achats
-        </div>
+        <BreadcrumbNav items={BREADCRUMBS.fournisseurs} />
         <h1 className="text-4xl font-black uppercase tracking-tighter text-gray-900">
           Fournisseurs <span className="text-[#00A09D]">.</span>
         </h1>
@@ -104,7 +100,6 @@ export const FournisseurHeader = ({
           size={16}
         />
         <input
-          {...tour.search}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Rechercher un partenaire, matricule fiscal…"
@@ -114,7 +109,6 @@ export const FournisseurHeader = ({
 
       <button
         type="button"
-        {...tour.actions}
         onClick={onOpenNew}
         className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl border-2 border-gray-900 bg-white px-8 py-4 text-[10px] font-black uppercase tracking-widest text-gray-900 shadow-[8px_8px_0px_rgba(0,160,157,0.2)] transition-all hover:bg-gray-900 hover:text-white"
       >

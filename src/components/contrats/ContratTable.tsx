@@ -32,6 +32,72 @@ import {
 import { AppConfirmModal, AppFeedbackBanner } from "@/components/ui/feedback";
 import { getActionErrorMessage, useAppFeedback } from "@/hooks/useAppFeedback";
 
+/** Map OCR unit (label or code) to an existing `unites_mesure.code`. */
+function resolveUniteQuantiteCode(
+  raw: string | null | undefined,
+  unites: UniteMesure[]
+): string {
+  const value = String(raw ?? "").trim();
+  if (!value) return "";
+
+  const byCode = unites.find((u) => u.code.toUpperCase() === value.toUpperCase());
+  if (byCode) return byCode.code;
+
+  const token = value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+
+  const aliases: Record<string, string> = {
+    t: "T",
+    tm: "T",
+    tonne: "T",
+    tonnes: "T",
+    tonnemetrique: "T",
+    tonnesmetriques: "T",
+    kg: "KG",
+    kilo: "KG",
+    kilos: "KG",
+    kilogramme: "KG",
+    kilogrammes: "KG",
+    g: "G",
+    gr: "G",
+    gramme: "G",
+    grammes: "G",
+    l: "L",
+    litre: "L",
+    litres: "L",
+    ml: "ML",
+    millilitre: "ML",
+    millilitres: "ML",
+    unite: "UNITE",
+    unites: "UNITE",
+    piece: "UNITE",
+    pieces: "UNITE",
+    palette: "PALETTE",
+    palettes: "PALETTE",
+    rouleau: "ROULEAU",
+    rouleaux: "ROULEAU",
+    caisse: "CAISSE",
+    caisses: "CAISSE",
+  };
+
+  const aliased = aliases[token];
+  if (aliased && unites.some((u) => u.code === aliased)) return aliased;
+
+  const byLabel = unites.find((u) => {
+    const labelToken = u.label
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "");
+    return labelToken === token || labelToken.includes(token) || token.includes(labelToken);
+  });
+
+  return byLabel?.code ?? "";
+}
+
 // Sous-composant interne pour la pagination en français
 const LocalPagination = ({ 
   currentPage, 
@@ -600,7 +666,7 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
     }
   };
 
-  const { sortKey, sortDirection, toggleSort, sortRows } = useTableSort(CONTRAT_SORT_COLUMNS);
+  const { sortKey, sortDirection, toggleSort, resetSort, sortRows } = useTableSort(CONTRAT_SORT_COLUMNS);
 
   const filteredRows = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -765,6 +831,11 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
       updated.emballage = emballages.find(em => String(em.id) === String(payload.emballage_id));
 
       setRows(prev => editing ? prev.map(r => r.id === updated.id ? updated : r) : [updated, ...prev]);
+      if (!editing) {
+        resetSort();
+        setCurrentPage(1);
+        setFocusPinned(false);
+      }
       setIsOpen(false);
       setEditing(null);
       setForm(emptyForm);
@@ -804,7 +875,11 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
         date_debut: extracted.date_debut || prev.date_debut || "",
         date_fin: extracted.date_fin || prev.date_fin || "",
         quantite_contractuelle: Number(extracted.quantite_contractuelle ?? prev.quantite_contractuelle ?? 0),
-        unite_quantite: extracted.unite_quantite ?? prev.unite_quantite ?? "",
+        // Backend maps OCR labels (« Tonnes ») → code unites_mesure (« T »); keep previous / default if empty.
+        unite_quantite:
+          resolveUniteQuantiteCode(extracted.unite_quantite, unitesMesure) ||
+          String(prev.unite_quantite ?? "").trim() ||
+          "T",
         montant_ht: extracted.montant_ht ?? prev.montant_ht ?? null,
         montant_tva: extracted.montant_tva ?? prev.montant_tva ?? 0,
         montant_cautionnement:
@@ -1584,6 +1659,7 @@ export default function ContratTable({ data }: { data?: TableContrat[] }) {
         onExtractFromFile={handleExtractFromFile}
         onDocumentFile={setPendingDocumentFile}
         hasPendingDocument={!!pendingDocumentFile}
+        pendingDocumentFile={pendingDocumentFile}
         fournisseurs={fournisseurs}
         emballages={emballages}
         unitesMesure={unitesMesure}

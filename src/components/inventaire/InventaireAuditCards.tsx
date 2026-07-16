@@ -13,20 +13,19 @@ import {
   CheckCheck,
 } from "lucide-react";
 import { TableInventaire } from "@/types/inventaire";
-import { tourPageAttrs } from "@/lib/tourPageAttrs";
-
-const tour = tourPageAttrs("/stock-inventaire");
+import InventaireDetailPanel from "./InventaireDetailPanel";
 
 interface Props {
   data: TableInventaire[];
   focusedId?: string | number | null;
+  expandedId?: string | null;
+  onToggleExpand: (id: string) => void;
   selectedIds: Set<string>;
   onToggleSelect: (id: string) => void;
   onToggleSelectAll: () => void;
   onBulkDelete: () => void;
   onAdjust: (id: string, newVal: number) => void;
   onRegulariser: (item: TableInventaire) => void;
-  onView: (item: TableInventaire) => void;
   onEdit: (item: TableInventaire) => void;
   onDelete: (item: TableInventaire) => void;
 }
@@ -48,13 +47,14 @@ function statutLabel(statut: string): string {
 export default function InventaireAuditCards({
   data,
   focusedId,
+  expandedId,
+  onToggleExpand,
   selectedIds,
   onToggleSelect,
   onToggleSelectAll,
   onBulkDelete,
   onAdjust,
   onRegulariser,
-  onView,
   onEdit,
   onDelete,
 }: Props) {
@@ -78,7 +78,7 @@ export default function InventaireAuditCards({
   }
 
   return (
-    <div className="space-y-4 pb-20" {...tour.table}>
+    <div className="space-y-4 pb-20">
       {deletableRows.length > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-4 rounded-[24px] border border-gray-100 bg-white px-6 py-4 shadow-sm">
           <label className="flex cursor-pointer items-center gap-3">
@@ -123,17 +123,20 @@ export default function InventaireAuditCards({
         const rowDeletable = isDeletable(row);
         const isSelected = selectedIds.has(row.id);
 
+        const isExpanded = expandedId === row.id;
+
         return (
+          <div key={row.id} id={`inventaire-row-${row.id}`} className="space-y-0">
           <div
-            key={row.id}
-            id={`inventaire-row-${row.id}`}
-            className={`group relative bg-white rounded-[32px] border transition-all duration-500 overflow-hidden ${
+            className={`group relative overflow-hidden rounded-[32px] border transition-all duration-500 ${
               String(focusedId ?? "") === String(row.id)
                 ? "border-[#00A09D] shadow-lg shadow-[#00A09D]/20 ring-2 ring-[#00A09D]/30"
-                : isSelected
-                ? "border-[#00A09D] shadow-lg shadow-[#00A09D]/10"
-                : "border-gray-100 hover:shadow-2xl hover:shadow-gray-200/50"
-            }`}
+                : isExpanded
+                  ? "border-indigo-200 shadow-md"
+                  : isSelected
+                    ? "border-[#00A09D] shadow-lg shadow-[#00A09D]/10"
+                    : "border-gray-100 hover:shadow-2xl hover:shadow-gray-200/50"
+            } bg-gradient-to-r from-white via-indigo-50/10 to-teal-50/10`}
           >
             {/* Barre de statut latérale */}
             <div className={`absolute left-0 top-0 bottom-0 w-2 ${
@@ -266,7 +269,16 @@ export default function InventaireAuditCards({
                         <CheckCheck size={18} />
                       </button>
                     )}
-                    <button onClick={() => onView(row)} className="p-3 rounded-xl bg-gray-50 text-gray-400 hover:bg-[#1C2434] hover:text-white transition-all">
+                    <button
+                      type="button"
+                      onClick={() => onToggleExpand(row.id)}
+                      className={`p-3 rounded-xl transition-all ${
+                        isExpanded
+                          ? "bg-[#1C2434] text-white"
+                          : "bg-gray-50 text-gray-400 hover:bg-[#1C2434] hover:text-white"
+                      }`}
+                      title={isExpanded ? "Masquer le détail" : "Voir le détail"}
+                    >
                       <Eye size={18} />
                     </button>
                     <button onClick={() => onEdit(row)} className="p-3 rounded-xl bg-gray-50 text-gray-400 hover:bg-[#00A09D] hover:text-white transition-all">
@@ -291,6 +303,9 @@ export default function InventaireAuditCards({
               </div>
 
             </div>
+          </div>
+
+          {isExpanded ? <InventaireDetailPanel item={row} /> : null}
           </div>
         );
       })}

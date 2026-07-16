@@ -1,6 +1,12 @@
 import { graphqlRequest, type GraphqlRequestOptions } from "@/lib/graphqlClient";
 
-export type UserRole = "ADMIN" | "STOCK" | "LOGISTIQUE" | "CONTRAT" | "FINANCE";
+import type { AccessRole } from "@/lib/access";
+
+/** Rôles assignables via l’admin (CONTRAT legacy retiré de l’UI). */
+export type AssignableUserRole = AccessRole;
+
+/** Valeur possible en base (inclut CONTRAT legacy, non assignable). */
+export type UserRole = AssignableUserRole | "CONTRAT";
 
 export type AdminUser = {
   id: string;
@@ -91,6 +97,28 @@ export async function listAdminUsers(
   };
 }
 
+/** Trouve la page contenant un utilisateur (navigation depuis une alerte). */
+export async function findAdminUserPage(
+  userId: string,
+  perPage: number,
+  filters: { search?: string | null; role?: string | null } = {},
+  opts?: GraphqlRequestOptions
+): Promise<number | null> {
+  let page = 1;
+  let lastPage = 1;
+
+  do {
+    const { data, paginatorInfo } = await listAdminUsers(page, perPage, filters, opts);
+    if (data.some((user) => String(user.id) === String(userId))) {
+      return page;
+    }
+    lastPage = paginatorInfo.lastPage;
+    page += 1;
+  } while (page <= lastPage);
+
+  return null;
+}
+
 export async function adminCreateUser(
   input: {
     name: string;
@@ -99,7 +127,7 @@ export async function adminCreateUser(
     photo?: string | null;
     is_active?: boolean;
     password: string;
-    role: UserRole;
+    role: AssignableUserRole;
   },
   opts?: GraphqlRequestOptions
 ): Promise<AdminUser> {
@@ -120,7 +148,7 @@ export async function adminCreateUser(
 
 export async function adminUpdateUserRole(
   id: string | number,
-  role: UserRole,
+  role: AssignableUserRole,
   opts?: GraphqlRequestOptions
 ): Promise<AdminUser> {
   const mutation = `

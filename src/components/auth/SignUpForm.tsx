@@ -83,7 +83,7 @@ export default function SignUpForm() {
                 <Input 
                   onChange={(e) => handleInputChange('firstName', e.target.value, setFirstName)} 
                   className={`w-full py-4 px-6 rounded-[22px] border-2 font-bold transition-all ${errors.firstName ? 'border-red-500 bg-red-50' : 'border-gray-100 bg-[#F8FAFA] focus:border-[#00A09D]'}`} 
-                  placeholder="Jean" 
+                  placeholder="********" 
                 />
                 {errors.firstName && <p className="text-[9px] font-black text-red-500 uppercase ml-4">{errors.firstName}</p>}
               </div>
@@ -92,7 +92,7 @@ export default function SignUpForm() {
                 <Input 
                   onChange={(e) => handleInputChange('lastName', e.target.value, setLastName)} 
                   className={`w-full py-4 px-6 rounded-[22px] border-2 font-bold transition-all ${errors.lastName ? 'border-red-500 bg-red-50' : 'border-gray-100 bg-[#F8FAFA] focus:border-[#00A09D]'}`} 
-                  placeholder="Dupont" 
+                  placeholder="********" 
                 />
                 {errors.lastName && <p className="text-[9px] font-black text-red-500 uppercase ml-4">{errors.lastName}</p>}
               </div>

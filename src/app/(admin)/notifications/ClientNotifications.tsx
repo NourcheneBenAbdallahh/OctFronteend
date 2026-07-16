@@ -1,15 +1,16 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { SortableTh } from '@/components/ui/SortableTableHeader';
 import { useTableSort } from '@/hooks/useTableSort';
 import type { SortColumn } from '@/lib/tableSort';
-import PageBreadcrumb from '@/components/common/PageBreadCrumb';
-import { getAlerts, getUnreadAlertsCount, markAlertAsRead, markAllAlertsAsRead, archiveAlert, Alert, AlertSeverity, AlertStatus } from '@/lib/notifications.api';
-import { hasAlertTarget, navigateToAlert } from '@/lib/notifications.helpers';
-import { useAuthStore } from '@/store/useAuthStore';
+import { Alert, AlertSeverity, AlertStatus } from '@/lib/notifications.api';
+import { hasAlertTarget, navigateToAlert, getSeverityLabel, getStatusLabel, getAlertTypeLabel } from '@/lib/notifications.helpers';
+import { useLiveAlertsContext } from '@/context/LiveAlertsContext';
 import { ResponsiveTableWrap } from '@/components/ui/ResponsiveTableWrap';
+import { BreadcrumbNav } from '@/components/common/BreadcrumbNav';
+import { BREADCRUMBS } from '@/lib/breadcrumbs';
 
 const severityColors: Record<AlertSeverity, string> = {
   info: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
@@ -23,34 +24,30 @@ const statusColors: Record<AlertStatus, string> = {
   archived: 'bg-gray-200 text-gray-500 dark:bg-gray-800 dark:text-gray-500',
 };
 
-const severityLabels: Record<AlertSeverity, string> = {
-  info: 'Info',
-  warning: 'Avertissement',
-  critical: 'Critique',
-};
-
-const statusLabels: Record<AlertStatus, string> = {
-  unread: 'Non lue',
-  read: 'Lue',
-  archived: 'Archivee',
-};
-
-const typeLabels: Record<string, string> = {
-  LOW_STOCK: 'Stock faible',
-  WAREHOUSE_CAPACITY_HIGH: 'Capacite entrepot elevee',
-  INVENTORY_ANOMALY: 'Anomalie inventaire',
-  SUPPLIER_DELAY: 'Retard fournisseur',
-};
-
-interface ClientNotificationsProps {}
-
 const ALERT_SORT_COLUMNS: Record<string, SortColumn<Alert>> = {
   severity: { accessor: (a) => a.severity, type: 'string' },
-  type: { accessor: (a) => a.type, type: 'string' },
   title: { accessor: (a) => a.title, type: 'string' },
   status: { accessor: (a) => a.status, type: 'string' },
   date: { accessor: (a) => a.created_at, type: 'date' },
 };
+
+type AlertFilter = 'all' | 'unread' | 'read' | 'critical' | 'archived';
+
+const FILTER_LABELS: Record<AlertFilter, string> = {
+  all: 'Toutes',
+  unread: 'Non lues',
+  read: 'Lues',
+  critical: 'Urgentes',
+  archived: 'Archivées',
+};
+
+function matchesFilter(alert: Alert, filter: AlertFilter): boolean {
+  if (filter === 'all') return true;
+  if (filter === 'unread') return alert.status === 'unread';
+  if (filter === 'read') return alert.status === 'read';
+  if (filter === 'archived') return alert.status === 'archived';
+  return alert.severity === 'critical';
+}
 
 function formatRelativeDate(dateString: string): string {
   const date = new Date(dateString);
@@ -79,103 +76,72 @@ function formatRelativeDate(dateString: string): string {
   return `il y a ${diffDays} ${diffDays > 1 ? "jours" : "jour"}`;
 }
 
-export default function ClientNotifications({}: ClientNotificationsProps) {
+export default function ClientNotifications() {
   const router = useRouter();
-  const token = useAuthStore((state) => state.token);
-  const userId = useAuthStore((state) => state.user?.id);
-  const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const {
+    alerts,
+    unreadCount,
+    loading,
+    markAsRead,
+    markAllAsRead,
+    archiveAlert,
+  } = useLiveAlertsContext();
   const [currentPage, setCurrentPage] = useState(1);
+  const [activeFilter, setActiveFilter] = useState<AlertFilter>('all');
+  const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null);
   const itemsPerPage = 8;
 
-  const fetchAlerts = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [alertsData, countData] = await Promise.all([getAlerts(), getUnreadAlertsCount()]);
-      setAlerts(alertsData);
-      setUnreadCount(countData);
-    } catch (error) {
-      console.error('Failed to fetch notifications:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchAlerts();
-  }, [fetchAlerts]);
-
-  useEffect(() => {
-    if (!token || !userId) return;
-    const hubUrl = process.env.NEXT_PUBLIC_MERCURE_HUB_URL;
-    if (!hubUrl) return;
-
-    const topic = `https://oct.tn/users/${userId}/alerts`;
-    const subscribeUrl = `${hubUrl}?topic=${encodeURIComponent(topic)}`;
-    const source = new EventSource(subscribeUrl);
-    source.onmessage = () => {
-      fetchAlerts();
-    };
-    source.onerror = () => {
-      // EventSource retries automatically.
-    };
-
-    return () => source.close();
-  }, [token, userId, fetchAlerts]);
-
   const handleMarkRead = async (id: string) => {
-    try {
-      await markAlertAsRead(id);
-      setAlerts(alerts.map((alert) => 
-        alert.id === id ? { ...alert, status: 'read' as AlertStatus, read_at: new Date().toISOString() } : alert
-      ));
-      setUnreadCount((prev) => Math.max(0, prev - 1));
-    } catch (error) {
-      console.error('Failed to mark as read:', error);
-    }
+    await markAsRead(id);
   };
 
   const handleMarkAllRead = async () => {
-    try {
-      await markAllAlertsAsRead();
-      setAlerts(alerts.map((alert) => ({ ...alert, status: 'read' as AlertStatus, read_at: new Date().toISOString() })));
-      setUnreadCount(0);
-    } catch (error) {
-      console.error('Failed to mark all as read:', error);
-    }
+    await markAllAsRead();
   };
 
   const handleArchive = async (id: string) => {
-    try {
-      await archiveAlert(id);
-      setAlerts(alerts.filter((alert) => alert.id !== id));
-    } catch (error) {
-      console.error('Failed to archive:', error);
-    }
+    await archiveAlert(id);
   };
 
   const handleOpenAlert = async (alert: Alert) => {
-    if (!hasAlertTarget(alert)) return;
-    if (alert.status === 'unread') {
-      await handleMarkRead(alert.id);
+    setSelectedAlertId(alert.id);
+
+    if (hasAlertTarget(alert)) {
+      if (alert.status === 'unread') {
+        await handleMarkRead(alert.id);
+      }
+      navigateToAlert(alert, router);
+      return;
     }
-    navigateToAlert(alert, router);
+  };
+
+  const toggleFilter = (filter: AlertFilter) => {
+    setActiveFilter((current) => (current === filter ? 'all' : filter));
+    setCurrentPage(1);
+    setSelectedAlertId(null);
   };
 
   const { sortKey, sortDirection, toggleSort, sortRows } = useTableSort(ALERT_SORT_COLUMNS);
   const sortedAlerts = useMemo(() => sortRows(alerts), [alerts, sortRows]);
+  const filteredAlerts = useMemo(
+    () => sortedAlerts.filter((alert) => matchesFilter(alert, activeFilter)),
+    [sortedAlerts, activeFilter]
+  );
+  const selectedAlert = useMemo(
+    () => filteredAlerts.find((alert) => alert.id === selectedAlertId) ?? null,
+    [filteredAlerts, selectedAlertId]
+  );
 
-  const totalPages = Math.max(1, Math.ceil(sortedAlerts.length / itemsPerPage));
+  const totalPages = Math.max(1, Math.ceil(filteredAlerts.length / itemsPerPage));
   const start = (currentPage - 1) * itemsPerPage;
-  const paginatedAlerts = sortedAlerts.slice(start, start + itemsPerPage);
+  const paginatedAlerts = filteredAlerts.slice(start, start + itemsPerPage);
   const readCount = alerts.filter((a) => a.status === 'read').length;
   const archivedCount = alerts.filter((a) => a.status === 'archived').length;
   const criticalCount = alerts.filter((a) => a.severity === 'critical').length;
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [sortKey, sortDirection]);
+  }, [sortKey, sortDirection, activeFilter]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -193,17 +159,17 @@ export default function ClientNotifications({}: ClientNotificationsProps) {
 
   return (
     <div>
-      <PageBreadcrumb pageTitle='Notifications' />
-      <div className='mt-6 space-y-6'>
+      <div className='space-y-6'>
         <div className='rounded-3xl border border-indigo-100 bg-gradient-to-r from-indigo-50 via-white to-blue-50 p-6 shadow-sm dark:border-gray-800 dark:bg-white/[0.03]'>
           <div className='flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between'>
             <div>
+              <BreadcrumbNav items={BREADCRUMBS.notifications} className='mb-3' />
               <p className='text-[11px] font-black uppercase tracking-[0.2em] text-indigo-500'>Centre de notifications</p>
               <h2 className='mt-2 text-2xl font-black text-gray-900 dark:text-white'>
                 Alertes systeme
               </h2>
               <p className='mt-1 text-sm text-gray-500 dark:text-gray-400'>
-                Suivi des alertes en temps reel avec actions rapides.
+                Mises a jour en temps reel via Mercure Hub.
               </p>
             </div>
             <div className='flex items-center gap-3'>
@@ -212,7 +178,7 @@ export default function ClientNotifications({}: ClientNotificationsProps) {
               </span>
               {unreadCount > 0 && (
                 <button
-                  onClick={handleMarkAllRead}
+                  onClick={() => void handleMarkAllRead()}
                   className='rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition-all'
                 >
                   Tout marquer comme lu
@@ -223,28 +189,81 @@ export default function ClientNotifications({}: ClientNotificationsProps) {
         </div>
 
         <div className='grid grid-cols-1 gap-4 md:grid-cols-4'>
-          <div className='rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-white/[0.03]'>
-            <p className='text-[10px] font-black uppercase tracking-widest text-gray-400'>Non lues</p>
-            <p className='mt-2 text-2xl font-black text-indigo-600'>{unreadCount}</p>
-          </div>
-          <div className='rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-white/[0.03]'>
-            <p className='text-[10px] font-black uppercase tracking-widest text-gray-400'>Lues</p>
-            <p className='mt-2 text-2xl font-black text-green-600'>{readCount}</p>
-          </div>
-          <div className='rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-white/[0.03]'>
-            <p className='text-[10px] font-black uppercase tracking-widest text-gray-400'>Critiques</p>
-            <p className='mt-2 text-2xl font-black text-red-600'>{criticalCount}</p>
-          </div>
-          <div className='rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-white/[0.03]'>
-            <p className='text-[10px] font-black uppercase tracking-widest text-gray-400'>Archivees</p>
-            <p className='mt-2 text-2xl font-black text-gray-600 dark:text-gray-300'>{archivedCount}</p>
-          </div>
+          {([
+            ['unread', unreadCount, 'text-indigo-600', 'border-indigo-200 ring-indigo-100'],
+            ['read', readCount, 'text-green-600', 'border-green-200 ring-green-100'],
+            ['critical', criticalCount, 'text-red-600', 'border-red-200 ring-red-100'],
+            ['archived', archivedCount, 'text-gray-600 dark:text-gray-300', 'border-gray-200 ring-gray-100'],
+          ] as const).map(([filter, count, countClass, activeRing]) => (
+            <button
+              key={filter}
+              type='button'
+              onClick={() => toggleFilter(filter)}
+              className={`rounded-2xl border bg-white p-4 text-left shadow-sm transition-all hover:shadow-md dark:border-gray-800 dark:bg-white/[0.03] ${
+                activeFilter === filter
+                  ? `ring-2 ${activeRing} ${activeRing.replace('ring-', 'border-')}`
+                  : 'border-gray-100'
+              }`}
+            >
+              <p className='text-[10px] font-black uppercase tracking-widest text-gray-400'>
+                {FILTER_LABELS[filter]}
+              </p>
+              <p className={`mt-2 text-2xl font-black ${countClass}`}>{count}</p>
+              {activeFilter === filter && (
+                <p className='mt-2 text-[10px] font-bold uppercase tracking-wider text-gray-400'>
+                  Filtre actif
+                </p>
+              )}
+            </button>
+          ))}
         </div>
 
+        {activeFilter !== 'all' && (
+          <div className='flex items-center justify-between rounded-2xl border border-indigo-100 bg-indigo-50/60 px-4 py-3 text-sm text-indigo-700'>
+            <span>
+              Affichage : <strong>{FILTER_LABELS[activeFilter]}</strong> ({filteredAlerts.length})
+            </span>
+            <button
+              type='button'
+              onClick={() => toggleFilter(activeFilter)}
+              className='text-xs font-black uppercase tracking-wider text-indigo-600 hover:text-indigo-800'
+            >
+              Tout afficher
+            </button>
+          </div>
+        )}
+
+        {selectedAlert && !hasAlertTarget(selectedAlert) && (
+          <div className='rounded-3xl border border-indigo-100 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-white/[0.03]'>
+            <div className='flex flex-wrap items-start justify-between gap-4'>
+              <div>
+                <p className='text-[10px] font-black uppercase tracking-widest text-indigo-500'>Détail de l&apos;alerte</p>
+                <h3 className='mt-2 text-lg font-black text-gray-900 dark:text-white'>{selectedAlert.title}</h3>
+              </div>
+              <div className='flex flex-wrap gap-2'>
+                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${severityColors[selectedAlert.severity]}`}>
+                  {getSeverityLabel(selectedAlert.severity)}
+                </span>
+                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${statusColors[selectedAlert.status]}`}>
+                  {getStatusLabel(selectedAlert.status)}
+                </span>
+              </div>
+            </div>
+            <p className='mt-4 text-sm leading-relaxed text-gray-600 dark:text-gray-300'>
+              {selectedAlert.message}
+            </p>
+            <p className='mt-4 text-xs font-semibold uppercase tracking-wider text-gray-400'>
+              {getAlertTypeLabel(selectedAlert.type)}
+            </p>
+          </div>
+        )}
+
         <div>
-          {alerts.length === 0 ? (
+          {filteredAlerts.length === 0 ? (
             <div className='rounded-2xl border border-gray-100 bg-white py-14 text-center shadow-sm dark:border-gray-800 dark:bg-white/[0.03]'>
-              <h3 className='mt-2 text-sm font-medium text-gray-900 dark:text-white'>Aucune alerte</h3>
+              <h3 className='mt-2 text-sm font-medium text-gray-900 dark:text-white'>
+                {activeFilter === 'all' ? 'Aucune alerte' : `Aucune alerte ${FILTER_LABELS[activeFilter].toLowerCase()}`}
+              </h3>
               <p className='mt-1 text-sm text-gray-500 dark:text-gray-400'>
                 Tout est a jour. Pas de nouvelle alerte.
               </p>
@@ -252,11 +271,10 @@ export default function ClientNotifications({}: ClientNotificationsProps) {
           ) : (
             <div className='overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-[0_12px_40px_rgba(15,23,42,0.06)] dark:border-gray-800 dark:bg-white/[0.03]'>
               <ResponsiveTableWrap showScrollHint={paginatedAlerts.length > 0}>
-                <table className='w-full min-w-[900px]'>
+                <table className='w-full min-w-[760px]'>
                   <thead className='border-b border-gray-200 bg-gray-50/80 text-xs font-black uppercase tracking-wider text-gray-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-400'>
                     <tr>
-                      <SortableTh columnKey="severity" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-gray-500">Severite</SortableTh>
-                      <SortableTh columnKey="type" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-gray-500">Type</SortableTh>
+                      <SortableTh columnKey="severity" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-gray-500">Libelle</SortableTh>
                       <SortableTh columnKey="title" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-gray-500">Titre</SortableTh>
                       <SortableTh columnKey="status" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-gray-500">Statut</SortableTh>
                       <SortableTh columnKey="date" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-gray-500">Date</SortableTh>
@@ -268,22 +286,21 @@ export default function ClientNotifications({}: ClientNotificationsProps) {
                       <tr
                         key={alert.id}
                         onClick={() => void handleOpenAlert(alert)}
-                        className={`${hasAlertTarget(alert) ? 'cursor-pointer' : ''} hover:bg-gray-50 dark:hover:bg-white/[0.03] ${alert.status === 'unread' ? 'bg-blue-50/30 dark:bg-blue-900/5' : ''}`}
+                        className={`cursor-pointer hover:bg-gray-50 dark:hover:bg-white/[0.03] ${
+                          selectedAlertId === alert.id ? 'bg-indigo-50/60 dark:bg-indigo-900/10' : ''
+                        } ${alert.status === 'unread' ? 'bg-blue-50/30 dark:bg-blue-900/5' : ''}`}
                       >
                         <td className='px-6 py-4'>
                           <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${severityColors[alert.severity]}`}>
-                            {severityLabels[alert.severity]}
+                            {getSeverityLabel(alert.severity)}
                           </span>
-                        </td>
-                        <td className='px-6 py-4 text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300'>
-                          {typeLabels[alert.type] || alert.type.replace(/_/g, ' ')}
                         </td>
                         <td className='px-6 py-4 font-medium text-gray-900 dark:text-white max-w-md truncate' title={alert.title}>
                           {alert.title}
                         </td>
                         <td className='px-6 py-4'>
                           <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${statusColors[alert.status]}`}>
-                            {statusLabels[alert.status]}
+                            {getStatusLabel(alert.status)}
                           </span>
                         </td>
                         <td className='px-6 py-4 text-gray-500 dark:text-gray-400'>
@@ -360,4 +377,3 @@ export default function ClientNotifications({}: ClientNotificationsProps) {
     </div>
   );
 }
-

@@ -1,4 +1,4 @@
-import { Outfit } from 'next/font/google';
+import localFont from 'next/font/local';
 import './globals.css';
 import "flatpickr/dist/flatpickr.css";
 import { SidebarProvider } from '@/context/SidebarContext';
@@ -22,8 +22,20 @@ export const metadata: Metadata = {
   },
 };
 
-const outfit = Outfit({
-  subsets: ["latin"],
+const outfit = localFont({
+  src: [
+    {
+      path: "../fonts/outfit-latin-wght-normal.woff2",
+      weight: "100 900",
+      style: "normal",
+    },
+    {
+      path: "../fonts/outfit-latin-ext-wght-normal.woff2",
+      weight: "100 900",
+      style: "normal",
+    },
+  ],
+  display: "swap",
 });
 
 const themeInitScript = `

@@ -1,4 +1,43 @@
-import type { Alert } from "@/lib/notifications.api";
+import type { Alert, AlertSeverity, AlertStatus } from "@/lib/notifications.api";
+
+export const SEVERITY_LABELS: Record<AlertSeverity, string> = {
+  info: "Information",
+  warning: "Attention",
+  critical: "Urgent",
+};
+
+export const STATUS_LABELS: Record<AlertStatus, string> = {
+  unread: "Non lue",
+  read: "Lue",
+  archived: "Archivée",
+};
+
+export const ALERT_TYPE_LABELS: Record<string, string> = {
+  LOW_STOCK: "Stock faible",
+  WAREHOUSE_CAPACITY_HIGH: "Capacité entrepôt élevée",
+  INVENTORY_ANOMALY: "Anomalie inventaire",
+  SUPPLIER_DELAY: "Retard fournisseur",
+  COMMAND_DELAY: "Retard commande",
+  CONTRACT_EXHAUSTED: "Contrat épuisé",
+  CONTRACT_EXPIRED: "Contrat expiré",
+  CONTRACT_EXPIRING: "Contrat expire bientôt",
+  NEW_USER_PENDING: "Nouveau compte",
+  ENTITY_CREATED: "Entité créée",
+  STATUS_CHANGED: "Changement de statut",
+  ENTITY_VALIDATED: "Validation",
+};
+
+export function getSeverityLabel(severity: AlertSeverity): string {
+  return SEVERITY_LABELS[severity] ?? severity;
+}
+
+export function getStatusLabel(status: AlertStatus): string {
+  return STATUS_LABELS[status] ?? status;
+}
+
+export function getAlertTypeLabel(type: string): string {
+  return ALERT_TYPE_LABELS[type] ?? type.replace(/_/g, " ").toLowerCase();
+}
 
 const ENTITY_FOCUS_ROUTES: Record<string, string> = {
   commande: "/commandes",
@@ -6,8 +45,11 @@ const ENTITY_FOCUS_ROUTES: Record<string, string> = {
   entrepot: "/entrepots",
   stock: "/stock",
   stock_inventaire: "/stock-inventaire",
+  inventaire: "/stock-inventaire",
   mouvement: "/mouvements",
   mouvement_stock: "/mouvements",
+  facture: "/factures",
+  bon_livraison: "/bon-livraisons",
   user: "/users",
 };
 
@@ -18,6 +60,7 @@ const LEGACY_PATH_ROUTES: Record<string, string> = {
   contrats: "/contrats",
   entrepots: "/entrepots",
   "stock-inventaire": "/stock-inventaire",
+  inventaires: "/stock-inventaire",
   "bon-livraisons": "/bon-livraisons",
   factures: "/factures",
   mouvements: "/mouvements",
@@ -36,6 +79,13 @@ const ALERT_TYPE_ROUTES: Partial<Record<string, string>> = {
   INVENTORY_ANOMALY: "/stock-inventaire",
   NEW_USER_PENDING: "/users",
 };
+
+function normalizeEntityId(entityId?: string | number | null): string | number | null {
+  if (entityId == null || entityId === "") return null;
+  const raw = String(entityId);
+  const clean = raw.split(":")[0];
+  return clean === "" ? null : clean;
+}
 
 function buildFocusUrl(basePath: string, entityId: string | number): string {
   return `${basePath}?focus=${encodeURIComponent(String(entityId))}`;
@@ -77,7 +127,7 @@ function resolveTypeRoute(
 
 export function getSafeAlertUrl(alert: Alert): string | null {
   const rawUrl = (alert.action_url || "").trim();
-  const entityId = alert.entity_id;
+  const entityId = normalizeEntityId(alert.entity_id);
 
   if (rawUrl) {
     if (rawUrl.includes("focus=")) {
@@ -134,8 +184,7 @@ export function navigateToAlert(
 }
 
 export function formatAlertType(type: Alert["type"]): string {
-  if (type === "NEW_USER_PENDING") return "Nouveau compte";
-  return type.replace(/_/g, " ").toLowerCase();
+  return getAlertTypeLabel(type);
 }
 
 export function getAlertSeverityAccent(severity: Alert["severity"]): string {
@@ -203,4 +252,36 @@ export function getAlertCtaTone(severity: Alert["severity"]): string {
     default:
       return "bg-[#00A09D] hover:bg-[#008f8c]";
   }
+}
+
+export function getAlertBusinessKey(alert: Alert): string {
+  if (alert.entity_type && alert.entity_id != null) {
+    return `${alert.type}|${alert.entity_type}|${alert.entity_id}`;
+  }
+  return `id|${alert.id}`;
+}
+
+export function dedupeAlerts(alerts: Alert[]): Alert[] {
+  const byKey = new Map<string, Alert>();
+
+  for (const alert of alerts) {
+    const key = getAlertBusinessKey(alert);
+    const existing = byKey.get(key);
+    if (!existing) {
+      byKey.set(key, alert);
+      continue;
+    }
+
+    const existingTime = new Date(existing.created_at ?? 0).getTime();
+    const incomingTime = new Date(alert.created_at ?? 0).getTime();
+    if (incomingTime >= existingTime) {
+      byKey.set(key, alert);
+    }
+  }
+
+  return Array.from(byKey.values()).sort((a, b) => {
+    const aTime = new Date(a.created_at ?? 0).getTime();
+    const bTime = new Date(b.created_at ?? 0).getTime();
+    return bTime - aTime;
+  });
 }

@@ -90,4 +90,11 @@ export type InventaireFilters = {
   periode_fin_to: string;
 };
 
+export type InventaireCampaignContext = {
+  entrepot: string;
+  date_mode: InventaireDateMode;
+  pivot_day: string;
+  pivot_year: string;
+};
+
 export type InventaireViewMode = "audit" | "critical";

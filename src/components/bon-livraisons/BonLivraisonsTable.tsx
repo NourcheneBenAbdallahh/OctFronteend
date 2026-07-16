@@ -22,12 +22,12 @@ import {
   CommandeOption,
 } from "@/types/bon-livraison";
 import { 
-  X, FileText, Upload, Edit2, AlertCircle, ShoppingCart, Truck, CheckCircle2, Search, ArrowRight, Eye, Download
+  X, FileText, Upload, AlertCircle, ShoppingCart, Truck, CheckCircle2, Search, ArrowRight, Eye, Download, ChevronDown
 } from "lucide-react";
 import { CommandeSearchablePicker } from "@/components/bon-livraisons/CommandeSearchablePicker";
 import { formatNumber } from "@/lib/utils";
 import { BonLivraisonDocumentModal } from "@/components/bon-livraisons/BonLivraisonDocumentModal";
-import BonLivraisonDetailDrawer from "@/components/bon-livraisons/BonLivraisonDetailDrawer";
+import BonLivraisonDetailPanel from "@/components/bon-livraisons/BonLivraisonDetailPanel";
 import {
   downloadBlob,
   fetchBonLivraisonDocument,
@@ -36,6 +36,8 @@ import { UniteMesureSearchablePicker } from "@/components/unites-mesure/UniteMes
 import { SortableTh } from "@/components/ui/SortableTableHeader";
 import { useTableSort } from "@/hooks/useTableSort";
 import type { SortColumn } from "@/lib/tableSort";
+import { BreadcrumbNav } from "@/components/common/BreadcrumbNav";
+import { BREADCRUMBS } from "@/lib/breadcrumbs";
 import {
   convertQuantityBetweenUnites,
   formatQuantitePrincipale,
@@ -209,7 +211,7 @@ export default function BonLivraisonsTable({
 
   const [currentPage, setCurrentPage] = useState(1);
   const [documentViewerBl, setDocumentViewerBl] = useState<TableBonLivraison | null>(null);
-  const [detailBl, setDetailBl] = useState<TableBonLivraison | null>(null);
+  const [expandedId, setExpandedId] = useState<Id | null>(null);
   const [documentDownloadLoadingId, setDocumentDownloadLoadingId] = useState<string | null>(null);
 
   useEffect(() => setRows(data), [data]);
@@ -631,6 +633,7 @@ export default function BonLivraisonsTable({
     {/* HEADER SECTION */}
     <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
       <div>
+        <BreadcrumbNav items={BREADCRUMBS.bonLivraisons} className="mb-2" />
         <h1 className="text-3xl font-black text-gray-900 tracking-tight flex items-center gap-3 flex-wrap">
           Flux Réceptions
           {readOnly ? (
@@ -755,6 +758,7 @@ export default function BonLivraisonsTable({
         <table className="w-full min-w-[900px] text-left border-collapse">
           <thead>
             <tr className="bg-gray-50/50">
+              <th className="px-4 py-4 w-10" />
               <SortableTh columnKey="numero_bl" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400">Référence BL</SortableTh>
               <SortableTh columnKey="commande" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400" align="center">Commande</SortableTh>
               <SortableTh columnKey="quantite" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.15em] text-gray-400" align="center">Quantité Reçue</SortableTh>
@@ -764,10 +768,21 @@ export default function BonLivraisonsTable({
           </thead>
           <tbody className="divide-y divide-gray-50">
             {paginatedRows.map((bl) => (
-              <tr key={bl.id} className="hover:bg-indigo-50/10 transition-colors group">
+              <React.Fragment key={bl.id}>
+              <tr
+                onClick={() => setExpandedId(expandedId === bl.id ? null : bl.id)}
+                className="group cursor-pointer bg-gradient-to-r from-white via-indigo-50/15 to-teal-50/10 transition-all hover:via-indigo-50/25"
+              >
+                <td className="px-4 py-5">
+                  <ChevronDown
+                    className={`h-4 w-4 text-gray-300 transition-transform duration-500 ${
+                      expandedId === bl.id ? "rotate-180 text-indigo-600" : ""
+                    }`}
+                  />
+                </td>
                 <td className="px-6 py-5">
                   <div className="flex items-center gap-4">
-                    <div className="h-10 w-10 rounded-2xl bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-white group-hover:shadow-sm transition-all">
+                    <div className="h-10 w-10 rounded-2xl bg-white/60 flex items-center justify-center text-gray-400 group-hover:bg-white/90 group-hover:shadow-sm transition-all">
                       <FileText className="h-5 w-5" />
                     </div>
                     <div>
@@ -803,7 +818,7 @@ export default function BonLivraisonsTable({
                     </span>
                   </div>
                 </td>
-                <td className="px-6 py-5">
+                <td className="px-6 py-5" onClick={(e) => e.stopPropagation()}>
                   {bl.document_bl ? (
                     <div className="flex items-center justify-center gap-1">
                       <button
@@ -830,30 +845,50 @@ export default function BonLivraisonsTable({
                     </span>
                   )}
                 </td>
-                <td className="px-6 py-5">
+                <td className="px-6 py-5" onClick={(e) => e.stopPropagation()}>
                   <div className="flex justify-end gap-1">
                     <button
                       type="button"
                       title="Voir le détail"
                       aria-label={`Voir le détail du BL ${bl.numero_bl || bl.id}`}
-                      onClick={() => setDetailBl(bl)}
-                      className="p-2.5 text-gray-400 hover:text-indigo-600 hover:bg-white rounded-xl transition-all"
+                      onClick={() => setExpandedId(expandedId === bl.id ? null : bl.id)}
+                      className="p-2.5 text-gray-400 hover:text-indigo-600 hover:bg-white/80 rounded-xl transition-all"
                     >
                       <Eye className="h-4 w-4" />
                     </button>
-                    {!readOnly ? (
-                      <button
-                        type="button"
-                        title="Modifier"
-                        onClick={() => openEdit(bl)}
-                        className="p-2.5 text-gray-400 hover:text-indigo-600 hover:bg-white rounded-xl transition-all"
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </button>
-                    ) : null}
                   </div>
                 </td>
               </tr>
+
+              {expandedId === bl.id ? (
+                <tr>
+                  <td colSpan={6} className="border-none bg-gradient-to-r from-indigo-50/20 via-white to-teal-50/15 p-0">
+                    <BonLivraisonDetailPanel
+                      bl={bl}
+                      emballageLabel={getEmballageLabel(bl)}
+                      entrepotLabel={getEntrepotLabel(bl)}
+                      unitCode={getUnitCode(bl)}
+                      userNamesById={userNamesById}
+                      documentDownloadLoading={documentDownloadLoadingId === String(bl.id)}
+                      onViewDocument={
+                        bl.document_bl ? () => setDocumentViewerBl(bl) : undefined
+                      }
+                      onDownloadDocument={
+                        bl.document_bl ? () => handleDownloadDocument(bl) : undefined
+                      }
+                      onEdit={
+                        !readOnly
+                          ? () => {
+                              setExpandedId(null);
+                              openEdit(bl);
+                            }
+                          : undefined
+                      }
+                    />
+                  </td>
+                </tr>
+              ) : null}
+              </React.Fragment>
             ))}
           </tbody>
         </table>
@@ -875,36 +910,6 @@ export default function BonLivraisonsTable({
         onClose={() => setDocumentViewerBl(null)}
         bonLivraisonId={documentViewerBl?.id ?? null}
         numeroBl={documentViewerBl?.numero_bl}
-      />
-
-      <BonLivraisonDetailDrawer
-        bl={detailBl}
-        open={Boolean(detailBl)}
-        onClose={() => setDetailBl(null)}
-        emballageLabel={detailBl ? getEmballageLabel(detailBl) : ""}
-        entrepotLabel={detailBl ? getEntrepotLabel(detailBl) : ""}
-        unitCode={detailBl ? getUnitCode(detailBl) : ""}
-        userNamesById={userNamesById}
-        documentDownloadLoading={
-          detailBl != null && documentDownloadLoadingId === String(detailBl.id)
-        }
-        onViewDocument={
-          detailBl?.document_bl
-            ? () => setDocumentViewerBl(detailBl)
-            : undefined
-        }
-        onDownloadDocument={
-          detailBl?.document_bl ? () => handleDownloadDocument(detailBl) : undefined
-        }
-        onEdit={
-          !readOnly && detailBl
-            ? () => {
-                const target = detailBl;
-                setDetailBl(null);
-                openEdit(target);
-              }
-            : undefined
-        }
       />
 
       {/* DRAWER DESIGN */}

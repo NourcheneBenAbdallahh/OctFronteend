@@ -14,8 +14,8 @@ export type Commande = {
   emballage_id: string | number;
   quantite: number;
   fournisseur_id: string | number;
-  contrat_id: string | number;
-  entrepot_id: string | number;
+  contrat_id: string | number | null;
+  entrepot_id: string | number | null;
   quantite_recue_total?: number;
   quantite_receptionnee?: number;
   reste: number;

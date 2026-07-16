@@ -8,7 +8,14 @@ export type AlertType =
   | "WAREHOUSE_CAPACITY_HIGH"
   | "INVENTORY_ANOMALY"
   | "SUPPLIER_DELAY"
-  | "NEW_USER_PENDING";
+  | "NEW_USER_PENDING"
+  | "COMMAND_DELAY"
+  | "CONTRACT_EXHAUSTED"
+  | "CONTRACT_EXPIRED"
+  | "CONTRACT_EXPIRING"
+  | "ENTITY_CREATED"
+  | "STATUS_CHANGED"
+  | "ENTITY_VALIDATED";
 
 export interface Alert {
   id: string;

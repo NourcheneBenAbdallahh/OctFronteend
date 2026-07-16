@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { syncAuthAccessCookie } from '@/lib/authCookie';
-import { clearOnboardingPending } from '@/lib/onboardingStorage';
 import type { User } from '@/types/auth';
 
 interface AuthState {
@@ -37,7 +36,6 @@ export const useAuthStore = create<AuthState>()(
 
       logout: () => {
         syncAuthAccessCookie(null);
-        clearOnboardingPending();
         set({ user: null, token: null, isAuthenticated: false });
         localStorage.removeItem('auth-storage');
       },

@@ -13,6 +13,7 @@ type SortableThProps = TableSortHeaderProps & {
   columnKey: string;
   className?: string;
   align?: "left" | "center" | "right";
+  title?: string;
   children: React.ReactNode;
 };
 
@@ -29,6 +30,7 @@ export function SortableTh({
   onSort,
   className = "",
   align = "left",
+  title,
   children,
 }: SortableThProps) {
   const isActive = sortKey === columnKey;
@@ -38,6 +40,7 @@ export function SortableTh({
       <button
         type="button"
         onClick={() => onSort(columnKey)}
+        title={title}
         className={`inline-flex w-full items-center gap-1.5 transition-colors hover:text-gray-700 ${alignClass[align]}`}
         aria-sort={
           isActive

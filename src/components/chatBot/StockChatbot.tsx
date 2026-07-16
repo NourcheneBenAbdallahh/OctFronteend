@@ -3,15 +3,7 @@
 import { useState, useCallback } from "react";
 import { MessageCircle, Send } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
-import { getGraphqlEndpoint, readPersistedAuthToken } from "@/lib/graphqlClient";
-
-const ASK_MUTATION = `
-  mutation AskStockBot($question: String!, $history: [ChatbotHistoryMessageInput!]) {
-    askStockBot(question: $question, history: $history) {
-      answer
-    }
-  }
-`;
+import { askStockBot } from "@/lib/chatbot.api";
 
 export type StockChatbotVariant = "widget" | "page";
 
@@ -33,7 +25,7 @@ export default function StockChatbot({ variant = "widget" }: StockChatbotProps) 
 
     const currentQuestion = question.trim();
     const historyPayload = messages.map((m) => ({
-      role: m.role === "user" ? "user" : "assistant",
+      role: (m.role === "user" ? "user" : "assistant") as "user" | "assistant",
       content: m.text,
     }));
 
@@ -42,57 +34,7 @@ export default function StockChatbot({ variant = "widget" }: StockChatbotProps) 
     setLoading(true);
 
     try {
-      const endpoint = getGraphqlEndpoint();
-      const bearer = token || readPersistedAuthToken();
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      };
-      if (bearer) {
-        headers.Authorization = `Bearer ${bearer}`;
-      }
-
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          query: ASK_MUTATION,
-          variables: {
-            question: currentQuestion,
-            history: historyPayload.length > 0 ? historyPayload : null,
-          },
-        }),
-        cache: "no-store",
-      });
-
-      const rawText = await res.text();
-      let json: {
-        data?: { askStockBot?: { answer?: string } };
-        errors?: Array<{ message: string }>;
-      };
-
-      try {
-        json = JSON.parse(rawText) as typeof json;
-      } catch {
-        throw new Error("Réponse serveur invalide.");
-      }
-
-      if (!res.ok) {
-        throw new Error(`Erreur HTTP ${res.status}`);
-      }
-
-      if (json.errors?.length) {
-        const msg = json.errors.map((e) => e.message).join(" ");
-        if (msg.toLowerCase().includes("unauthenticated") || res.status === 401) {
-          throw new Error("Connectez-vous pour utiliser l’assistant.");
-        }
-        throw new Error(msg);
-      }
-
-      const answer =
-        json.data?.askStockBot?.answer?.trim() ||
-        "Je n’ai pas reçu de réponse. Réessayez dans un instant ou reformulez votre question.";
-
+      const answer = await askStockBot(currentQuestion, historyPayload);
       setMessages((prev) => [...prev, { role: "bot", text: answer }]);
     } catch (e) {
       const err = e instanceof Error ? e.message : "Erreur inconnue.";
@@ -106,7 +48,7 @@ export default function StockChatbot({ variant = "widget" }: StockChatbotProps) 
     } finally {
       setLoading(false);
     }
-  }, [question, token, messages]);
+  }, [question, messages]);
 
   const panelClass =
     variant === "page"
@@ -154,16 +96,20 @@ export default function StockChatbot({ variant = "widget" }: StockChatbotProps) 
               <div className="space-y-2 text-xs leading-relaxed text-gray-600 dark:text-gray-400">
                 <p>
                   Posez une question sur vos <strong>stocks</strong>,{" "}
-                  <strong>commandes</strong>, <strong>factures</strong> ou{" "}
+                  <strong>commandes</strong>, <strong>contrats</strong> ou{" "}
                   <strong>entrepôts</strong>. Réponse basée sur les données enregistrées dans
                   l&apos;application.
+                </p>
+                <p className="text-[11px] text-gray-500 dark:text-gray-500">
+                  Les questions de <strong>facturation</strong> ne sont pas traitées par cet
+                  assistant.
                 </p>
                 <p className="rounded-lg bg-[#F8FAFA] px-3 py-2 text-[11px] dark:bg-gray-800/80">
                   <span className="font-bold text-[#1C2434] dark:text-gray-200">
                     Exemples à taper :
                   </span>{" "}
-                  « bilan », « combien de contrats », « stock faible », « factures impayées », «
-                  état des commandes ». Vous pouvez aussi poser votre question en phrase complète.
+                  « bilan », « combien de contrats », « stock faible », « état des commandes ».
+                  Vous pouvez aussi poser votre question en phrase complète.
                 </p>
               </div>
             )}

@@ -1,16 +1,19 @@
 "use client";
 
 import type { Stock } from "@/types/stock";
+import type { UniteMesure } from "@/types/unite-mesure";
 import StockCard from "./StockCard";
 
 interface Props {
   rows: Stock[];
+  unitesMesure: UniteMesure[];
   onView?: (stock: Stock) => void;
   onViewLot?: (stock: Stock) => void;
 }
 
 export default function StocksCardsView({
   rows,
+  unitesMesure,
   onView,
   onViewLot,
 }: Props) {
@@ -28,6 +31,7 @@ export default function StocksCardsView({
         <StockCard
           key={stock.id}
           stock={stock}
+          unitesMesure={unitesMesure}
           onView={onView}
           onViewLot={onViewLot}
         />

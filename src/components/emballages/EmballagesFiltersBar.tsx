@@ -13,7 +13,6 @@ import {
   CheckCircle2,
   XCircle,
 } from "lucide-react";
-import { tourPageAttrs } from "@/lib/tourPageAttrs";
 import type { TableEmballages } from "@/types/emballage";
 import { FilterBarSelect } from "@/components/ui/FilterBarSelect";
 import {
@@ -22,8 +21,6 @@ import {
   uniqueEmballageFilterOptions,
   type EmballagesFiltersState,
 } from "./emballagesFilters";
-
-const tour = tourPageAttrs("/emballages");
 
 interface Props {
   rows: TableEmballages[];
@@ -53,7 +50,6 @@ export default function EmballagesFiltersBar({ rows, filters, onChange }: Props)
       <div className="relative flex min-h-[52px] flex-1 items-center rounded-2xl border border-gray-100 bg-white px-4 py-3 shadow-sm ring-indigo-500/10 transition-all focus-within:ring-2">
         <Search size={18} className="mr-3 shrink-0 text-gray-300" />
         <input
-          {...tour.search}
           className="min-w-0 flex-1 outline-none text-sm font-medium placeholder:text-gray-300"
           placeholder="Rechercher par code, nom, type ou matériau…"
           value={filters.search}

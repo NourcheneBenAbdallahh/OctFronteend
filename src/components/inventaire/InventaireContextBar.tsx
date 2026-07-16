@@ -1,16 +1,16 @@
 "use client";
 
 import { Calendar, CalendarRange, Layers, Warehouse } from "lucide-react";
-import type { InventaireDateMode, InventaireFilters } from "@/types/inventaire";
-import { describeInventaireScope, yearOptions } from "@/lib/inventaire.dates";
+import type { InventaireCampaignContext, InventaireDateMode } from "@/types/inventaire";
+import { describeInventaireScope, normalizeIsoDay, todayIsoDay, yearOptions } from "@/lib/inventaire.dates";
 import { FilterBarSelect } from "@/components/ui/FilterBarSelect";
 
 type EntrepotOption = { id: string; label: string };
 
 interface Props {
   entrepots: EntrepotOption[];
-  filters: InventaireFilters;
-  onChange: (filters: InventaireFilters) => void;
+  campaign: InventaireCampaignContext;
+  onChange: (campaign: InventaireCampaignContext) => void;
   scopedCount: number;
   totalCount: number;
   onGenerer: () => void;
@@ -24,23 +24,23 @@ const MODES: { id: InventaireDateMode; label: string; icon: typeof Calendar }[] 
 
 export default function InventaireContextBar({
   entrepots,
-  filters,
+  campaign,
   onChange,
   scopedCount,
   totalCount,
   onGenerer,
   loading = false,
 }: Props) {
-  const entrepotName = entrepots.find((e) => e.id === filters.entrepot)?.label;
+  const entrepotName = entrepots.find((e) => e.id === campaign.entrepot)?.label;
   const scopeLabel = describeInventaireScope(
-    filters.date_mode,
-    filters.pivot_day,
-    filters.pivot_year,
+    campaign.date_mode,
+    campaign.pivot_day,
+    campaign.pivot_year,
     entrepotName
   );
 
-  const patch = (partial: Partial<InventaireFilters>) =>
-    onChange({ ...filters, ...partial, code_session: "" });
+  const patch = (partial: Partial<InventaireCampaignContext>) =>
+    onChange({ ...campaign, ...partial });
 
   return (
     <div className="rounded-[32px] border border-[#00A09D]/15 bg-gradient-to-br from-[#F2F7F7] to-white p-6 md:p-8 shadow-sm space-y-6">
@@ -51,18 +51,19 @@ export default function InventaireContextBar({
           </p>
           <h2 className="text-2xl font-[1000] text-[#1C2434] tracking-tight">{scopeLabel}</h2>
           <p className="text-sm text-gray-500 font-medium mt-2 max-w-xl">
-            Choisissez l&apos;entrepôt et la date (jour ou année) pour filtrer et générer une campagne
+            Choisissez l&apos;entrepôt et la date (jour ou année) pour générer une campagne
             tracée (<span className="font-black text-[#1C2434]">code_session</span> + période).
+            Les lignes du tableau restent toutes visibles.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 bg-white px-4 py-2 rounded-full border border-gray-100">
-            {scopedCount} ligne{scopedCount !== 1 ? "s" : ""} / {totalCount}
+            {scopedCount} ligne{scopedCount !== 1 ? "s" : ""} affichée{scopedCount !== 1 ? "s" : ""} / {totalCount}
           </span>
           <button
             type="button"
             onClick={onGenerer}
-            disabled={loading || !filters.entrepot}
+            disabled={loading || !campaign.entrepot}
             className="h-12 px-6 inline-flex items-center gap-2 rounded-full bg-[#00A09D] text-white text-[10px] font-black uppercase tracking-widest hover:bg-[#008f8c] disabled:opacity-40 transition-all"
           >
             <Layers size={16} />
@@ -73,10 +74,10 @@ export default function InventaireContextBar({
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <FilterBarSelect
-          value={filters.entrepot}
+          value={campaign.entrepot}
           onChange={(entrepot) => patch({ entrepot })}
           placeholder="Choisir un entrepôt"
-          ariaLabel="Filtrer par entrepôt"
+          ariaLabel="Entrepôt pour la campagne"
           icon={<Warehouse size={14} />}
           options={entrepots.map((e) => ({ value: e.id, label: e.label }))}
           triggerClassName="h-12 w-full min-w-0 rounded-2xl border border-white bg-white text-[10px] font-black uppercase tracking-widest text-[#1C2434] shadow-sm"
@@ -89,7 +90,7 @@ export default function InventaireContextBar({
               type="button"
               onClick={() => patch({ date_mode: id })}
               className={`flex-1 h-10 flex items-center justify-center gap-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                filters.date_mode === id
+                campaign.date_mode === id
                   ? "bg-[#1C2434] text-white shadow-md"
                   : "text-gray-400 hover:text-[#1C2434]"
               }`}
@@ -100,17 +101,19 @@ export default function InventaireContextBar({
           ))}
         </div>
 
-        {filters.date_mode === "day" && (
+        {campaign.date_mode === "day" && (
           <input
             type="date"
-            value={filters.pivot_day.slice(0, 10)}
-            onChange={(e) => patch({ pivot_day: e.target.value })}
+            value={normalizeIsoDay(campaign.pivot_day)}
+            onChange={(e) =>
+              patch({ pivot_day: e.target.value ? normalizeIsoDay(e.target.value) : todayIsoDay() })
+            }
             className="h-12 px-4 rounded-2xl border border-white bg-white text-sm font-bold text-[#1C2434] outline-none focus:border-[#00A09D] shadow-sm"
           />
         )}
-        {filters.date_mode === "year" && (
+        {campaign.date_mode === "year" && (
           <select
-            value={filters.pivot_year}
+            value={campaign.pivot_year}
             onChange={(e) => patch({ pivot_year: e.target.value })}
             className="h-12 px-4 rounded-2xl border border-white bg-white text-sm font-black text-[#1C2434] outline-none focus:border-[#00A09D] shadow-sm cursor-pointer"
           >

@@ -22,6 +22,8 @@ type LiveAlertsContextValue = {
   setDropdownOpen: (open: boolean) => void;
   markAsRead: (alertId: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
+  archiveAlert: (alertId: string) => Promise<void>;
+  refreshAlerts: () => Promise<void>;
   subscribeNewAlert: (listener: (alert: Alert) => void) => () => void;
 };
 
@@ -37,7 +39,6 @@ export function LiveAlertsProvider({ children }: { children: ReactNode }) {
 
   const alertsState = useLiveAlerts({
     onNewAlert: notifyListeners,
-    isDropdownOpen,
   });
 
   const subscribeNewAlert = useCallback((listener: (alert: Alert) => void) => {

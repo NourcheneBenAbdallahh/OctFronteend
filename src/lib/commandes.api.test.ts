@@ -1,6 +1,38 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { Commande } from "@/types/commandes";
-import { normalizeCommande } from "./commandes.api";
+import { listAllCommandes, normalizeCommande } from "./commandes.api";
+
+vi.mock("./graphqlClient", () => ({
+  graphqlRequest: vi.fn(),
+}));
+
+import { graphqlRequest } from "./graphqlClient";
+
+describe("listAllCommandes", () => {
+  beforeEach(() => {
+    vi.mocked(graphqlRequest).mockReset();
+  });
+
+  it("agrège toutes les pages jusqu'à lastPage", async () => {
+    vi.mocked(graphqlRequest)
+      .mockResolvedValueOnce({
+        commandes: {
+          data: [{ id: "1" } as Commande, { id: "2" } as Commande],
+          paginatorInfo: { count: 2, currentPage: 1, lastPage: 2, perPage: 2, total: 3 },
+        },
+      })
+      .mockResolvedValueOnce({
+        commandes: {
+          data: [{ id: "3" } as Commande],
+          paginatorInfo: { count: 1, currentPage: 2, lastPage: 2, perPage: 2, total: 3 },
+        },
+      });
+
+    const all = await listAllCommandes(undefined, 2);
+    expect(all.map((c) => c.id)).toEqual(["1", "2", "3"]);
+    expect(graphqlRequest).toHaveBeenCalledTimes(2);
+  });
+});
 
 describe("normalizeCommande", () => {
   it("conserve un statut autorisé", () => {

@@ -1,14 +1,16 @@
 import React from "react";
-import { Search, Plus, Users, ChevronRight } from "lucide-react";
+import { Search, Plus, Users } from "lucide-react";
+import { BreadcrumbNav } from "@/components/common/BreadcrumbNav";
+import { BREADCRUMBS } from "@/lib/breadcrumbs";
 import { RoleSearchableDropdown } from "./RoleSearchableDropdown";
-import type { UserRole } from "@/lib/users.api";
+import type { AssignableUserRole } from "@/lib/users.api";
 
 interface Props {
   searchInput: string;
   setSearchInput: (q: string) => void;
   roleFilter: string;
   setRoleFilter: React.Dispatch<React.SetStateAction<string>>;
-  roleOptions: UserRole[];
+  roleOptions: AssignableUserRole[];
   roleFr: (role: string) => string;
   onOpenNew: () => void;
   total: number;
@@ -31,15 +33,11 @@ export const UsersHeader = ({
   <div className="mb-8 space-y-8">
     <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
       <div>
+        <BreadcrumbNav items={BREADCRUMBS.users} className="mb-2" />
         <h1 className="text-4xl font-black tracking-tighter text-gray-900 sm:text-5xl">
           Utilisateurs
           <span className="text-[#00A09D]">.</span>
         </h1>
-        <nav className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-400">
-          <span>Administration</span>
-          <ChevronRight size={10} />
-          <span>Utilisateurs</span>
-        </nav>
       </div>
       <div className="flex min-w-[160px] items-center gap-4 rounded-[2rem] border border-gray-50 bg-white p-4 shadow-sm">
         <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">

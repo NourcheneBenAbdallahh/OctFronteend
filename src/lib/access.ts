@@ -1,13 +1,35 @@
 /**
  * Rôles fonctionnels alignés avec l’ENUM backend (users.role).
- * CONTRAT est traité comme LOGISTIQUE pour le menu et les garde-frontières UX.
+ * La valeur legacy CONTRAT en base est traitée comme LOGISTIQUE (menu, droits, affichage).
  */
 
 export type AccessRole = "ADMIN" | "STOCK" | "LOGISTIQUE" | "FINANCE";
 
+/** Rôles proposés à la création / modification utilisateur (sans CONTRAT legacy). */
+export const ASSIGNABLE_USER_ROLES: AccessRole[] = [
+  "ADMIN",
+  "STOCK",
+  "LOGISTIQUE",
+  "FINANCE",
+];
+
+const ROLE_DISPLAY_LABELS: Record<AccessRole, string> = {
+  ADMIN: "Administrateur",
+  STOCK: "Stock",
+  LOGISTIQUE: "Logistique",
+  FINANCE: "Finance",
+};
+
+/** Libellé affiché pour un rôle (CONTRAT legacy → Logistique). */
+export function roleDisplayLabel(role: string | undefined | null): string {
+  const r = toAccessRole(role);
+  if (r) return ROLE_DISPLAY_LABELS[r];
+  return role?.trim() || "—";
+}
+
 export function canUseStockAi(role: string | undefined | null): boolean {
   const r = toAccessRole(role);
-  return r === "ADMIN" || r === "STOCK";
+  return r === "ADMIN" || r === "STOCK" || r === "LOGISTIQUE";
 }
 
 const DEMO_PREFIXES = [
@@ -76,7 +98,7 @@ export function canAccessPath(
     return true;
   }
   if (path === "/calendar" || path.startsWith("/calendar/")) {
-    return true;
+    return r === "LOGISTIQUE" || r === "FINANCE";
   }
 
   if (path === "/bi" || path.startsWith("/bi/")) {
@@ -90,7 +112,7 @@ export function canAccessPath(
   }
 
   if (path.startsWith("/unites-mesure")) {
-    return isAdminUser(role);
+    return r === "LOGISTIQUE";
   }
 
   if (path.startsWith("/emballages")) {
@@ -174,8 +196,8 @@ export function filterCommandesForCalendarUser<
 }
 
 /**
- * Aligné sur `commandes` GraphQL (@requiresRole LOGISTIQUE) : ADMIN court-circuité côté API,
- * CONTRAT traité comme LOGISTIQUE. FINANCE / STOCK n’ont pas accès à la liste commandes.
+ * Aligné sur `commandes` GraphQL (@requiresRole LOGISTIQUE) : ADMIN court-circuité côté API.
+ * FINANCE / STOCK n’ont pas accès à la liste commandes.
  */
 export function canQueryCommandesList(role: string | undefined | null): boolean {
   if (isAdminUser(role)) return true;
@@ -226,7 +248,7 @@ export function canViewPredictiveStockAlerts(
   return scope === "full" || scope === "stock";
 }
 
-/** Liste fournisseurs (page `/fournisseurs`) : ADMIN + LOGISTIQUE (+ CONTRAT). */
+/** Liste fournisseurs (page `/fournisseurs`) : ADMIN + LOGISTIQUE. */
 export function canViewFournisseursList(
   role: string | undefined | null
 ): boolean {
@@ -241,15 +263,6 @@ export function canViewFournisseursMap(
 }
 
 /** Libellé menu latéral pour la route `/bi`. */
-export function sidebarBiNavLabel(role: string | undefined | null): string {
-  switch (biDataScopeForRole(role)) {
-    case "stock":
-      return "BI — Stock";
-    case "logistique":
-      return "BI — Logistique";
-    case "finance":
-      return "BI — Finance";
-    default:
-      return "Tableau BI";
-  }
+export function sidebarBiNavLabel(_role?: string | undefined | null): string {
+  return "Tableau de bord";
 }

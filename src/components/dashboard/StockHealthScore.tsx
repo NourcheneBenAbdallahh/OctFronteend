@@ -63,8 +63,8 @@ export default function StockHealthScore({ stocks }: { stocks: Stock[] }) {
   return (
     <div className="bg-white p-8 rounded-[40px] border border-gray-100 shadow-sm flex flex-col items-center min-h-[340px] justify-between">
       <div className="text-center">
-        <h3 className="text-[11px] font-[1000] text-[#1C2434] uppercase tracking-[0.2em] mb-1">Santé Globale</h3>
-        <p className="text-[9px] font-bold text-gray-400 uppercase">État des stocks vs Seuils</p>
+        <h3 className="text-[11px] font-[1000] text-[#1C2434] uppercase tracking-[0.2em] mb-1">État du stock</h3>
+        <p className="text-[9px] font-bold text-gray-400 uppercase">Produits au-dessus du minimum</p>
       </div>
 
       <div className="relative w-full flex justify-center">
@@ -75,7 +75,7 @@ export default function StockHealthScore({ stocks }: { stocks: Stock[] }) {
         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Disponibilité</p>
         <p className="text-sm font-[1000] text-[#1C2434]">
           {healthy} <span className="text-gray-400 mx-1">/</span> {totalTypes} 
-          <span className="ml-2 text-[10px] text-[#00A09D] bg-[#00A09D]/10 px-2 py-0.5 rounded-full uppercase">Modèles OK</span>
+          <span className="ml-2 text-[10px] text-[#00A09D] bg-[#00A09D]/10 px-2 py-0.5 rounded-full uppercase">OK</span>
         </p>
       </div>
     </div>

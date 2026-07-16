@@ -13,6 +13,8 @@ import UnitesMesureFormModal from "./UnitesMesureFormModal";
 import { EMPTY_UNITES_FILTERS, type UnitesMesureFiltersState } from "./unitesMesureFilters";
 import { useTableSort } from "@/hooks/useTableSort";
 import type { SortColumn } from "@/lib/tableSort";
+import { isAdminUser } from "@/lib/access";
+import { useAuthStore } from "@/store/useAuthStore";
 
 const PAGE_SIZE = 10;
 
@@ -22,7 +24,6 @@ const UNITE_SORT_COLUMNS: Record<string, SortColumn<UniteMesure>> = {
   dimension: { accessor: (r) => r.dimension, type: "string" },
   facteur_kg: { accessor: (r) => r.facteur_vers_kg, type: "number" },
   facteur_l: { accessor: (r) => r.facteur_vers_l, type: "number" },
-  sort_order: { accessor: (r) => r.sort_order, type: "number" },
 };
 
 interface Props {
@@ -36,6 +37,8 @@ export default function UnitesMesureTable({ data, onRefresh }: Props) {
   const [editing, setEditing] = useState<UniteMesure | null>(null);
   const [filters, setFilters] = useState<UnitesMesureFiltersState>(EMPTY_UNITES_FILTERS);
   const [page, setPage] = useState(1);
+  const userRole = useAuthStore((s) => s.user?.role);
+  const canManage = isAdminUser(userRole);
   const {
     feedback,
     confirm,
@@ -106,6 +109,7 @@ export default function UnitesMesureTable({ data, onRefresh }: Props) {
         onFiltersChange={setFilters}
         total={rows.length}
         filteredCount={filteredRows.length}
+        canManage={canManage}
         onOpenNew={() => {
           setEditing(null);
           setIsOpen(true);
@@ -122,6 +126,7 @@ export default function UnitesMesureTable({ data, onRefresh }: Props) {
               sortKey={sortKey}
               sortDirection={sortDirection}
               onSort={toggleSort}
+              canManage={canManage}
               onEdit={(item) => {
                 setEditing(item);
                 setIsOpen(true);

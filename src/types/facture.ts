@@ -45,7 +45,14 @@ export type Facture = {
     numero_contrat: string;
   } | null;
   
-  valide_par?: string | null;
+  valide_par?: {
+    id: string | number;
+    name: string;
+  } | null;
+  created_by?: {
+    id: string | number;
+    name: string;
+  } | null;
   created_at?: string | null;
   updated_at?: string | null;
 };
@@ -55,7 +62,7 @@ export type CreateFactureInput = {
   numero_facture: string;
   date_facture: string;
   bon_livraison_ids: (string | number)[];
-  montant_ht: number; 
+  montant_ht?: number;
   fournisseur_id?: string | number;
   contrat_id?: string | number;
   statut?: FactureStatut;
@@ -90,6 +97,8 @@ export type BonLivraisonOption = {
     contrat?: {
       id: string | number;
       numero_contrat: string;
+      montant_ht?: number;
+      quantite_contractuelle?: number;
     };
   };
 

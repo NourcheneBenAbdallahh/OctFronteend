@@ -16,6 +16,7 @@ import {
   canQueryCommandesList,
   filterCommandesForCalendarUser,
   isAdminUser,
+  toAccessRole,
 } from "@/lib/access";
 import { listCommandes } from "@/lib/commandes.api";
 import { fetchAllFactures } from "@/lib/bi.data";
@@ -231,8 +232,8 @@ const Calendar: React.FC = () => {
     if (roleUpper === "FINANCE") {
       return "Vos factures, positionnées à la date d'émission (vue finance).";
     }
-    if (roleUpper === "LOGISTIQUE" || roleUpper === "CONTRAT") {
-      return "Toutes les commandes de votre section (logistique / contrat).";
+    if (toAccessRole(user?.role) === "LOGISTIQUE") {
+      return "Toutes les commandes de votre section logistique.";
     }
     if (!loadCommandes && !showFacturesOnCalendar) {
       return "Ce calendrier affiche les commandes (logistique) ou les factures (finance) ; aucune donnée pour votre rôle.";

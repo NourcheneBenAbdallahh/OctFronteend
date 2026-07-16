@@ -4,7 +4,6 @@ export type UniteMesureFormState = {
   dimension: string;
   facteur_vers_kg: string;
   facteur_vers_l: string;
-  sort_order: string;
 };
 
 export type UniteMesureFieldErrors = Partial<Record<keyof UniteMesureFormState, string>>;
@@ -16,7 +15,6 @@ export function emptyUniteMesureForm(dimension = "masse"): UniteMesureFormState 
     dimension,
     facteur_vers_kg: "",
     facteur_vers_l: "",
-    sort_order: "0",
   };
 }
 
@@ -52,16 +50,6 @@ export function validateUniteMesureForm(
     errors.label = "Au moins 2 caractères.";
   } else if (label.length > 80) {
     errors.label = "80 caractères maximum.";
-  }
-
-  const sortRaw = form.sort_order.trim();
-  if (sortRaw === "") {
-    errors.sort_order = "Indiquez un ordre (0 = en tête de liste).";
-  } else {
-    const sortOrder = Number(sortRaw);
-    if (!Number.isInteger(sortOrder) || sortOrder < 0) {
-      errors.sort_order = "Entier positif ou zéro uniquement.";
-    }
   }
 
   const fKg = parseOptionalPositiveFactor(form.facteur_vers_kg);
@@ -100,11 +88,4 @@ export function validateUniteMesureForm(
   }
 
   return errors;
-}
-
-export function parseSortOrder(raw: string): number {
-  const trimmed = raw.trim();
-  if (trimmed === "") return 0;
-  const n = parseInt(trimmed, 10);
-  return Number.isInteger(n) && n >= 0 ? n : 0;
 }

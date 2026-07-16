@@ -11,7 +11,6 @@ import { login } from "@/lib/auth.api";
 import { isValidEmailFormat } from "@/lib/email-validation"; 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/store/useAuthStore";
-import { setOnboardingPending } from "@/lib/onboardingStorage";
 import { APP_NAME, APP_SHORT_NAME } from "@/lib/branding";
 
 export default function SignInForm() {
@@ -47,9 +46,6 @@ export default function SignInForm() {
       
   
       setAuth(data.user, data.token);
-      if (data.isFirstLogin) {
-        setOnboardingPending(data.user.id);
-      }
 
       router.push("/bi"); 
     } catch (err: any) {
