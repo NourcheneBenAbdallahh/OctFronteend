@@ -78,18 +78,33 @@ describe("inventaire.filters", () => {
     ).toHaveLength(1);
   });
 
-  it("filtre par mode jour", () => {
+  it("ne filtre pas par mode jour mais filtre par session", () => {
     const withDates = [
-      row({ id: "10", date_inventaire: "2026-05-10T08:00:00" }),
-      row({ id: "11", date_inventaire: "2026-06-01T08:00:00" }),
+      row({ id: "10", date_inventaire: "2026-05-10T08:00:00", code_session: "S-A" }),
+      row({ id: "11", date_inventaire: "2026-06-01T08:00:00", code_session: "S-B" }),
     ];
-    const filtered = applyInventaireFilters(withDates, {
+    const byDay = applyInventaireFilters(withDates, {
       ...EMPTY_INVENTAIRE_FILTERS,
       date_mode: "day",
       pivot_day: "2026-05-10",
     });
+    expect(byDay).toHaveLength(2);
+
+    const bySession = applyInventaireFilters(withDates, {
+      ...EMPTY_INVENTAIRE_FILTERS,
+      code_session: "S-A",
+    });
+    expect(bySession).toHaveLength(1);
+    expect(bySession[0].id).toBe("10");
+  });
+
+  it("filtre entrepôt même si id numérique vs string", () => {
+    const withNumericId = [row({ id: "10", entrepot_id: 10 as unknown as string })];
+    const filtered = applyInventaireFilters(withNumericId, {
+      ...EMPTY_INVENTAIRE_FILTERS,
+      entrepot: "10",
+    });
     expect(filtered).toHaveLength(1);
-    expect(filtered[0].id).toBe("10");
   });
 
   it("buildInventaireFiltersLabel résume les filtres actifs", () => {

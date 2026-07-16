@@ -7,7 +7,7 @@ import {
   createCommande,
   dropCommande,
   fetchCommandeById,
-  listCommandes,
+  listAllCommandes,
   normalizeCommande,
   updateCommande,
 } from "@/lib/commandes.api";
@@ -56,6 +56,8 @@ import { SortableTh } from "@/components/ui/SortableTableHeader";
 import { getActionErrorMessage, useAppFeedback } from "@/hooks/useAppFeedback";
 import { useTableSort } from "@/hooks/useTableSort";
 import type { SortColumn } from "@/lib/tableSort";
+import { BreadcrumbNav } from "@/components/common/BreadcrumbNav";
+import { BREADCRUMBS } from "@/lib/breadcrumbs";
 import {
   X,
   Plus,
@@ -292,10 +294,9 @@ const goToPage = (page: number) => {
     let cancelled = false;
     (async () => {
       try {
-        const first = Math.min(total, 300);
-        const res = await listCommandes(1, first, { token });
+        const all = await listAllCommandes({ token });
         if (!cancelled) {
-          setStatsRows(res.commandes.data.map(normalizeCommande));
+          setStatsRows(all.map(normalizeCommande));
         }
       } catch {
         if (!cancelled) {
@@ -605,6 +606,7 @@ const goToPage = (page: number) => {
         return;
       }
       setDrawerStep(3);
+      return;
     }
   };
 
@@ -622,6 +624,7 @@ const goToPage = (page: number) => {
           const res = await cancelCommande(id);
           const updated = normalizeCommande(res.cancelCommande);
           setRows((prev) => prev.map((r) => (String(r.id) === String(updated.id) ? updated : r)));
+          setStatsRows((prev) => prev.map((r) => (String(r.id) === String(updated.id) ? updated : r)));
           showSuccess("Commande annulée.");
         }),
     });
@@ -639,6 +642,7 @@ const goToPage = (page: number) => {
         void runConfirmedAction(async () => {
           await dropCommande(id);
           setRows((prev) => prev.filter((r) => String(r.id) !== String(id)));
+          setStatsRows((prev) => prev.filter((r) => String(r.id) !== String(id)));
           showSuccess("Commande supprimée.");
         }),
     });
@@ -689,11 +693,13 @@ const goToPage = (page: number) => {
         const res = await updateCommande(editing.id, updatePayload);
         const updated = normalizeCommande(res.updateCommande);
         setRows((prev) => prev.map((r) => String(r.id) === String(updated.id) ? updated : r));
+        setStatsRows((prev) => prev.map((r) => String(r.id) === String(updated.id) ? updated : r));
         showSuccess("Commande modifiée.");
       } else {
         const res = await createCommande(payloadBase as any);
         const created = normalizeCommande(res.createCommande);
         setRows((prev) => [created, ...prev]);
+        setStatsRows((prev) => [created, ...prev]);
         showSuccess("Commande créée.");
       }
       closeDrawer();
@@ -702,17 +708,23 @@ const goToPage = (page: number) => {
     } finally { setSubmitLoading(false); }
   }
 
-const statusCounts = useMemo(() => computeCommandeStatusCounts(rows), [rows]);
+const statusCounts = useMemo(
+  () => computeCommandeStatusCounts(statsRows),
+  [statsRows]
+);
 
 const dashboardStats = useMemo(
   () => computeCommandeDashboardStats(statsRows),
   [statsRows]
 );
 
-const filteredRows = useMemo(
-  () => filterCommandesByQuery(rows, query, fournisseursMap),
-  [rows, query, fournisseursMap]
-);
+const isSearchActive = query.trim() !== "";
+
+/** Sans filtre : page serveur. Avec recherche/filtre : toute la liste chargée. */
+const filteredRows = useMemo(() => {
+  const source = isSearchActive ? statsRows : rows;
+  return filterCommandesByQuery(source, query, fournisseursMap);
+}, [isSearchActive, statsRows, rows, query, fournisseursMap]);
 
 const toggleQuickFilter = (filterKey: string) => {
   setQuery((prev) => (prev === filterKey ? "" : filterKey));
@@ -745,6 +757,7 @@ const toggleQuickFilter = (filterKey: string) => {
       {/* HEADER SECTION */}
       <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
+          <BreadcrumbNav items={BREADCRUMBS.commandes} className="mb-2" />
           <h1 className="text-3xl font-black text-gray-900 tracking-tight">Flux Commandes</h1>
           <p className="text-sm text-gray-500 font-medium italic">Suivi des réceptions et délais</p>
         </div>
@@ -851,7 +864,7 @@ const toggleQuickFilter = (filterKey: string) => {
   <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-2">Filtrer par :</div>
   {['TOUT', 'EN_ATTENTE', 'VALIDEE', 'PARTIELLEMENT_RECEPTIONNEE', 'RECEPTIONNEE'].map((s) => {
     const isActive = s === 'TOUT' ? query === '' : query === s;
-    const count = s === 'TOUT' ? rows.length : (statusCounts[s] || 0);
+    const count = s === 'TOUT' ? (pagination.total ?? statsRows.length) : (statusCounts[s] || 0);
 
     return (
       <button
@@ -981,13 +994,21 @@ const toggleQuickFilter = (filterKey: string) => {
           </table>
         </ResponsiveTableWrap>
       </div>
-<div className="mt-6 flex justify-center">
-  <Pagination
-    currentPage={pagination.currentPage}
-    totalPages={pagination.lastPage}
-    onPageChange={goToPage}
-  />
-</div>
+{!isSearchActive && pagination.lastPage > 1 && (
+  <div className="mt-6 flex justify-center">
+    <Pagination
+      currentPage={pagination.currentPage}
+      totalPages={pagination.lastPage}
+      onPageChange={goToPage}
+    />
+  </div>
+)}
+{isSearchActive && (
+  <p className="mt-4 text-center text-xs font-medium text-gray-400">
+    {sortedRows.length} résultat{sortedRows.length !== 1 ? "s" : ""} sur {statsRows.length} commande
+    {statsRows.length !== 1 ? "s" : ""}
+  </p>
+)}
       {/* DRAWER SECTION */}
       {isDrawerOpen && (
         <>
@@ -1037,10 +1058,13 @@ const toggleQuickFilter = (filterKey: string) => {
               </div>
 
               <form
+                noValidate
                 className="flex min-h-0 flex-1 flex-col"
                 onSubmit={(e) => {
                   e.preventDefault();
-                  if (drawerStep === 3) void handleSubmit(e);
+                  if (drawerStep < 3) {
+                    goDrawerNext();
+                  }
                 }}
               >
                 <div className="form-scroll min-h-0 flex-1 px-8 py-5 sm:px-10 sm:py-6">
@@ -1229,7 +1253,6 @@ const toggleQuickFilter = (filterKey: string) => {
                                 setForm({ ...form, date_livraison_prevue: e.target.value })
                               }
                               className="w-full rounded-2xl border-2 border-gray-50 bg-gray-50/30 p-4 text-sm font-black shadow-sm outline-none transition-all focus:border-indigo-500 focus:bg-white"
-                              required
                             />
                           </div>
                           <div className="space-y-4">
@@ -1244,7 +1267,6 @@ const toggleQuickFilter = (filterKey: string) => {
                                 onChange={(e) => setForm({ ...form, quantite: e.target.value })}
                                 className="w-full rounded-2xl border-2 border-gray-50 bg-gray-50/30 p-4 font-mono text-sm font-black shadow-sm outline-none transition-all focus:border-indigo-500 focus:bg-white"
                                 placeholder="Ex. 10000"
-                                required
                               />
                             </div>
                             <div className="space-y-3">
@@ -1430,7 +1452,7 @@ const toggleQuickFilter = (filterKey: string) => {
                         Annuler
                       </button>
                       <button
-                        type="submit"
+                        type="button"
                         disabled={
                           submitLoading ||
                           contractStats?.depasse ||
@@ -1442,6 +1464,7 @@ const toggleQuickFilter = (filterKey: string) => {
                           !Number.isFinite(quantiteEnPrincipal) ||
                           quantiteEnPrincipal < 0
                         }
+                        onClick={(e) => void handleSubmit(e)}
                         className="flex-[2] rounded-2xl bg-gray-900 py-4 text-[11px] font-black uppercase tracking-[0.2em] text-white shadow-xl shadow-gray-200 transition-all hover:bg-indigo-600 disabled:bg-gray-100 disabled:text-gray-300 sm:min-w-0"
                       >
                         {submitLoading ? "Envoi en cours…" : editing ? "Confirmer la modification" : "Lancer la commande"}

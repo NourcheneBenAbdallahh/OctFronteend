@@ -19,6 +19,8 @@ describe("normalizeInventaire", () => {
     const out = normalizeInventaire(inv);
     expect(out.entrepot_name).toBe("Tunis");
     expect(out.emballage_name).toBe("Sac");
+    expect(out.entrepot_id).toBe("10");
+    expect(out.emballage_id).toBe("20");
   });
 
   it("fallback sur les ids si relations absentes", () => {

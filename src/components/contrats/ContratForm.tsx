@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { X, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Check, AlertCircle } from "lucide-react";
 import { UniteMesureSearchablePicker } from "@/components/unites-mesure/UniteMesureSearchablePicker";
 
@@ -22,6 +22,7 @@ export const ContratForm = ({
   onDocumentFile,
   extracting,
   hasPendingDocument,
+  pendingDocumentFile,
 }: any) => {
   const [step, setStep] = useState(1);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -167,18 +168,13 @@ export const ContratForm = ({
                     Import OCR du contrat (PDF/Image)
                   </label>
                   <div className="rounded-2xl border-2 border-dashed border-indigo-100 bg-indigo-50/40 p-4">
-                    <input
-                      type="file"
-                      accept=".pdf,image/*"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
+                    <ContractFilePicker
+                      disabled={extracting || loading}
+                      selectedFile={pendingDocumentFile}
+                      onChange={(file) => {
                         onExtractFromFile(file);
                         onDocumentFile?.(file);
-                        e.currentTarget.value = "";
                       }}
-                      className="block w-full text-xs font-semibold text-gray-700 file:mr-3 file:rounded-xl file:border-0 file:bg-[#1C2434] file:px-3 file:py-2 file:text-[10px] file:font-black file:uppercase file:tracking-wider file:text-white hover:file:bg-indigo-600"
-                      disabled={extracting || loading}
                     />
                     <p className="mt-2 text-[10px] font-semibold text-indigo-700/80">
                       {extracting
@@ -202,17 +198,11 @@ export const ContratForm = ({
                         Document existant enregistré.
                       </p>
                     )}
-                    <input
-                      type="file"
-                      accept=".pdf,image/*"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        onDocumentFile?.(file);
-                        e.currentTarget.value = "";
-                      }}
-                      className="block w-full text-xs font-semibold text-gray-700 file:mr-3 file:rounded-xl file:border-0 file:bg-[#1C2434] file:px-3 file:py-2 file:text-[10px] file:font-black file:uppercase file:tracking-wider file:text-white hover:file:bg-indigo-600"
+                    <ContractFilePicker
                       disabled={loading}
+                      selectedFile={pendingDocumentFile}
+                      existingDocumentPath={form.document_contrat}
+                      onChange={(file) => onDocumentFile?.(file)}
                     />
                     {hasPendingDocument && (
                       <p className="text-[10px] font-semibold text-indigo-700">
@@ -455,6 +445,67 @@ const SelectField = ({ label, value, options, onChange, labelKey, error, disable
     </div>
   );
 };
+
+function contractFileLabel(
+  selectedFile?: File | null,
+  existingDocumentPath?: string | null
+): string {
+  if (selectedFile) return selectedFile.name;
+  if (existingDocumentPath) {
+    const base = existingDocumentPath.split("/").pop();
+    return base ?? "Document enregistré";
+  }
+  return "Aucun fichier choisi";
+}
+
+function ContractFilePicker({
+  onChange,
+  disabled,
+  selectedFile,
+  existingDocumentPath,
+}: {
+  onChange: (file: File) => void;
+  disabled?: boolean;
+  selectedFile?: File | null;
+  existingDocumentPath?: string | null;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const hasFile = !!selectedFile || !!existingDocumentPath;
+  const label = contractFileLabel(selectedFile, existingDocumentPath);
+
+  return (
+    <div className="flex items-center gap-3 flex-wrap">
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        disabled={disabled}
+        className="rounded-xl border-0 bg-[#1C2434] px-3 py-2 text-[10px] font-black uppercase tracking-wider text-white hover:bg-indigo-600 disabled:opacity-50"
+      >
+        Choisir un fichier
+      </button>
+      <span
+        className={`text-xs font-semibold truncate max-w-full ${
+          hasFile ? "text-gray-800" : "text-gray-400"
+        }`}
+      >
+        {label}
+      </span>
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".pdf,image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          onChange(file);
+          e.currentTarget.value = "";
+        }}
+        disabled={disabled}
+      />
+    </div>
+  );
+}
 
 const InputFieldDark = ({ label, type = "text", value, onChange, step, error, disabled }: any) => (
   <div className="space-y-2">

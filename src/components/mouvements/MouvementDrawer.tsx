@@ -2,7 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { fetchLotsDisponibles } from "@/lib/mouvement.api";
-import { MOUVEMENT_TYPES, needsDestination, needsLot, needsSource } from "@/lib/mouvement.config";
+import {
+  MANUAL_MOUVEMENT_TYPES,
+  MOUVEMENT_TYPES,
+  needsDestination,
+  needsLot,
+  needsSource,
+} from "@/lib/mouvement.config";
 import {
   buildSummary,
   formatQuantity,
@@ -252,7 +258,7 @@ export default function MouvementStepperModal({
           {/* STEP 1: TYPE */}
           {step === 1 && (
             <div className="grid max-w-none grid-cols-1 gap-4 sm:gap-7 lg:grid-cols-2 lg:gap-8 xl:grid-cols-3 animate-in fade-in slide-in-from-bottom-4">
-              {(Object.keys(MOUVEMENT_TYPES) as MouvementType[]).map((type) => {
+              {MANUAL_MOUVEMENT_TYPES.map((type) => {
                 const meta = MOUVEMENT_TYPES[type];
                 return (
                   <button
@@ -261,8 +267,7 @@ export default function MouvementStepperModal({
                     onClick={() => setForm((prev) => ({ ...prev, type, motif: type === "PTE" ? prev.motif : "" }))}
                     className={`group relative rounded-2xl border-2 bg-white p-5 text-left shadow-sm transition-all active:scale-[0.99] sm:rounded-3xl sm:p-9 min-h-[128px] sm:min-h-[168px] md:min-h-[188px] touch-manipulation ${form.type === type ? "border-[#00A09D] bg-[#00A09D]/5 ring-2 ring-[#00A09D]/10" : "border-gray-100 hover:border-gray-300"}`}
                   >
-                    <div className="flex items-start justify-between gap-3 sm:gap-4">
-                      <span className="text-3xl leading-none sm:text-4xl md:text-5xl shrink-0">{meta.icon}</span>
+                    <div className="flex items-start justify-end">
                       <TypeBadge type={type} />
                     </div>
                     <h4 className="mt-3 font-black uppercase tracking-tight text-base text-[#1C2434] pr-1 sm:mt-5 sm:text-lg md:text-xl">
@@ -513,7 +518,9 @@ export default function MouvementStepperModal({
                 {form.type === "PTE" && summary.motifLabel && (
                   <SummaryRow label="Motif" value={summary.motifLabel} />
                 )}
-                <SummaryRow label="Trajet" value={`${summary.sourceLabel} → ${summary.destLabel}`} />
+                {summary.trajetLabel ? (
+                  <SummaryRow label="Trajet" value={summary.trajetLabel} />
+                ) : null}
               </div>
             </div>
           )}

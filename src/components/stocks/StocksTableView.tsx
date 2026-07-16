@@ -3,11 +3,14 @@
 import Link from "next/link";
 import { Eye, ArrowDownToLine, ArrowUpFromLine, History } from "lucide-react";
 import type { Stock } from "@/types/stock";
+import type { UniteMesure } from "@/types/unite-mesure";
+import { formatStockQuantity } from "@/lib/stock.display";
 import { ResponsiveTableWrap } from "@/components/ui/ResponsiveTableWrap";
 import { SortableTh, type TableSortHeaderProps } from "@/components/ui/SortableTableHeader";
 
 interface Props extends TableSortHeaderProps {
   rows: Stock[];
+  unitesMesure: UniteMesure[];
   onView?: (stock: Stock) => void;
   onViewLot?: (stock: Stock) => void;
   focusedId?: string | number | null;
@@ -19,6 +22,7 @@ function getMouvementId(stock: Stock) {
 
 export default function StocksTableView({
   rows,
+  unitesMesure,
   onView,
   onViewLot,
   focusedId,
@@ -93,7 +97,7 @@ export default function StocksTableView({
                 </td>
                 <td className="px-6 py-4 text-right">
                   <span className={`text-base font-black ${isEntree ? "text-emerald-600" : "text-orange-600"}`}>
-                    {Number(stock.quantite).toLocaleString("fr-FR")}
+                    {formatStockQuantity(stock, unitesMesure)}
                   </span>
                 </td>
                 <td className="px-6 py-4 text-xs font-bold text-gray-500">

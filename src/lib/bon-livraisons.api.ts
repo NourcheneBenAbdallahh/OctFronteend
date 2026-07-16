@@ -44,6 +44,7 @@ const BON_LIVRAISON_FIELDS = `
   modified_by
   document_bl
   date_validation
+  is_factured
   created_at
   updated_at
   commande {
@@ -63,6 +64,8 @@ const BON_LIVRAISON_FIELDS = `
     contrat {
       id
       numero_contrat
+      montant_ht
+      quantite_contractuelle
     }
     emballage {
       id

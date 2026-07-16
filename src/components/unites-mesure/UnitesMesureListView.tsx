@@ -32,6 +32,7 @@ export const UnitesMesureListView = ({
   rows,
   onEdit,
   onDelete,
+  canManage = true,
   sortKey,
   sortDirection,
   onSort,
@@ -39,10 +40,11 @@ export const UnitesMesureListView = ({
   rows: UniteMesure[];
   onEdit: (row: UniteMesure) => void;
   onDelete: (id: string | number) => void;
+  canManage?: boolean;
 } & TableSortHeaderProps) => (
   <div className="overflow-hidden rounded-[2.5rem] border border-gray-100 bg-white shadow-sm">
     <ResponsiveTableWrap>
-    <table className="w-full min-w-[760px] text-left border-collapse">
+    <table className="w-full min-w-[680px] text-left border-collapse">
       <thead>
         <tr className="border-b border-gray-50 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
           <SortableTh columnKey="code" sortKey={sortKey} sortDirection={sortDirection} onSort={onSort} className="px-8 py-6">Code</SortableTh>
@@ -50,8 +52,7 @@ export const UnitesMesureListView = ({
           <SortableTh columnKey="dimension" sortKey={sortKey} sortDirection={sortDirection} onSort={onSort} className="px-8 py-6">Dimension</SortableTh>
           <SortableTh columnKey="facteur_kg" sortKey={sortKey} sortDirection={sortDirection} onSort={onSort} className="px-8 py-6">Facteur → kg</SortableTh>
           <SortableTh columnKey="facteur_l" sortKey={sortKey} sortDirection={sortDirection} onSort={onSort} className="px-8 py-6">Facteur → L</SortableTh>
-          <SortableTh columnKey="sort_order" sortKey={sortKey} sortDirection={sortDirection} onSort={onSort} className="px-8 py-6" align="center">Ordre</SortableTh>
-          <th className="px-8 py-6 text-center">Actions</th>
+          {canManage ? <th className="px-8 py-6 text-center">Actions</th> : null}
         </tr>
       </thead>
       <tbody className="divide-y divide-gray-50">
@@ -74,25 +75,26 @@ export const UnitesMesureListView = ({
             </td>
             <td className="px-8 py-6 text-sm font-bold text-gray-800">{fmtFactor(row.facteur_vers_kg)}</td>
             <td className="px-8 py-6 text-sm font-bold text-gray-800">{fmtFactor(row.facteur_vers_l)}</td>
-            <td className="px-8 py-6 text-center text-sm font-black text-gray-900">{row.sort_order ?? 0}</td>
-            <td className="px-8 py-6 text-center">
-              <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
-                <button
-                  type="button"
-                  onClick={() => onEdit(row)}
-                  className="h-9 w-9 flex items-center justify-center bg-white border border-gray-100 text-gray-400 hover:text-indigo-600 rounded-xl transition-all shadow-sm"
-                >
-                  <Edit3 size={14} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onDelete(row.id)}
-                  className="h-9 w-9 flex items-center justify-center bg-white border border-gray-100 text-gray-400 hover:text-red-600 rounded-xl transition-all shadow-sm"
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            </td>
+            {canManage ? (
+              <td className="px-8 py-6 text-center">
+                <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                  <button
+                    type="button"
+                    onClick={() => onEdit(row)}
+                    className="h-9 w-9 flex items-center justify-center bg-white border border-gray-100 text-gray-400 hover:text-indigo-600 rounded-xl transition-all shadow-sm"
+                  >
+                    <Edit3 size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDelete(row.id)}
+                    className="h-9 w-9 flex items-center justify-center bg-white border border-gray-100 text-gray-400 hover:text-red-600 rounded-xl transition-all shadow-sm"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </td>
+            ) : null}
           </tr>
         ))}
       </tbody>

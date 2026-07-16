@@ -9,7 +9,6 @@ import { Modal } from "@/components/ui/modal";
 import {
   emptyUniteMesureForm,
   parseOptionalPositiveFactor,
-  parseSortOrder,
   validateUniteMesureForm,
   type UniteMesureFieldErrors,
   type UniteMesureFormState,
@@ -29,7 +28,6 @@ function formFromEditing(editing: UniteMesure): UniteMesureFormState {
     dimension: editing.dimension,
     facteur_vers_kg: editing.facteur_vers_kg != null ? String(editing.facteur_vers_kg) : "",
     facteur_vers_l: editing.facteur_vers_l != null ? String(editing.facteur_vers_l) : "",
-    sort_order: String(editing.sort_order ?? 0),
   };
 }
 
@@ -79,7 +77,6 @@ export default function UnitesMesureFormModal({
     setFieldErrors({});
     setLoading(true);
     try {
-      const sortOrder = parseSortOrder(form.sort_order);
       const fKg = parseOptionalPositiveFactor(form.facteur_vers_kg);
       const fL = parseOptionalPositiveFactor(form.facteur_vers_l);
 
@@ -89,7 +86,6 @@ export default function UnitesMesureFormModal({
           dimension: form.dimension,
           facteur_vers_kg: fKg,
           facteur_vers_l: fL,
-          sort_order: sortOrder,
         });
       } else {
         await createUniteMesure({
@@ -98,7 +94,6 @@ export default function UnitesMesureFormModal({
           dimension: form.dimension,
           facteur_vers_kg: fKg ?? undefined,
           facteur_vers_l: fL ?? undefined,
-          sort_order: sortOrder,
         });
       }
       await onSaved();
@@ -141,52 +136,28 @@ export default function UnitesMesureFormModal({
 
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
           <div className="form-scroll min-h-0 flex-1 space-y-8 px-12 py-6">
-            <div className="grid grid-cols-2 gap-8">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">
-                  Code
-                </label>
-                <input
-                  required={!editing}
-                  disabled={!!editing}
-                  className={`${inputClass} font-mono tracking-tight disabled:opacity-50 ${fieldErrors.code ? inputErrorClass : ""}`}
-                  placeholder="Ex. Kg, L, m3"
-                  value={form.code}
-                  onChange={(e) => {
-                    setForm({ ...form, code: e.target.value });
-                    clearError("code");
-                  }}
-                />
-                {fieldErrors.code ? (
-                  <p className="text-[10px] font-bold text-red-600 ml-1">{fieldErrors.code}</p>
-                ) : (
-                  <p className="text-[10px] font-medium text-gray-400 ml-1">
-                    Respectez la casse souhaitée (ex. Kg, pas KG).
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">
-                  Ordre d’affichage
-                </label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  className={`${inputClass} ${fieldErrors.sort_order ? inputErrorClass : ""}`}
-                  placeholder="0"
-                  value={form.sort_order}
-                  onChange={(e) => {
-                    setForm({ ...form, sort_order: e.target.value.replace(/[^\d]/g, "") });
-                    clearError("sort_order");
-                  }}
-                />
-                {fieldErrors.sort_order ? (
-                  <p className="text-[10px] font-bold text-red-600 ml-1">{fieldErrors.sort_order}</p>
-                ) : (
-                  <p className="text-[10px] font-medium text-gray-400 ml-1">0 = affiché en premier.</p>
-                )}
-              </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">
+                Code
+              </label>
+              <input
+                required={!editing}
+                disabled={!!editing}
+                className={`${inputClass} font-mono tracking-tight disabled:opacity-50 ${fieldErrors.code ? inputErrorClass : ""}`}
+                placeholder="Ex. Kg, L, m3"
+                value={form.code}
+                onChange={(e) => {
+                  setForm({ ...form, code: e.target.value });
+                  clearError("code");
+                }}
+              />
+              {fieldErrors.code ? (
+                <p className="text-[10px] font-bold text-red-600 ml-1">{fieldErrors.code}</p>
+              ) : (
+                <p className="text-[10px] font-medium text-gray-400 ml-1">
+                  Respectez la casse souhaitée (ex. Kg, pas KG).
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">

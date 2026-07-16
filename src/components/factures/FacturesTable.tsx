@@ -6,6 +6,7 @@ import {
   updateFacture,
   createFacture,
   deleteFacture,
+  listAllFactures,
   normalizeFacture
 } from "@/lib/factures.api";
 import { exportFacturesPdf } from "@/lib/factures.pdf";
@@ -24,11 +25,26 @@ import { formatNumber } from "@/lib/utils";
 import { getActionErrorMessage, useAppFeedback } from "@/hooks/useAppFeedback";
 import { useTableSort } from "@/hooks/useTableSort";
 import type { SortColumn } from "@/lib/tableSort";
+import { BreadcrumbNav } from "@/components/common/BreadcrumbNav";
+import { BREADCRUMBS } from "@/lib/breadcrumbs";
+import { useAuthStore } from "@/store/useAuthStore";
 
 // Helper functions
 const formatDate = (date: string | Date) => {
   const d = new Date(date);
   return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+};
+
+/** Valeur pour `<input type="date">` (yyyy-mm-dd, fuseau local). */
+const toDateInputValue = (date: string | Date) => {
+  if (!date) return new Date().toISOString().split("T")[0];
+  if (typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)) return date;
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return new Date().toISOString().split("T")[0];
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 };
 
 const formatMoney = (amount: number | string) => {
@@ -38,6 +54,53 @@ const formatMoney = (amount: number | string) => {
 
 const asIdString = (value?: string | number | null) =>
   value === undefined || value === null ? "" : String(value);
+
+const blFournisseurId = (bl: BonLivraisonOption) =>
+  asIdString(bl.fournisseur_id ?? bl.commande?.fournisseur_id);
+
+const blContratId = (bl: BonLivraisonOption) =>
+  asIdString(bl.contrat_id ?? bl.commande?.contrat_id);
+
+const isBlAvailable = (bl: BonLivraisonOption) =>
+  !Boolean(bl.is_factured);
+
+const TVA_RATE = 0.19;
+
+function unitPriceFromContrat(
+  contrat?: { montant_ht?: number; quantite_contractuelle?: number }
+): number {
+  const montant = Number(contrat?.montant_ht ?? 0);
+  const qte = Number(contrat?.quantite_contractuelle ?? 0);
+  if (montant > 0 && qte > 0) return montant / qte;
+  return 10;
+}
+
+function estimateFactureAmounts(bls: BonLivraisonOption[]): { ht: number; ttc: number } {
+  if (!bls.length) return { ht: 0, ttc: 0 };
+  const unitPrice = unitPriceFromContrat(bls[0].commande?.contrat);
+  const totalQte = bls.reduce((sum, bl) => sum + Number(bl.quantite_recue || 0), 0);
+  const ht = Math.round(totalQte * unitPrice * 100) / 100;
+  const ttc = Math.round(ht * (1 + TVA_RATE) * 100) / 100;
+  return { ht, ttc };
+}
+
+function validateurLabel(facture: TableFacture): string | null {
+  if (facture.valide_par && typeof facture.valide_par === "object") {
+    return facture.valide_par.name;
+  }
+  return null;
+}
+
+function createurLabel(facture: TableFacture): string | null {
+  if (facture.created_by && typeof facture.created_by === "object") {
+    return facture.created_by.name;
+  }
+  return null;
+}
+
+function isFactureDeletable(facture: TableFacture): boolean {
+  return facture.statut === "BROUILLON";
+}
 
 type Id = string | number;
 
@@ -91,11 +154,32 @@ const emptyForm: FactureForm = {
   statut: "BROUILLON",
 };
 
-const STATUT_STYLES: Record<string, string> = {
+const STATUT_STYLES: Record<FactureStatut, string> = {
   BROUILLON: "bg-amber-50 text-amber-700 border-amber-200",
   VALIDE: "bg-blue-50 text-blue-700 border-blue-200",
   PAYE: "bg-green-50 text-green-700 border-green-200",
+  ANNULE: "bg-red-50 text-red-700 border-red-200",
 };
+
+const STATUT_LABELS: Record<FactureStatut, string> = {
+  BROUILLON: "Brouillon",
+  VALIDE: "Validée",
+  PAYE: "Payée",
+  ANNULE: "Annulée",
+};
+
+const TERMINAL_STATUTS: FactureStatut[] = ["PAYE", "ANNULE"];
+
+function getStatutOptions(current: FactureStatut): FactureStatut[] {
+  switch (current) {
+    case "BROUILLON":
+      return ["BROUILLON", "VALIDE", "ANNULE"];
+    case "VALIDE":
+      return ["VALIDE", "PAYE", "ANNULE"];
+    default:
+      return [current];
+  }
+}
 
 
 export default function FacturesTable({
@@ -107,7 +191,11 @@ export default function FacturesTable({
   pagination: FacturesPaginatorInfo;
   bonsLivraison: BonLivraisonOption[];
 }) {
+  const token = useAuthStore((state) => state.token);
   const [rows, setRows] = useState<TableFacture[]>([]);
+  /** Jeu complet pour recherche / filtres statut. */
+  const [allRows, setAllRows] = useState<TableFacture[]>([]);
+  const [blOptions, setBlOptions] = useState<BonLivraisonOption[]>(bonsLivraison);
   const [paginationState, setPaginationState] = useState<FacturesPaginatorInfo>({
     count: 0,
     currentPage: 1,
@@ -150,6 +238,58 @@ const handlePageChange = (page: number) => {
   router.push(`${pathname}?${params.toString()}`);
 };
   useEffect(() => { setRows(data); }, [data]);
+  useEffect(() => {
+    setBlOptions(bonsLivraison.filter(isBlAvailable));
+  }, [bonsLivraison]);
+
+  useEffect(() => {
+    if (!token) {
+      setAllRows(rows);
+      return;
+    }
+
+    const total = pagination.total ?? rows.length;
+    if (total <= rows.length) {
+      setAllRows(rows);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const all = await listAllFactures({ token });
+        if (!cancelled) {
+          setAllRows(all.map(normalizeFacture));
+        }
+      } catch {
+        if (!cancelled) {
+          setAllRows(rows);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, pagination.total, rows]);
+
+  const markBlsAsFactured = (ids: string[]) => {
+    const idSet = new Set(ids.map(String));
+    setBlOptions((prev) =>
+      prev.map((bl) =>
+        idSet.has(String(bl.id)) ? { ...bl, is_factured: true } : bl
+      )
+    );
+  };
+
+  const markBlsAsAvailable = (ids: string[]) => {
+    const idSet = new Set(ids.map(String));
+    setBlOptions((prev) =>
+      prev.map((bl) =>
+        idSet.has(String(bl.id)) ? { ...bl, is_factured: false } : bl
+      )
+    );
+  };
 
 // 1. Calculer le nombre d'éléments par statut pour les badges
 const statusCounts = useMemo(() => {
@@ -160,35 +300,35 @@ const statusCounts = useMemo(() => {
     ANNULE: 0,
   };
   
-  rows.forEach((item) => {
+  allRows.forEach((item) => {
     if (counts[item.statut] !== undefined) {
       counts[item.statut]++;
     }
   });
   
   return counts;
-}, [rows]);
+}, [allRows]);
 
-// 2. Mettre à jour la logique de filtrage pour qu'elle comprenne les statuts
+const isSearchActive = query.trim() !== "";
+
+// 2. Sans filtre : page serveur. Avec recherche/filtre : toute la liste.
 const filteredRows = useMemo(() => {
+  const source = isSearchActive ? allRows : rows;
   const q = query.trim().toUpperCase();
-  if (!q) return rows;
+  if (!q) return source;
 
-  // Liste des statuts possibles
   const statusList = ['BROUILLON', 'VALIDE', 'PAYE', 'ANNULE'];
 
   if (statusList.includes(q)) {
-    // Si on a cliqué sur un bouton de statut
-    return rows.filter(r => r.statut === q);
+    return source.filter(r => r.statut === q);
   }
 
-  // Sinon, recherche textuelle (Numéro ou fournisseur)
-  return rows.filter(r => 
+  return source.filter(r => 
     r.numero_facture?.toLowerCase().includes(query.toLowerCase()) ||
     r.fournisseur?.raison_sociale?.toLowerCase().includes(query.toLowerCase()) ||
     r.contrat?.numero_contrat?.toLowerCase().includes(query.toLowerCase())
   );
-}, [rows, query]);
+}, [isSearchActive, allRows, rows, query]);
 
   const factureSortColumns = useMemo<Record<string, SortColumn<TableFacture>>>(
     () => ({
@@ -209,19 +349,32 @@ const filteredRows = useMemo(() => {
     [filteredRows, sortRows]
   );
 
+  const blLookupById = useMemo(() => {
+    const map = new Map<string, BonLivraisonOption>();
+    blOptions.forEach((bl) => map.set(String(bl.id), bl));
+    editing?.bon_livraisons?.forEach((bl) => map.set(String(bl.id), bl));
+    return map;
+  }, [blOptions, editing]);
+
+  const selectedBls = useMemo(() => {
+    return form.bon_livraison_ids
+      .map((id) => blLookupById.get(id))
+      .filter((bl): bl is BonLivraisonOption => Boolean(bl));
+  }, [form.bon_livraison_ids, blLookupById]);
+
   const fournisseurOptions = useMemo(() => {
     const map = new Map<string, string>();
-    bonsLivraison.forEach((bl) => {
+    blOptions.forEach((bl) => {
       const fid = asIdString(bl.fournisseur_id ?? bl.commande?.fournisseur_id);
       const name = bl.fournisseur_name ?? bl.commande?.fournisseur?.raison_sociale;
       if (fid && name && !map.has(fid)) map.set(fid, name);
     });
     return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
-  }, [bonsLivraison]);
+  }, [blOptions]);
 
   const contratOptions = useMemo(() => {
     const map = new Map<string, string>();
-    bonsLivraison.forEach((bl) => {
+    blOptions.forEach((bl) => {
       const cid = asIdString(bl.contrat_id ?? bl.commande?.contrat_id);
       const name = bl.contrat_name ?? bl.commande?.contrat?.numero_contrat;
       const fid = asIdString(bl.fournisseur_id ?? bl.commande?.fournisseur_id);
@@ -230,7 +383,7 @@ const filteredRows = useMemo(() => {
       if (!map.has(cid)) map.set(cid, name);
     });
     return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
-  }, [bonsLivraison, form.fournisseur_id]);
+  }, [blOptions, form.fournisseur_id]);
 
   const fournisseurPickerOptions = useMemo(
     () => fournisseurOptions.map((f) => ({ id: f.id, label: f.name })),
@@ -311,26 +464,24 @@ const filteredRows = useMemo(() => {
   // --- AUTO-REMPLISSAGE DES VALEURS + FOURNISSEUR/CONTRAT ---
   useEffect(() => {
     if (!form.bon_livraison_ids.length) return;
-    const selectedBLs = bonsLivraison.filter((bl) =>
-      form.bon_livraison_ids.includes(String(bl.id))
-    );
-    if (!selectedBLs.length) return;
+    if (!selectedBls.length) return;
 
-    const first = selectedBLs[0];
+    const first = selectedBls[0];
     const fournisseurId = asIdString(first.fournisseur_id ?? first.commande?.fournisseur_id);
     const contratId = asIdString(first.contrat_id ?? first.commande?.contrat_id);
-    const totalQuantite = selectedBLs.reduce((sum, bl) => sum + bl.quantite_recue, 0);
+
+    const { ht } = estimateFactureAmounts(selectedBls);
 
     setForm((prev) => {
       const next = { ...prev };
       if (fournisseurId && prev.fournisseur_id !== fournisseurId) next.fournisseur_id = fournisseurId;
       if (contratId && prev.contrat_id !== contratId) next.contrat_id = contratId;
-      if (!prev.montant_ht || prev.montant_ht === "0") {
-        next.montant_ht = (totalQuantite * 100).toFixed(3);
+      if (!editing) {
+        next.montant_ht = ht.toFixed(3);
       }
       return next;
     });
-  }, [form.bon_livraison_ids, bonsLivraison]);
+  }, [form.bon_livraison_ids, selectedBls, editing]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -342,41 +493,49 @@ const filteredRows = useMemo(() => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const estimatedAmounts = useMemo(() => {
+    return estimateFactureAmounts(selectedBls);
+  }, [selectedBls]);
+
   const filteredBL = useMemo(() => {
     const s = blSearch.trim().toLowerCase();
 
-    let list = bonsLivraison.filter((b) => {
-      const isSelected = form.bon_livraison_ids.includes(String(b.id));
-      return b.numero_bl.toLowerCase().includes(s) && (!b.is_factured || isSelected);
+    let list = blOptions.filter((b) => {
+      if (!isBlAvailable(b)) return false;
+      return b.numero_bl.toLowerCase().includes(s);
     });
 
     if (form.fournisseur_id) {
-      list = list.filter((b) => {
-        const fid = asIdString(b.fournisseur_id ?? b.commande?.fournisseur_id);
-        return fid === form.fournisseur_id;
-      });
+      list = list.filter((b) => blFournisseurId(b) === form.fournisseur_id);
     }
 
     if (form.contrat_id) {
-      list = list.filter((b) => {
-        const cid = asIdString(b.contrat_id ?? b.commande?.contrat_id);
-        return cid === form.contrat_id;
-      });
+      list = list.filter((b) => blContratId(b) === form.contrat_id);
     }
 
-    // Si un BL est déjà sélectionné, on garde la contrainte "même commande"
+    // Si un BL est déjà sélectionné, limiter au même fournisseur/contrat
     if (form.bon_livraison_ids.length > 0) {
-      const firstBLId = form.bon_livraison_ids[0];
-      const firstBL = bonsLivraison.find((b) => String(b.id) === firstBLId);
-      if (!firstBL) return [];
-      list = list.filter((b) => b.commande_id === firstBL.commande_id);
+      const firstBL = blOptions.find(
+        (b) => String(b.id) === form.bon_livraison_ids[0]
+      );
+      if (firstBL) {
+        const firstFournisseurId = blFournisseurId(firstBL);
+        const firstContratId = blContratId(firstBL);
+        list = list.filter(
+          (b) =>
+            blFournisseurId(b) === firstFournisseurId &&
+            blContratId(b) === firstContratId
+        );
+      }
     }
 
     return list;
-  }, [bonsLivraison, blSearch, form.bon_livraison_ids, form.fournisseur_id, form.contrat_id]);
+  }, [blOptions, blSearch, form.bon_livraison_ids, form.fournisseur_id, form.contrat_id]);
 
   const toggleBL = (id: string) => {
-    const bl = bonsLivraison.find((b) => String(b.id) === id);
+    const bl = blOptions.find((b) => String(b.id) === id);
+    if (!bl) return;
+
     setForm((prev) => {
       if (prev.bon_livraison_ids.includes(id)) {
         return {
@@ -385,8 +544,29 @@ const filteredRows = useMemo(() => {
         };
       }
 
-      const fournisseurId = asIdString(bl?.fournisseur_id ?? bl?.commande?.fournisseur_id);
-      const contratId = asIdString(bl?.contrat_id ?? bl?.commande?.contrat_id);
+      if (!isBlAvailable(bl)) {
+        setErrorMessage(`Le BL ${bl.numero_bl} est déjà rattaché à une facture.`);
+        return prev;
+      }
+
+      const fournisseurId = blFournisseurId(bl);
+      const contratId = blContratId(bl);
+
+      if (prev.bon_livraison_ids.length > 0) {
+        const firstBL = blOptions.find(
+          (b) => String(b.id) === prev.bon_livraison_ids[0]
+        );
+        if (
+          firstBL &&
+          (blFournisseurId(firstBL) !== fournisseurId ||
+            blContratId(firstBL) !== contratId)
+        ) {
+          setErrorMessage(
+            "Tous les BL d'une facture doivent appartenir au même fournisseur et contrat."
+          );
+          return prev;
+        }
+      }
 
       return {
         ...prev,
@@ -395,6 +575,7 @@ const filteredRows = useMemo(() => {
         contrat_id: prev.contrat_id || contratId,
       };
     });
+    setErrorMessage("");
   };
 
   const openNew = () => {
@@ -408,7 +589,7 @@ const filteredRows = useMemo(() => {
     setEditing(item);
     setForm({
       numero_facture: item.numero_facture || "",
-      date_facture: formatDate(item.date_facture),
+      date_facture: toDateInputValue(item.date_facture),
       montant_ht: String(item.montant_ht || ""),
       bon_livraison_ids: item.bon_livraisons?.map(bl => String(bl.id)) || [],
       fournisseur_id: asIdString(item.fournisseur_id ?? item.fournisseur?.id),
@@ -455,21 +636,26 @@ const filteredRows = useMemo(() => {
           statut: form.statut,
         };
         const res = await updateFacture(editing.id, payload);
-        setRows(prev => prev.map(r => String(r.id) === String(editing.id) ? normalizeFacture(res.updateFacture) : r));
+        const updated = normalizeFacture(res.updateFacture);
+        setRows(prev => prev.map(r => String(r.id) === String(editing.id) ? updated : r));
+        setAllRows(prev => prev.map(r => String(r.id) === String(editing.id) ? updated : r));
         showSuccess("Facture modifiée.");
       } else {
         const payload: CreateFactureInput = {
           numero_facture: form.numero_facture,
           date_facture: form.date_facture,
-          montant_ht: Number(form.montant_ht),
           bon_livraison_ids: form.bon_livraison_ids,
           fournisseur_id: form.fournisseur_id || undefined,
           contrat_id: form.contrat_id || undefined,
-          statut: form.statut,
+          statut: "VALIDE",
         };
         const res = await createFacture(payload);
-        setRows(prev => [normalizeFacture(res.createFacture), ...prev]);
-        showSuccess("Facture créée.");
+        const created = normalizeFacture(res.createFacture);
+        setRows(prev => [created, ...prev]);
+        setAllRows(prev => [created, ...prev]);
+        markBlsAsFactured(form.bon_livraison_ids);
+        router.refresh();
+        showSuccess("Facture validée.");
       }
       closeDrawer();
     } catch (err: unknown) {
@@ -478,22 +664,38 @@ const filteredRows = useMemo(() => {
   }
 
   function handleDelete(id: Id) {
-    const row = rows.find((r) => String(r.id) === String(id));
+    const row = allRows.find((r) => String(r.id) === String(id))
+      ?? rows.find((r) => String(r.id) === String(id));
+    if (row && !isFactureDeletable(row)) {
+      showError("Impossible de supprimer une facture validée ou clôturée.");
+      return;
+    }
     clearFeedback();
+    const blIds =
+      row?.bon_livraisons?.map((bl) => String(bl.id)) ?? [];
+
     openConfirm({
       title: "Supprimer cette facture ?",
       detail: row?.numero_facture ?? `#${id}`,
-      description: "Cette action est irréversible.",
+      description:
+        blIds.length > 0
+          ? "Cette action est irréversible. Les bons de livraison associés seront détachés et pourront être refacturés."
+          : "Cette action est irréversible.",
       variant: "danger",
       onConfirm: () =>
         void runConfirmedAction(async () => {
           await deleteFacture(id);
           setRows((prev) => prev.filter((r) => String(r.id) !== String(id)));
+          setAllRows((prev) => prev.filter((r) => String(r.id) !== String(id)));
           setSelectedIds((prev) => {
             const next = new Set(prev);
             next.delete(String(id));
             return next;
           });
+          if (blIds.length) {
+            markBlsAsAvailable(blIds);
+          }
+          router.refresh();
           showSuccess("Facture supprimée.");
         }),
     });
@@ -502,18 +704,35 @@ const filteredRows = useMemo(() => {
   const handleStatusChange = async (id: string | number, newStatut: FactureStatut) => {
     setUpdatingStatus(id);
     try {
-      const currentFacture = rows.find(r => r.id === id);
+      const currentFacture =
+        allRows.find((r) => String(r.id) === String(id)) ??
+        rows.find((r) => String(r.id) === String(id));
       if (!currentFacture) return;
+
+      const allowed = getStatutOptions(currentFacture.statut);
+      if (!allowed.includes(newStatut)) return;
       
-      await updateFacture(id, { 
+      const res = await updateFacture(id, { 
         statut: newStatut,
         bon_livraison_ids: currentFacture.bon_livraisons.map(bl => bl.id)
       });
-      // Mettre à jour l'état local
-      setRows(rows.map(row => 
-        row.id === id ? { ...row, statut: newStatut } : row
-      ));
-      showSuccess("Statut de la facture mis à jour.");
+      const updated = normalizeFacture(res.updateFacture);
+      setRows((prev) =>
+        prev.map((row) =>
+          String(row.id) === String(id) ? updated : row
+        )
+      );
+      setAllRows((prev) =>
+        prev.map((row) =>
+          String(row.id) === String(id) ? updated : row
+        )
+      );
+      showSuccess(
+        newStatut === "VALIDE"
+          ? "Facture validée."
+          : "Statut de la facture mis à jour."
+      );
+      router.refresh();
     } catch (error) {
       console.error("Erreur lors de la mise à jour du statut:", error);
       showError(getActionErrorMessage(error, "Erreur lors de la mise à jour du statut."));
@@ -535,9 +754,7 @@ const filteredRows = useMemo(() => {
             <div className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center shadow-sm text-[#00A09D]">
               <FileText className="h-5 w-5" />
             </div>
-            <nav className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">
-              Ressources / <span className="text-gray-900">Finance</span>
-            </nav>
+            <BreadcrumbNav items={BREADCRUMBS.factures} />
           </div>
           <h1 className="text-4xl font-black text-gray-900 uppercase tracking-tighter leading-none">
             Factures<span className="text-[#00A09D]">.</span>
@@ -545,10 +762,7 @@ const filteredRows = useMemo(() => {
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-3 sm:gap-6">
-          <div className="text-right hidden sm:block">
-            <span className="text-[10px] font-black text-gray-400 uppercase block">Total Actif</span>
-            <span className="text-2xl font-black text-gray-900 leading-none">{filteredRows.length} Factures</span>
-          </div>
+      
           <button
             type="button"
             onClick={handlePrintPdf}
@@ -610,7 +824,7 @@ const filteredRows = useMemo(() => {
               : "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50"
           }`}
         >
-          Toutes ({rows.length})
+          Toutes ({pagination.total ?? allRows.length})
         </button>
         {Object.entries(statusCounts).map(([statut, count]) => (
           <button
@@ -618,14 +832,11 @@ const filteredRows = useMemo(() => {
             onClick={() => setQuery(statut)}
             className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${
               query === statut 
-                ? `${STATUT_STYLES[statut]} shadow-lg` 
+                ? `${STATUT_STYLES[statut as FactureStatut]} shadow-lg` 
                 : "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50"
             }`}
           >
-            {statut === 'BROUILLON' && 'Brouillons'}
-            {statut === 'VALIDE' && 'Validées'}
-            {statut === 'PAYE' && 'Payées'}
-            {statut === 'ANNULE' && 'Annulées'} ({count})
+            {STATUT_LABELS[statut as FactureStatut]} ({count})
           </button>
         ))}
       </div>
@@ -752,13 +963,15 @@ const filteredRows = useMemo(() => {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      {item.valide_par ? (
+                      {validateurLabel(item) ? (
                         <div className="flex items-center gap-2">
                           <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
                             <User className="h-4 w-4 text-green-600" />
                           </div>
                           <div>
-                            <p className="text-sm font-medium text-gray-900">ID {item.valide_par}</p>
+                            <p className="text-sm font-medium text-gray-900">
+                              {validateurLabel(item)}
+                            </p>
                             <p className="text-xs text-green-600 font-medium">Validé</p>
                           </div>
                         </div>
@@ -780,13 +993,10 @@ const filteredRows = useMemo(() => {
                           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
                           <span className="text-xs text-indigo-700 font-medium">Mise à jour...</span>
                         </div>
-                      ) : item.statut === 'VALIDE' ? (
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                          <span className={`px-4 py-2 rounded-xl text-[10px] font-black border uppercase shadow-sm ${STATUT_STYLES[item.statut]}`}>
-                            VALIDÉ
-                          </span>
-                        </div>
+                      ) : TERMINAL_STATUTS.includes(item.statut) ? (
+                        <span className={`inline-flex px-4 py-2 rounded-xl text-[10px] font-black border uppercase shadow-sm ${STATUT_STYLES[item.statut]}`}>
+                          {STATUT_LABELS[item.statut]}
+                        </span>
                       ) : (
                         <div className="relative">
                           <select
@@ -794,10 +1004,11 @@ const filteredRows = useMemo(() => {
                             onChange={(e) => handleStatusChange(item.id, e.target.value as FactureStatut)}
                             className={`px-4 py-2 rounded-xl text-[10px] font-black border uppercase cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 appearance-none pr-8 shadow-sm transition-all hover:shadow-md ${STATUT_STYLES[item.statut]}`}
                           >
-                            <option value="BROUILLON">BROUILLON</option>
-                            <option value="VALIDE">VALIDE</option>
-                            <option value="PAYE">PAYE</option>
-                            <option value="ANNULE">ANNULE</option>
+                            {getStatutOptions(item.statut).map((statut) => (
+                              <option key={statut} value={statut}>
+                                {STATUT_LABELS[statut].toUpperCase()}
+                              </option>
+                            ))}
                           </select>
                           <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 pointer-events-none text-gray-400" />
                         </div>
@@ -811,12 +1022,14 @@ const filteredRows = useMemo(() => {
                         >
                           <Edit2 className="h-4 w-4 text-indigo-600 group-hover:rotate-12 transition-transform" />
                         </button>
-                        <button 
-                          onClick={() => handleDelete(item.id)} 
-                          className="group p-2.5 bg-red-50 rounded-xl hover:bg-red-100 transition-all duration-200 transform hover:scale-105"
-                        >
-                          <Trash2 className="h-4 w-4 text-red-600 group-hover:rotate-12 transition-transform" />
-                        </button>
+                        {isFactureDeletable(item) ? (
+                          <button 
+                            onClick={() => handleDelete(item.id)} 
+                            className="group p-2.5 bg-red-50 rounded-xl hover:bg-red-100 transition-all duration-200 transform hover:scale-105"
+                          >
+                            <Trash2 className="h-4 w-4 text-red-600 group-hover:rotate-12 transition-transform" />
+                          </button>
+                        ) : null}
                       </div>
                     </td>
                   </tr>
@@ -889,6 +1102,30 @@ const filteredRows = useMemo(() => {
 
                             <div className="space-y-5 lg:col-span-2">
                               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
+                                Informations
+                              </p>
+                              <div className="rounded-[2rem] border border-gray-100 bg-white p-6 shadow-sm sm:p-8">
+                                <div className="flex items-center justify-between gap-4 border-b border-gray-50 pb-5">
+                                  <span className="text-xs font-bold uppercase tracking-wide text-gray-500">
+                                    Créé par
+                                  </span>
+                                  <span className="text-sm font-semibold text-gray-900">
+                                    {createurLabel(item) ?? "—"}
+                                  </span>
+                                </div>
+                                {validateurLabel(item) ? (
+                                  <div className="flex items-center justify-between gap-4 pt-5">
+                                    <span className="text-xs font-bold uppercase tracking-wide text-gray-500">
+                                      Validé par
+                                    </span>
+                                    <span className="text-sm font-semibold text-green-700">
+                                      {validateurLabel(item)}
+                                    </span>
+                                  </div>
+                                ) : null}
+                              </div>
+
+                              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
                                 Synthèse financière
                               </p>
                               <div className="space-y-4 rounded-[2rem] border border-gray-100 bg-white p-6 shadow-sm sm:p-8">
@@ -941,6 +1178,14 @@ const filteredRows = useMemo(() => {
         
         {/* PAGINATION */}
         <div className="bg-gray-50 px-6 py-6 border-t border-gray-100">
+          {isSearchActive ? (
+            <p className="text-center text-sm text-gray-600">
+              <span className="font-medium text-gray-900">{filteredRows.length}</span> résultat
+              {filteredRows.length !== 1 ? "s" : ""} sur{" "}
+              <span className="font-medium text-gray-900">{allRows.length}</span> facture
+              {allRows.length !== 1 ? "s" : ""}
+            </p>
+          ) : (
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="text-sm text-gray-600">
@@ -998,6 +1243,7 @@ const filteredRows = useMemo(() => {
               </button>
             </div>
           </div>
+          )}
         </div>
       </div>
 
@@ -1015,7 +1261,7 @@ const filteredRows = useMemo(() => {
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
                     <h2 className="text-2xl font-black text-gray-900">
-                      {editing ? "Modifier facture" : "Nouvelle facture groupée"}
+                      {editing ? "Modifier facture" : "Nouvelle facture"}
                     </h2>
                     <div className="mt-2 h-1.5 w-12 rounded-full bg-indigo-600 shadow-lg shadow-indigo-100" />
                     <p className="mt-3 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
@@ -1116,7 +1362,7 @@ const filteredRows = useMemo(() => {
                     {form.bon_livraison_ids.length > 0 ? (
                       <div className="flex flex-wrap gap-2">
                         {form.bon_livraison_ids.map((id) => {
-                          const bl = bonsLivraison.find((b) => String(b.id) === id);
+                          const bl = blLookupById.get(id);
                           return (
                             <div
                               key={id}
@@ -1234,14 +1480,17 @@ const filteredRows = useMemo(() => {
                       <div className="relative">
                         <Banknote className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-indigo-400" />
                         <input
-                          type="number"
-                          step="0.001"
-                          className="w-full rounded-2xl border-2 border-indigo-100 bg-indigo-50/50 p-4 pl-12 text-sm font-black text-indigo-700 outline-none focus:border-indigo-400 focus:bg-white"
-                          value={form.montant_ht}
-                          onChange={(e) => setForm({ ...form, montant_ht: e.target.value })}
-                          required
+                          type="text"
+                          readOnly
+                          className="w-full cursor-default rounded-2xl border-2 border-indigo-100 bg-indigo-50/50 p-4 pl-12 text-sm font-black text-indigo-700 outline-none"
+                          value={editing ? form.montant_ht : estimatedAmounts.ht.toFixed(3)}
                         />
                       </div>
+                      {!editing ? (
+                        <p className="ml-1 text-[10px] text-gray-400">
+                          Calculé depuis le contrat et les quantités reçues des BL.
+                        </p>
+                      ) : null}
                     </div>
                   </div>
 
@@ -1252,7 +1501,10 @@ const filteredRows = useMemo(() => {
                           Total estimé (TVA 19 %)
                         </p>
                         <p className="text-3xl font-black tabular-nums">
-                          {(Number(form.montant_ht) * 1.19).toFixed(3)}{" "}
+                          {(editing
+                            ? Math.round(Number(form.montant_ht) * (1 + TVA_RATE) * 100) / 100
+                            : estimatedAmounts.ttc
+                          ).toFixed(3)}{" "}
                           <span className="text-sm font-medium">DT</span>
                         </p>
                       </div>
@@ -1272,7 +1524,7 @@ const filteredRows = useMemo(() => {
                     ) : (
                       <>
                         <Save className="h-5 w-5" />
-                        Valider la facture groupée
+                        {editing ? "Enregistrer" : "Valider la facture"}
                       </>
                     )}
                   </button>

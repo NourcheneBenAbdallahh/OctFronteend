@@ -41,6 +41,14 @@ const FACTURE_FIELDS = `
   montant_ttc
   jours_retard_total
   statut
+  valide_par {
+    id
+    name
+  }
+  created_by {
+    id
+    name
+  }
   fournisseur {
     id
     raison_sociale
@@ -76,6 +84,22 @@ const LIST_FACTURES = `
 
 export async function listFactures(page = 1, opts?: GraphqlRequestOptions) {
   return graphqlRequest<ListFacturesResponse>(LIST_FACTURES, { page }, opts);
+}
+
+/** Charge toutes les pages de factures (recherche, stats). */
+export async function listAllFactures(
+  opts?: GraphqlRequestOptions
+): Promise<Facture[]> {
+  const acc: Facture[] = [];
+  let page = 1;
+  for (;;) {
+    const { factures } = await listFactures(page, opts);
+    acc.push(...factures.data);
+    if (page >= factures.paginatorInfo.lastPage) break;
+    page += 1;
+    if (page > 200) break;
+  }
+  return acc;
 }
 
 const CREATE_FACTURE = `

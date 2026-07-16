@@ -1,13 +1,39 @@
-import { GraphqlRequestError } from "@/lib/graphqlClient";
+import { GraphqlRequestError, friendlyGraphqlMessage } from "@/lib/graphqlClient";
 import type { TableInventaire } from "@/types/inventaire";
+
+const INVENTAIRE_FIELD_MESSAGES: Record<string, string> = {
+  date_inventaire:
+    "La date d'inventaire n'est pas valide. Choisissez un jour dans le calendrier.",
+  entrepot_id: "L'entrepôt sélectionné n'est pas valide.",
+  emballage_id: "L'emballage sélectionné n'est pas valide.",
+};
+
+function isTechnicalMessage(message: string): boolean {
+  return /Variable "\$|got invalid value|Unexpected data|SQLSTATE|stack trace|GraphQL error|internal server/i.test(
+    message
+  );
+}
 
 export function getInventaireErrorMessage(err: unknown, fallback: string): string {
   if (err instanceof GraphqlRequestError) {
-    return err.message;
+    for (const [field, msg] of Object.entries(err.validationByField ?? {})) {
+      const key = field.replace(/^input\./, "");
+      if (INVENTAIRE_FIELD_MESSAGES[key]) {
+        return INVENTAIRE_FIELD_MESSAGES[key];
+      }
+      const friendly = friendlyGraphqlMessage(msg, key);
+      if (!isTechnicalMessage(friendly)) return friendly;
+    }
+
+    const friendly = friendlyGraphqlMessage(err.message);
+    return isTechnicalMessage(friendly) ? fallback : friendly;
   }
+
   if (err instanceof Error && err.message.trim()) {
-    return err.message;
+    const friendly = friendlyGraphqlMessage(err.message);
+    return isTechnicalMessage(friendly) ? fallback : friendly;
   }
+
   return fallback;
 }
 

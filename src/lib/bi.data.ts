@@ -1,8 +1,8 @@
 import type { Stock } from "@/types/stock";
 import type { Commande } from "@/types/commandes";
 import type { Facture } from "@/types/facture";
-import { listCommandes } from "@/lib/commandes.api";
-import { listFactures } from "@/lib/factures.api";
+import { listAllCommandes } from "@/lib/commandes.api";
+import { listAllFactures } from "@/lib/factures.api";
 
 export type BiPeriodKey = "7d" | "30d" | "90d" | "180d" | "365d" | "all";
 
@@ -37,32 +37,11 @@ export type BiActivityDay = {
 };
 
 export async function fetchAllCommandes(token?: string | null): Promise<Commande[]> {
-  const acc: Commande[] = [];
-  let page = 1;
-  const first = 150;
-  for (;;) {
-    const { commandes } = await listCommandes(page, first, {
-      token: token ?? undefined,
-    });
-    acc.push(...commandes.data);
-    if (page >= commandes.paginatorInfo.lastPage) break;
-    page++;
-    if (page > 120) break;
-  }
-  return acc;
+  return listAllCommandes({ token: token ?? undefined });
 }
 
 export async function fetchAllFactures(token?: string | null): Promise<Facture[]> {
-  const acc: Facture[] = [];
-  let page = 1;
-  for (;;) {
-    const { factures } = await listFactures(page, { token: token ?? undefined });
-    acc.push(...factures.data);
-    if (page >= factures.paginatorInfo.lastPage) break;
-    page++;
-    if (page > 200) break;
-  }
-  return acc;
+  return listAllFactures({ token: token ?? undefined });
 }
 
 function atDayStart(d: Date): Date {
@@ -85,12 +64,37 @@ export function toLocalYmd(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+/**
+ * Parse les DateTime GraphQL. Essaie d'abord la valeur brute (souvent OK sous Chrome),
+ * puis `YYYY-MM-DDTHH:mm:ss` pour les navigateurs stricts.
+ */
+export function parseBiDate(value: string | Date | null | undefined): Date | null {
+  if (value == null) return null;
+  if (value instanceof Date) {
+    return Number.isFinite(value.getTime()) ? value : null;
+  }
+  const raw = String(value).trim();
+  if (!raw) return null;
+  const direct = new Date(raw);
+  if (Number.isFinite(direct.getTime())) return direct;
+  if (!raw.includes("T") && /^\d{4}-\d{2}-\d{2}[ ]/.test(raw)) {
+    const withT = raw.replace(" ", "T");
+    const d = new Date(withT);
+    if (Number.isFinite(d.getTime())) return d;
+  }
+  return null;
+}
+
+export function biDateMs(value: string | Date | null | undefined): number {
+  return parseBiDate(value)?.getTime() ?? Number.NaN;
+}
+
 export function getDataTimeBounds(stocks: Stock[]): { min: Date; max: Date } | null {
   if (!stocks.length) return null;
   let minT = Infinity;
   let maxT = -Infinity;
   for (const s of stocks) {
-    const t = new Date(s.date_stock).getTime();
+    const t = biDateMs(s.date_stock);
     if (!Number.isFinite(t)) continue;
     minT = Math.min(minT, t);
     maxT = Math.max(maxT, t);
@@ -137,6 +141,32 @@ export function previousPeriod(
 
 function inRange(ts: number, start: Date, end: Date): boolean {
   return ts >= start.getTime() && ts <= end.getTime();
+}
+
+/** Nombre de jours à remonter pour charger les stocks BI (marge pour activité 56 j + période précédente). */
+export function biStockFetchDays(periodKey: BiPeriodKey): number | null {
+  if (periodKey === "all") return null;
+  const days =
+    periodKey === "7d"
+      ? 7
+      : periodKey === "30d"
+        ? 30
+        : periodKey === "90d"
+          ? 90
+          : periodKey === "180d"
+            ? 180
+            : 365;
+  // +56 activité + période précédente
+  return days * 2 + 56;
+}
+
+export function biStockFetchFrom(periodKey: BiPeriodKey, anchor: Date): Date | null {
+  const days = biStockFetchDays(periodKey);
+  if (days == null) return null;
+  const from = new Date(anchor);
+  from.setHours(0, 0, 0, 0);
+  from.setDate(from.getDate() - (days - 1));
+  return from;
 }
 
 function emballageLabel(s: Stock): string {
@@ -195,7 +225,7 @@ function computeKpis(
   const skuSet = new Set<string>();
 
   for (const s of stocks) {
-    const t = new Date(s.date_stock).getTime();
+    const t = biDateMs(s.date_stock);
     if (!inRange(t, start, end)) continue;
     mouvements++;
     const q = Number(s.quantite) || 0;
@@ -212,14 +242,14 @@ function computeKpis(
 
   let commandesCreees = 0;
   for (const c of commandes) {
-    const t = new Date(c.date_commande).getTime();
+    const t = biDateMs(c.date_commande);
     if (!inRange(t, start, end)) continue;
     commandesCreees++;
   }
 
   let chiffreFacturesTtc = 0;
   for (const f of factures) {
-    const t = new Date(f.date_facture).getTime();
+    const t = biDateMs(f.date_facture);
     if (!inRange(t, start, end)) continue;
     if (f.statut === "ANNULE") continue;
     chiffreFacturesTtc += Number(f.montant_ttc) || 0;
@@ -251,7 +281,7 @@ export function buildDailySeries(
   const bucketSor: Record<string, number> = {};
 
   for (const s of stocks) {
-    const t = new Date(s.date_stock);
+    const t = parseBiDate(s.date_stock); if (!t) continue;
     const key = toLocalYmd(t);
     const q = Number(s.quantite) || 0;
     if (s.sens === "entree") bucketEnt[key] = (bucketEnt[key] || 0) + q;
@@ -284,7 +314,7 @@ export function aggregateByEntrepot(
 ): BiNamedSplit[] {
   const map: Record<string, { entrees: number; sorties: number }> = {};
   for (const s of stocks) {
-    const t = new Date(s.date_stock).getTime();
+    const t = biDateMs(s.date_stock);
     if (!inRange(t, start, end)) continue;
     const name = entrepotLabel(s);
     if (!map[name]) map[name] = { entrees: 0, sorties: 0 };
@@ -310,7 +340,7 @@ export function topEmballages(
 ): BiNamedSplit[] {
   const map: Record<string, { entrees: number; sorties: number }> = {};
   for (const s of stocks) {
-    const t = new Date(s.date_stock).getTime();
+    const t = biDateMs(s.date_stock);
     if (!inRange(t, start, end)) continue;
     const name = emballageLabel(s);
     if (!map[name]) map[name] = { entrees: 0, sorties: 0 };
@@ -351,7 +381,7 @@ export function commandesByStatut(
 ): BiCommandeStat[] {
   const m: Record<string, number> = {};
   for (const c of commandes) {
-    const t = new Date(c.date_commande).getTime();
+    const t = biDateMs(c.date_commande);
     if (!inRange(t, start, end)) continue;
     const st = String(c.statut);
     m[st] = (m[st] || 0) + 1;
@@ -368,7 +398,7 @@ export function facturesByStatut(
 ): BiFactureStat[] {
   const m: Record<string, { count: number; montantTtc: number }> = {};
   for (const f of factures) {
-    const t = new Date(f.date_facture).getTime();
+    const t = biDateMs(f.date_facture);
     if (!inRange(t, start, end)) continue;
     const st = String(f.statut);
     if (!m[st]) m[st] = { count: 0, montantTtc: 0 };
@@ -402,7 +432,7 @@ export function buildActivitySeries56(stocks: Stock[], end: Date): BiActivityDay
       const dateYmd = toLocalYmd(d);
       let n = 0;
       for (const s of stocks) {
-        if (toLocalYmd(new Date(s.date_stock)) === dateYmd) n++;
+        if (toLocalYmd(parseBiDate(s.date_stock) ?? new Date(0)) === dateYmd) n++;
       }
       points.push({
         dateYmd,
@@ -447,9 +477,9 @@ export function buildFacturesDailyTtcSeries(
   const bucket: Record<string, { ttc: number; count: number }> = {};
   for (const f of factures) {
     if (f.statut === "ANNULE") continue;
-    const t = new Date(f.date_facture).getTime();
+    const t = biDateMs(f.date_facture);
     if (!inRange(t, start, end)) continue;
-    const key = toLocalYmd(new Date(f.date_facture));
+    const key = toLocalYmd(parseBiDate(f.date_facture) ?? new Date(0));
     if (!bucket[key]) bucket[key] = { ttc: 0, count: 0 };
     bucket[key].ttc += Number(f.montant_ttc) || 0;
     bucket[key].count += 1;
@@ -488,7 +518,7 @@ export function aggregateFacturesByFournisseur(
   const m: Record<string, { montantTtc: number; count: number }> = {};
   for (const f of factures) {
     if (f.statut === "ANNULE") continue;
-    const t = new Date(f.date_facture).getTime();
+    const t = biDateMs(f.date_facture);
     if (!inRange(t, start, end)) continue;
     const name = (f.fournisseur?.raison_sociale || "").trim() || "—";
     if (!m[name]) m[name] = { montantTtc: 0, count: 0 };
@@ -511,7 +541,7 @@ export function facturesEncoursSurPeriode(
   let encoursCount = 0;
   for (const f of factures) {
     if (f.statut === "ANNULE" || f.statut === "PAYE") continue;
-    const t = new Date(f.date_facture).getTime();
+    const t = biDateMs(f.date_facture);
     if (!inRange(t, start, end)) continue;
     encoursTtc += Number(f.montant_ttc) || 0;
     encoursCount += 1;
@@ -527,7 +557,7 @@ export function facturesPenalitesSurPeriode(
   let s = 0;
   for (const f of factures) {
     if (f.statut === "ANNULE") continue;
-    const t = new Date(f.date_facture).getTime();
+    const t = biDateMs(f.date_facture);
     if (!inRange(t, start, end)) continue;
     s += Number(f.montant_penalites) || 0;
   }
@@ -542,7 +572,7 @@ export function facturesMontantHtSurPeriode(
   let s = 0;
   for (const f of factures) {
     if (f.statut === "ANNULE") continue;
-    const t = new Date(f.date_facture).getTime();
+    const t = biDateMs(f.date_facture);
     if (!inRange(t, start, end)) continue;
     s += Number(f.montant_ht) || 0;
   }
@@ -561,7 +591,7 @@ export function facturesAvecRetardSurPeriode(
     if (f.statut === "ANNULE") continue;
     const jr = Number(f.jours_retard_total) || 0;
     if (jr <= 0) continue;
-    const t = new Date(f.date_facture).getTime();
+    const t = biDateMs(f.date_facture);
     if (!inRange(t, start, end)) continue;
     count++;
     ttc += Number(f.montant_ttc) || 0;

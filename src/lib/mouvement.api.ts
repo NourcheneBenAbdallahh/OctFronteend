@@ -37,9 +37,11 @@ export async function fetchMouvements(filters: {
         statut
         quantite
         motif
-        date_mouvement   
-         entrepot_source_id
-      entrepot_destination_id
+        date_mouvement
+        emballage_id
+        lot_id
+        entrepot_source_id
+        entrepot_destination_id
         emballage {     
           id
           code
@@ -126,6 +128,8 @@ export async function fetchMouvementById(id: string | number): Promise<Mouvement
         quantite
         motif
         date_mouvement
+        emballage_id
+        lot_id
         entrepot_source_id
         entrepot_destination_id
         emballage {

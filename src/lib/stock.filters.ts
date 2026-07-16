@@ -1,4 +1,6 @@
 import type { Stock, StockFiltersState, StocksStats } from "@/types/stock";
+import type { StocksQueryFilters, StockDashboardStatsResult } from "@/lib/stock.api";
+import { dateToGraphqlDateTime, dateToGraphqlDateTimeOrNull } from "@/lib/graphqlDateTime";
 
 export const EMPTY_STOCK_FILTERS: StockFiltersState = {
   search: "",
@@ -106,6 +108,38 @@ export function paginateRows<T>(
 
 export function stockTotalPages(rowCount: number, pageSize: number): number {
   return Math.ceil(rowCount / pageSize);
+}
+
+export function toStocksServerFilters(
+  filters: StockFiltersState
+): StocksQueryFilters {
+  const toGraphqlEnd = (date: string) => {
+    const d = new Date(date);
+    d.setHours(23, 59, 59, 999);
+    return dateToGraphqlDateTime(d);
+  };
+
+  return {
+    from: filters.dateFrom
+      ? dateToGraphqlDateTime(new Date(filters.dateFrom))
+      : null,
+    to: filters.dateTo ? toGraphqlEnd(filters.dateTo) : null,
+    entrepot_id: filters.entrepot || null,
+    emballage_id: filters.emballage || null,
+    sens: filters.sens || null,
+    user_id: filters.user || null,
+    search: filters.search.trim() || null,
+    sort: filters.sort || "recent",
+  };
+}
+
+export function mapDashboardStats(raw: StockDashboardStatsResult): StocksStats {
+  return {
+    totalMouvements: raw.total_mouvements,
+    totalEntrees: raw.total_entrees,
+    totalSorties: raw.total_sorties,
+    mouvementsToday: raw.mouvements_today,
+  };
 }
 
 export function computeStocksStats(rows: Stock[]): StocksStats {

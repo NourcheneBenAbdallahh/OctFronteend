@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { BoxSelect, UserPlus, UserPen, KeyRound, Trash2, X } from "lucide-react";
 import { UsersHeader } from "./UsersHeader";
 import { Modal } from "@/components/ui/modal";
@@ -10,9 +11,11 @@ import { useUsersAdmin } from "./useUsersAdmin";
 import { UserRow } from "./UserRow";
 import { RoleSearchableDropdown } from "./RoleSearchableDropdown";
 import { 
-  UserRole, adminDeleteUser, adminUpdateUserRole, 
-  adminSetUserActive, adminCreateUser, adminUpdateUser, adminResetUserPassword
+  AssignableUserRole, adminDeleteUser, adminUpdateUserRole, 
+  adminSetUserActive, adminCreateUser, adminUpdateUser, adminResetUserPassword,
+  findAdminUserPage,
 } from "@/lib/users.api";
+import { ASSIGNABLE_USER_ROLES, roleDisplayLabel } from "@/lib/access";
 import { AppFeedbackBanner } from "@/components/ui/feedback";
 import {
   PasswordResetEmailSentModal,
@@ -24,15 +27,8 @@ import { useTableSort } from "@/hooks/useTableSort";
 import type { SortColumn } from "@/lib/tableSort";
 import type { AdminUser } from "@/lib/users.api";
 
-const ROLE_OPTIONS: UserRole[] = ["ADMIN", "STOCK", "LOGISTIQUE", "CONTRAT", "FINANCE"];
-const ROLE_LABEL: Record<string, string> = {
-  ADMIN: "Administrateur",
-  STOCK: "Stock",
-  LOGISTIQUE: "Logistique",
-  CONTRAT: "Contrats",
-  FINANCE: "Finance",
-};
-const roleFr = (role: string) => ROLE_LABEL[role.toUpperCase()] ?? role;
+const ROLE_OPTIONS = ASSIGNABLE_USER_ROLES;
+const roleFr = roleDisplayLabel;
 
 const USER_SORT_COLUMNS: Record<string, SortColumn<AdminUser>> = {
   name: { accessor: (u) => u.name, type: "string" },
@@ -42,6 +38,8 @@ const USER_SORT_COLUMNS: Record<string, SortColumn<AdminUser>> = {
 };
 
 export default function UsersAdminPage() {
+  const searchParams = useSearchParams();
+  const focusId = searchParams.get("focus");
   const [perPage, setPerPage] = useState(15);
   const me = useAuthStore((s) => s.user);
   const {
@@ -55,6 +53,46 @@ export default function UsersAdminPage() {
     () => sortRows(users),
     [users, sortRows]
   );
+
+  useEffect(() => {
+    if (!focusId) return;
+    setSearchInput("");
+    setRoleFilter("");
+  }, [focusId, setSearchInput, setRoleFilter]);
+
+  useEffect(() => {
+    if (!focusId) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const targetPage = await findAdminUserPage(focusId, perPage, {});
+        if (cancelled || targetPage == null) return;
+        setPage(targetPage);
+      } catch {
+        // ignore — la liste reste sur la page courante
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [focusId, perPage, setPage]);
+
+  useEffect(() => {
+    if (!focusId) return;
+    const isVisible = users.some((user) => String(user.id) === String(focusId));
+    if (!isVisible) return;
+
+    const timer = window.setTimeout(() => {
+      document.getElementById(`user-row-${focusId}`)?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }, 180);
+
+    return () => window.clearTimeout(timer);
+  }, [focusId, users, page]);
 
   const pageFeedback =
     error != null
@@ -75,7 +113,7 @@ export default function UsersAdminPage() {
     name: "",
     email: "",
     telephone: "",
-    role: "STOCK" as UserRole,
+    role: "STOCK" as AssignableUserRole,
     password: "",
     is_active: true,
   });
@@ -269,6 +307,7 @@ export default function UsersAdminPage() {
                   <UserRow 
                     key={u.id}
                     user={u}
+                    focusedId={focusId}
                     isMe={String(u.id) === String(me?.id)}
                     savingId={savingId}
                     roleOptions={ROLE_OPTIONS}
@@ -395,7 +434,7 @@ export default function UsersAdminPage() {
                   <label className="ml-1 block text-[10px] font-black uppercase tracking-widest text-gray-400">Rôle</label>
                   <RoleSearchableDropdown
                     value={createForm.role}
-                    onChange={(r) => setCreateForm((prev) => ({ ...prev, role: r as UserRole }))}
+                    onChange={(r) => setCreateForm((prev) => ({ ...prev, role: r as AssignableUserRole }))}
                     options={ROLE_OPTIONS}
                     roleFr={roleFr}
                   />

@@ -38,6 +38,7 @@ export type BonLivraison = {
   created_at?: string | null;
   updated_at?: string | null;
   commande?: BonLivraisonCommandeRef | null;
+  is_factured?: boolean;
 };
 
 export type TableBonLivraison = Omit<BonLivraison, "statut"> & {
@@ -93,7 +94,7 @@ export type CommandeOption = {
   reste?: number;
   statut?: string;
   emballage_id?: string | number;
-  entrepot_id?: string | number; 
+  entrepot_id?: string | number | null;
 };
 
 export type EntrepotOption = {

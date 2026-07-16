@@ -30,7 +30,7 @@ export default function UserDropdown() {
   };
 
   return (
-    <div className="relative" data-tour="header-profile">
+    <div className="relative">
       <button
         onClick={toggleDropdown}
         className="flex items-center text-gray-700 dark:text-gray-400 dropdown-toggle"

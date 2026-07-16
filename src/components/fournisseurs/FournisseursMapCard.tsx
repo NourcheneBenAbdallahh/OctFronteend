@@ -109,7 +109,7 @@ export default function FournisseursMapCard({ enabled = true }: Props) {
             Localisation des fournisseurs
           </h3>
           <p className="mt-1 text-gray-500 text-theme-sm dark:text-gray-400">
-            Visualisation en temps réel des fournisseurs géolocalisés
+            Où se trouvent vos fournisseurs sur la carte
           </p>
         </div>
       </div>

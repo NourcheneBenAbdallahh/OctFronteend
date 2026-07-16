@@ -25,7 +25,9 @@ export default async function FacturesPage({ searchParams }: PageProps) {
   const rows: TableFacture[] = facturesResult.factures.data.map(normalizeFacture);
 
   // Mapping rigoureux pour correspondre au type BonLivraisonOption du fichier central
-  const bonsLivraisonOptions: BonLivraisonOption[] = blResult.bonLivraisons.data.map(
+  const bonsLivraisonOptions: BonLivraisonOption[] = blResult.bonLivraisons.data
+    .filter((item: { is_factured?: boolean }) => !item.is_factured)
+    .map(
     (item: any) => ({
       id: item.id,
       numero_bl: item.numero_bl,
@@ -35,7 +37,7 @@ export default async function FacturesPage({ searchParams }: PageProps) {
       numero_commande: item.numero_commande || "N/A",
       // Ajout des champs nécessaires pour le filtrage et la validation
       commande_id: item.commande_id,
-      is_factured: item.is_factured,
+      is_factured: Boolean(item.is_factured),
       // Ajout des données de commande (sans prix_unitaire pour éviter l'erreur GraphQL)
       commande: item.commande ? {
         id: item.commande.id,
@@ -53,6 +55,10 @@ export default async function FacturesPage({ searchParams }: PageProps) {
           ? {
               id: item.commande.contrat.id,
               numero_contrat: item.commande.contrat.numero_contrat,
+              montant_ht: Number(item.commande.contrat.montant_ht ?? 0),
+              quantite_contractuelle: Number(
+                item.commande.contrat.quantite_contractuelle ?? 0
+              ),
             }
           : undefined,
       } : undefined

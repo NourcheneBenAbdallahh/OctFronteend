@@ -1,5 +1,38 @@
-import { describe, expect, it } from "vitest";
-import { normalizeFacture } from "./factures.api";
+import { describe, expect, it, vi, beforeEach } from "vitest";
+import type { Facture } from "@/types/facture";
+import { listAllFactures, normalizeFacture } from "./factures.api";
+
+vi.mock("./graphqlClient", () => ({
+  graphqlRequest: vi.fn(),
+}));
+
+import { graphqlRequest } from "./graphqlClient";
+
+describe("listAllFactures", () => {
+  beforeEach(() => {
+    vi.mocked(graphqlRequest).mockReset();
+  });
+
+  it("agrège toutes les pages jusqu'à lastPage", async () => {
+    vi.mocked(graphqlRequest)
+      .mockResolvedValueOnce({
+        factures: {
+          data: [{ id: "1" } as Facture, { id: "2" } as Facture],
+          paginatorInfo: { currentPage: 1, lastPage: 2, total: 3 },
+        },
+      })
+      .mockResolvedValueOnce({
+        factures: {
+          data: [{ id: "3" } as Facture],
+          paginatorInfo: { currentPage: 2, lastPage: 2, total: 3 },
+        },
+      });
+
+    const all = await listAllFactures();
+    expect(all.map((f) => f.id)).toEqual(["1", "2", "3"]);
+    expect(graphqlRequest).toHaveBeenCalledTimes(2);
+  });
+});
 
 describe("normalizeFacture", () => {
   it("normalise montants et statut", () => {

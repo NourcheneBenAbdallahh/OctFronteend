@@ -17,14 +17,12 @@ import {
   TableIcon,
   UserCircleIcon,
 } from "../icons/index";
-import SidebarWidget from "./SidebarWidget";
 import { Receipt } from "lucide-react";
 import { Truck } from "lucide-react";
 import { Boxes } from "lucide-react";
 import { ShoppingCart } from "lucide-react";
 import { ArrowLeftRight, BarChart3, Ruler, Users } from "lucide-react";
 import { canAccessPath, sidebarBiNavLabel } from "@/lib/access";
-import { pathToTourSlug } from "@/lib/appTour";
 import { useAuthStore } from "@/store/useAuthStore";
 type NavItem = {
   name: string;
@@ -37,7 +35,7 @@ const navItems: NavItem[] = [
  
   {
     icon: <BarChart3 className="w-5 h-5" />,
-    name: "Tableau BI",
+    name: "Tableau de bord",
     path: "/bi",
   },
   {
@@ -100,7 +98,7 @@ const navItems: NavItem[] = [
 
   {
     icon: <CalenderIcon />,
-    name: "Calendar",
+    name: "Calendrier",
     path: "/calendar",
   },
   {
@@ -145,15 +143,18 @@ const AppSidebar: React.FC = () => {
     menuType: "main" | "others"
   ) => (
     <ul className="flex flex-col gap-4">
-      {navItems.map((nav, index) => (
+      {navItems.map((nav, index) => {
+        const submenuOpen =
+          openSubmenu?.type === menuType && openSubmenu?.index === index;
+        const submenuActive = isSubmenuGroupActive(nav);
+
+        return (
         <li key={nav.name}>
           {nav.subItems ? (
             <button
               onClick={() => handleSubmenuToggle(index, menuType)}
               className={`menu-item group  ${
-                openSubmenu?.type === menuType && openSubmenu?.index === index
-                  ? "menu-item-active"
-                  : "menu-item-inactive"
+                submenuActive ? "menu-item-active" : "menu-item-inactive"
               } cursor-pointer ${
                 !isExpanded && !isHovered
                   ? "lg:justify-center"
@@ -162,9 +163,7 @@ const AppSidebar: React.FC = () => {
             >
               <span
                 className={` ${
-                  openSubmenu?.type === menuType && openSubmenu?.index === index
-                    ? "menu-item-icon-active"
-                    : "menu-item-icon-inactive"
+                  submenuActive ? "menu-item-icon-active" : "menu-item-icon-inactive"
                 }`}
               >
                 {nav.icon}
@@ -175,10 +174,7 @@ const AppSidebar: React.FC = () => {
               {(isExpanded || isHovered || isMobileOpen) && (
                 <ChevronDownIcon
                   className={`ml-auto w-5 h-5 transition-transform duration-200  ${
-                    openSubmenu?.type === menuType &&
-                    openSubmenu?.index === index
-                      ? "rotate-180 text-brand-500"
-                      : ""
+                    submenuOpen ? "rotate-180 text-brand-500" : ""
                   }`}
                 />
               )}
@@ -187,7 +183,6 @@ const AppSidebar: React.FC = () => {
             nav.path && (
               <Link
                 href={nav.path}
-                data-tour={`nav-${pathToTourSlug(nav.path)}`}
                 className={`menu-item group ${
                   isActive(nav.path) ? "menu-item-active" : "menu-item-inactive"
                 }`}
@@ -214,8 +209,7 @@ const AppSidebar: React.FC = () => {
               }}
               className="overflow-hidden transition-all duration-300"
               style={{
-                height:
-                  openSubmenu?.type === menuType && openSubmenu?.index === index
+                height: submenuOpen
                     ? `${subMenuHeight[`${menuType}-${index}`]}px`
                     : "0px",
               }}
@@ -225,7 +219,6 @@ const AppSidebar: React.FC = () => {
                   <li key={subItem.name}>
                     <Link
                       href={subItem.path}
-                      data-tour={`nav-${pathToTourSlug(subItem.path)}`}
                       className={`menu-dropdown-item ${
                         isActive(subItem.path)
                           ? "menu-dropdown-item-active"
@@ -264,7 +257,8 @@ const AppSidebar: React.FC = () => {
             </div>
           )}
         </li>
-      ))}
+        );
+      })}
     </ul>
   );
 
@@ -277,22 +271,31 @@ const AppSidebar: React.FC = () => {
   );
   const subMenuRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  // const isActive = (path: string) => path === pathname;
-   const isActive = useCallback((path: string) => path === pathname, [pathname]);
+  const isSubPathActive = useCallback(
+    (path: string) => pathname === path || pathname.startsWith(`${path}/`),
+    [pathname]
+  );
+
+  const isSubmenuGroupActive = useCallback(
+    (nav: NavItem) =>
+      nav.subItems?.some((sub) => isSubPathActive(sub.path)) ?? false,
+    [isSubPathActive]
+  );
+
+  const isActive = useCallback((path: string) => path === pathname, [pathname]);
 
   useEffect(() => {
-    const openNavForTour = (event: Event) => {
-      const path = (event as CustomEvent<{ path?: string }>).detail?.path;
-      if (!path) return;
-      visibleNavItems.forEach((nav, index) => {
-        if (nav.subItems?.some((s) => s.path === path)) {
-          setOpenSubmenu({ type: "main", index });
-        }
-      });
-    };
-    window.addEventListener("oct-tour-prepare-nav", openNavForTour);
-    return () => window.removeEventListener("oct-tour-prepare-nav", openNavForTour);
-  }, [visibleNavItems]);
+    const matchedIndex = visibleNavItems.findIndex((nav) =>
+      nav.subItems?.some((sub) => isSubPathActive(sub.path))
+    );
+
+    if (matchedIndex >= 0) {
+      setOpenSubmenu({ type: "main", index: matchedIndex });
+      return;
+    }
+
+    setOpenSubmenu(null);
+  }, [pathname, visibleNavItems, isSubPathActive]);
 
   useEffect(() => {
     // Set the height of the submenu items when the submenu is opened
@@ -350,7 +353,7 @@ const AppSidebar: React.FC = () => {
         </Link>
       </div>
       <div className="flex flex-col overflow-y-auto duration-300 ease-linear no-scrollbar">
-        <nav className="mb-6 pt-5" data-tour="sidebar-menu">
+        <nav className="mb-6 pt-5">
           <div className="flex flex-col gap-4">
             <div>
               <h2
@@ -372,7 +375,6 @@ const AppSidebar: React.FC = () => {
        
           </div>
         </nav>
-        {isExpanded || isHovered || isMobileOpen ? <SidebarWidget /> : null}
       </div>
     </aside>
   );

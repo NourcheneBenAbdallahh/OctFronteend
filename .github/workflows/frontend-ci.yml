@@ -127,14 +127,10 @@ jobs:
         id: image_ref
         run: echo "value=ghcr.io/${{ steps.image_vars.outputs.owner_lc }}/oct-frontend:${{ github.sha }}" >> "$GITHUB_OUTPUT"
 
-  test_and_sonar:
-    name: test_and_sonar
+  unit_tests:
+    name: unit_tests
     runs-on: ubuntu-latest
     needs: [quality, build]
-
-    permissions:
-      contents: read
-      pull-requests: write
 
     defaults:
       run:
@@ -166,33 +162,53 @@ jobs:
       - name: Normalize coverage paths for SonarCloud
         run: node scripts/ci-fix-sonar-paths.js
 
-      - name: Verify coverage paths match Sonar sources
-        shell: bash
-        run: |
-          SF_COUNT=$(grep -c '^SF:' coverage/lcov.info || true)
-          echo "LCOV source files: $SF_COUNT"
-          if [[ "$SF_COUNT" -lt 1 ]]; then
-            echo "::error::coverage/lcov.info ne contient aucun fichier (SF:)"
-            exit 1
-          fi
-          echo "Sample paths:"
-          grep '^SF:' coverage/lcov.info | head -5
-          MISSING=0
-          while IFS= read -r sf; do
-            rel="${sf#SF:}"
-            if [[ ! -f "$rel" ]]; then
-              echo "::warning::Fichier lcov introuvable sur disque: $rel"
-              MISSING=$((MISSING + 1))
-            fi
-          done < <(grep '^SF:' coverage/lcov.info)
-          if [[ "$MISSING" -gt 0 ]]; then
-            echo "::error::$MISSING chemin(s) lcov ne correspondent pas aux fichiers du dépôt"
-            exit 1
-          fi
-          echo "Tous les chemins lcov correspondent aux fichiers sources."
-
       - name: Publish coverage summary
         run: node scripts/ci-coverage-summary.js
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: frontend-coverage
+          path: |
+            coverage/lcov.info
+            coverage/coverage-final.json
+            coverage.txt
+            sonar-report.xml
+
+  sonar:
+    name: sonar
+    runs-on: ubuntu-latest
+    needs: [unit_tests]
+
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Download coverage report
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: frontend-coverage
+
+      - name: Verify coverage reports for SonarCloud
+        shell: bash
+        run: |
+          test -f coverage/lcov.info || { echo "::error::coverage/lcov.info manquant"; exit 1; }
+          test -f sonar-report.xml || { echo "::error::sonar-report.xml manquant"; exit 1; }
+          echo "Rapports de couverture prêts pour SonarCloud."
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "20"
+
+      - name: Normalize coverage paths for SonarCloud
+        run: node scripts/ci-fix-sonar-paths.js
 
       - name: Validate SonarCloud token
         shell: bash
@@ -204,21 +220,14 @@ jobs:
 
       - name: SonarCloud Scan
         uses: SonarSource/sonarqube-scan-action@bfd4e558cda28cda6b5defafb9232d191be8c203 # v4.2.1
-        with:
-          projectBaseDir: .
-          args: >
-            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
-            -Dsonar.typescript.lcov.reportPaths=coverage/lcov.info
-            -Dsonar.testExecutionReportPaths=sonar-report.xml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_SCANNER_OPTS: -Dsonar.qualitygate.wait=false
 
   integration_tests:
     name: integration_tests
     runs-on: ubuntu-latest
-    needs: [test_and_sonar, build]
+    needs: [unit_tests, build]
 
     steps:
       - name: Login to GHCR

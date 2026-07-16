@@ -40,8 +40,13 @@ export default function AlertToastStack() {
 
   useEffect(() => {
     const pushToast = (alert: Alert) => {
-      const key = `${alert.id}-${Date.now()}`;
-      setToasts((prev) => [...prev, { key, alert }].slice(-MAX_VISIBLE));
+      const key = String(alert.id);
+      setToasts((prev) => {
+        if (prev.some((toast) => toast.alert.id === alert.id)) {
+          return prev;
+        }
+        return [...prev, { key, alert }].slice(-MAX_VISIBLE);
+      });
       window.setTimeout(() => dismissToast(key), AUTO_DISMISS_MS);
     };
 

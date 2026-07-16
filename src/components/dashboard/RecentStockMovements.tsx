@@ -11,10 +11,10 @@ export default function RecentStockMovements({ stocks }: { stocks: Stock[] }) {
       <div className="p-8 border-b border-gray-50 flex items-center justify-between bg-white">
         <div>
           <h3 className="text-xl font-[1000] text-[#1C2434] uppercase tracking-tighter">
-            Journal des Flux
+            Derniers mouvements
           </h3>
           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">
-            Temps réel • {stocks.length} mouvements total
+            {stocks.length} mouvement{stocks.length > 1 ? "s" : ""} au total
           </p>
         </div>
         <Link href="/stock" className="text-[10px] font-black text-[#00A09D] border border-[#00A09D]/20 px-4 py-2 rounded-full uppercase hover:bg-[#00A09D] hover:text-white transition-all">
@@ -37,7 +37,7 @@ export default function RecentStockMovements({ stocks }: { stocks: Stock[] }) {
                 {/* Info Principale */}
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-8 flex-1">
                   <div>
-                    <span className="text-[10px] font-black text-gray-400 uppercase block mb-0.5">Lot & Emballage</span>
+                    <span className="text-[10px] font-black text-gray-400 uppercase block mb-0.5">Lot et produit</span>
                     <p className="text-sm font-[900] text-[#1C2434] uppercase truncate">{movement.lot?.code_lot || "LOT-SPEC"}</p>
                     <p className="text-[10px] font-bold text-gray-400 uppercase flex items-center gap-1">
                        <Package size={10} /> {movement.emballage?.name}
@@ -45,7 +45,7 @@ export default function RecentStockMovements({ stocks }: { stocks: Stock[] }) {
                   </div>
 
                   <div className="hidden md:block">
-                    <span className="text-[10px] font-black text-gray-400 uppercase block mb-0.5">Opérateur & Date</span>
+                    <span className="text-[10px] font-black text-gray-400 uppercase block mb-0.5">Par qui et quand</span>
                     <p className="text-[11px] font-bold text-[#1C2434] flex items-center gap-1 uppercase">
                        <User size={10} className="text-[#00A09D]" /> {movement.user?.name || "Système"}
                     </p>
@@ -63,7 +63,7 @@ export default function RecentStockMovements({ stocks }: { stocks: Stock[] }) {
                  }`}>
                    {movement.sens === 'entree' ? '+' : '-'}{Number(movement.quantite).toLocaleString()}
                  </span>
-                 <p className="text-[9px] font-black text-gray-300 uppercase leading-none">Pièces (PCS)</p>
+                 <p className="text-[9px] font-black text-gray-300 uppercase leading-none">unités</p>
               </div>
             </div>
           ))

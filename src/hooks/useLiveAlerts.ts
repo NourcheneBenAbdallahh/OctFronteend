@@ -6,47 +6,25 @@ import {
   getUnreadAlertsCount,
   markAlertAsRead,
   markAllAlertsAsRead,
+  archiveAlert,
   type Alert,
-  type AlertSeverity,
 } from "@/lib/notifications.api";
+import {
+  normalizeMercureAlert,
+  resolveMercureEventType,
+  subscribeToUserAlerts,
+  type MercureAlertPayload,
+} from "@/lib/mercure.client";
 import { useAuthStore } from "@/store/useAuthStore";
 import { playNotificationSound } from "@/lib/notificationSound";
+import { dedupeAlerts } from "@/lib/notifications.helpers";
 
 type Options = {
   onNewAlert?: (alert: Alert) => void;
-  pollWhenClosedMs?: number;
-  pollWhenOpenMs?: number;
-  isDropdownOpen?: boolean;
 };
 
-function normalizeMercureAlert(payload: Partial<Alert> & { id?: string | number }): Alert | null {
-  if (!payload.id) return null;
-  const incomingId = String(payload.id);
-  return {
-    id: incomingId,
-    type: (payload.type as Alert["type"]) ?? "LOW_STOCK",
-    title: payload.title ?? "Nouvelle alerte",
-    message: payload.message ?? "",
-    severity: (payload.severity as AlertSeverity) ?? "info",
-    status: (payload.status as Alert["status"]) ?? "unread",
-    entity_type: payload.entity_type ?? null,
-    entity_id: payload.entity_id ?? null,
-    action_url: payload.action_url ?? null,
-    is_active: true,
-    metadata: null,
-    read_at: null,
-    created_at: payload.created_at ?? new Date().toISOString(),
-    updated_at: payload.updated_at ?? payload.created_at ?? new Date().toISOString(),
-  };
-}
-
 export function useLiveAlerts(options: Options = {}) {
-  const {
-    onNewAlert,
-    pollWhenClosedMs = 5000,
-    pollWhenOpenMs = 3000,
-    isDropdownOpen = false,
-  } = options;
+  const { onNewAlert } = options;
 
   const token = useAuthStore((state) => state.token);
   const userId = useAuthStore((state) => state.user?.id);
@@ -62,13 +40,34 @@ export function useLiveAlerts(options: Options = {}) {
     onNewAlertRef.current = onNewAlert;
   }, [onNewAlert]);
 
-  const notifyIfNew = useCallback((alert: Alert, options?: { force?: boolean }) => {
+  const notifyIfNew = useCallback((alert: Alert, options?: { force?: boolean; reshow?: boolean }) => {
     const id = String(alert.id);
-    if (knownAlertIdsRef.current.has(id)) return;
+    if (!options?.reshow && knownAlertIdsRef.current.has(id)) return;
     knownAlertIdsRef.current.add(id);
     if (!options?.force && !initialLoadDoneRef.current) return;
     onNewAlertRef.current?.(alert);
     void playNotificationSound();
+  }, []);
+
+  const loadAlerts = useCallback(async () => {
+    try {
+      const [alertsData, unreadData] = await Promise.all([
+        getAlerts(),
+        getUnreadAlertsCount(),
+      ]);
+
+      if (!initialLoadDoneRef.current) {
+        alertsData.forEach((alert) => knownAlertIdsRef.current.add(String(alert.id)));
+        initialLoadDoneRef.current = true;
+      }
+
+      setAlerts(dedupeAlerts(alertsData));
+      setUnreadCount(unreadData);
+    } catch (error) {
+      console.error("Erreur lors du chargement des alertes:", error);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -81,77 +80,124 @@ export function useLiveAlerts(options: Options = {}) {
       setLoading(false);
       return;
     }
-  }, [token]);
-
-  useEffect(() => {
-    if (!token) return;
 
     setLoading(true);
-
-    const loadAlerts = async () => {
-      try {
-        const [alertsData, unreadData] = await Promise.all([
-          getAlerts(),
-          getUnreadAlertsCount(),
-        ]);
-
-        if (!initialLoadDoneRef.current) {
-          alertsData.forEach((alert) => knownAlertIdsRef.current.add(String(alert.id)));
-          initialLoadDoneRef.current = true;
-        } else {
-          alertsData.forEach((alert) => {
-            if (alert.status === "unread") {
-              notifyIfNew(alert);
-            }
-          });
-        }
-
-        setAlerts(alertsData);
-        setUnreadCount(unreadData);
-      } catch (error) {
-        console.error("Erreur lors du chargement des alertes:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     void loadAlerts();
-    const pollMs = isDropdownOpen ? pollWhenOpenMs : pollWhenClosedMs;
-    const timer = window.setInterval(loadAlerts, pollMs);
+  }, [token, loadAlerts]);
 
-    return () => window.clearInterval(timer);
-  }, [token, isDropdownOpen, pollWhenClosedMs, pollWhenOpenMs, notifyIfNew]);
+  const applyMercurePayload = useCallback(
+    (payload: MercureAlertPayload) => {
+      const eventType = resolveMercureEventType(payload);
+
+      switch (eventType) {
+        case "alert.created":
+        case "alert.updated":
+        case "legacy.created": {
+          const incoming = normalizeMercureAlert(payload);
+          if (!incoming) return;
+
+          setAlerts((prev) => {
+            const index = prev.findIndex((a) => String(a.id) === incoming.id);
+            const businessKey = incoming.entity_type && incoming.entity_id != null
+              ? `${incoming.type}|${incoming.entity_type}|${incoming.entity_id}`
+              : null;
+
+            if (index >= 0) {
+              const next = [...prev];
+              next[index] = { ...next[index], ...incoming };
+              return next;
+            }
+
+            if (businessKey) {
+              const dupIndex = prev.findIndex(
+                (a) =>
+                  a.type === incoming.type &&
+                  a.entity_type === incoming.entity_type &&
+                  String(a.entity_id) === String(incoming.entity_id)
+              );
+              if (dupIndex >= 0) {
+                const next = [...prev];
+                next[dupIndex] = { ...next[dupIndex], ...incoming };
+                return next;
+              }
+            }
+
+            return dedupeAlerts([incoming, ...prev]);
+          });
+
+          if (eventType === "alert.created" || eventType === "legacy.created") {
+            if (typeof payload.unread_count === "number") {
+              setUnreadCount(payload.unread_count);
+            } else {
+              setUnreadCount((prev) => prev + 1);
+            }
+            notifyIfNew(incoming, { force: true });
+          } else if (eventType === "alert.updated" && incoming.status === "unread") {
+            notifyIfNew(incoming, { force: true, reshow: true });
+          }
+          break;
+        }
+        case "alert.read": {
+          const alertId = String(payload.alert_id ?? payload.alert?.id ?? "");
+          if (!alertId) return;
+
+          setAlerts((prev) =>
+            prev.map((alert) =>
+              String(alert.id) === alertId
+                ? {
+                    ...alert,
+                    status: "read" as const,
+                    read_at: new Date().toISOString(),
+                    ...(payload.alert ? normalizeMercureAlert(payload) ?? {} : {}),
+                  }
+                : alert
+            )
+          );
+          if (typeof payload.unread_count === "number") {
+            setUnreadCount(payload.unread_count);
+          } else {
+            setUnreadCount((prev) => Math.max(0, prev - 1));
+          }
+          break;
+        }
+        case "alerts.all_read": {
+          setUnreadCount(typeof payload.unread_count === "number" ? payload.unread_count : 0);
+          setAlerts((prev) =>
+            prev.map((alert) => ({
+              ...alert,
+              status: "read",
+              read_at: alert.read_at ?? new Date().toISOString(),
+            }))
+          );
+          break;
+        }
+        case "alert.archived": {
+          const alertId = String(payload.alert_id ?? payload.alert?.id ?? "");
+          if (!alertId) return;
+          setAlerts((prev) =>
+            prev.map((alert) =>
+              String(alert.id) === alertId
+                ? { ...alert, status: "archived" as const, is_active: false }
+                : alert
+            )
+          );
+          break;
+        }
+        default:
+          break;
+      }
+    },
+    [notifyIfNew]
+  );
 
   useEffect(() => {
     if (!token || !userId) return;
-    const hubUrl = process.env.NEXT_PUBLIC_MERCURE_HUB_URL;
-    if (!hubUrl) return;
 
-    const topic = `https://oct.tn/users/${userId}/alerts`;
-    const subscribeUrl = `${hubUrl}?topic=${encodeURIComponent(topic)}`;
-    const source = new EventSource(subscribeUrl);
-
-    source.onmessage = (event) => {
-      try {
-        const payload = JSON.parse(event.data) as Partial<Alert> & { id?: string | number };
-        const incoming = normalizeMercureAlert(payload);
-        if (!incoming) return;
-
-        setAlerts((prev) => {
-          if (prev.some((a) => String(a.id) === incoming.id)) {
-            return prev;
-          }
-          return [incoming, ...prev];
-        });
-        setUnreadCount((prev) => prev + 1);
-        notifyIfNew(incoming, { force: true });
-      } catch {
-        // Ignore malformed mercure payloads.
-      }
-    };
+    const source = subscribeToUserAlerts(userId, applyMercurePayload);
+    if (!source) return;
 
     return () => source.close();
-  }, [token, userId, notifyIfNew]);
+  }, [token, userId, applyMercurePayload]);
 
   const handleMarkAsRead = useCallback(async (alertId: string) => {
     try {
@@ -185,11 +231,33 @@ export function useLiveAlerts(options: Options = {}) {
     }
   }, []);
 
+  const handleArchive = useCallback(async (alertId: string) => {
+    try {
+      await archiveAlert(alertId);
+      setAlerts((prev) =>
+        prev.map((alert) =>
+          alert.id === alertId
+            ? { ...alert, status: "archived" as const, is_active: false }
+            : alert
+        )
+      );
+    } catch (error) {
+      console.error("Erreur lors de l'archivage:", error);
+    }
+  }, []);
+
+  const refreshAlerts = useCallback(async () => {
+    setLoading(true);
+    await loadAlerts();
+  }, [loadAlerts]);
+
   return {
     alerts,
     unreadCount,
     loading,
     markAsRead: handleMarkAsRead,
     markAllAsRead: handleMarkAllAsRead,
+    archiveAlert: handleArchive,
+    refreshAlerts,
   };
 }

@@ -46,7 +46,13 @@ export default function StockPredictionCard({
   unitesMesure,
 }: Props) {
   const productAnalysis = useMemo(() => {
-    return stocks.reduce((acc: Record<string, ProductAgg>, s) => {
+    const chronologic = [...stocks].sort(
+      (a, b) =>
+        new Date(a.date_stock || 0).getTime() -
+        new Date(b.date_stock || 0).getTime()
+    );
+
+    return chronologic.reduce((acc: Record<string, ProductAgg>, s) => {
       const emb = s.emballage;
       const key = String(s.emballage_id ?? emb?.id ?? emb?.name ?? "unknown");
       const name = emb?.name || "Inconnu";
@@ -123,10 +129,10 @@ export default function StockPredictionCard({
               }`}
             >
               {p.daysLeft > 90
-                ? "+90 JOURS"
+                ? "Stock OK (+90 j)"
                 : p.daysLeft === 0
-                  ? "RUPTURE"
-                  : `J-${p.daysLeft} AVANT RUPTURE`}
+                  ? "Épuisé"
+                  : `Plus que ${p.daysLeft} jour${p.daysLeft > 1 ? "s" : ""}`}
             </div>
 
             <div className="mt-2">
@@ -134,14 +140,14 @@ export default function StockPredictionCard({
                 {p.name}
               </h4>
               <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400">
-                Analyse Prédictive
+                Estimation
               </p>
             </div>
 
             <div className="my-6 flex items-center justify-between">
               <div>
                 <p className="mb-1 text-[8px] font-black uppercase leading-none text-gray-400">
-                  Stock Actuel
+                  En stock
                 </p>
                 <p className="text-xl font-[1000] tracking-tighter text-[#1C2434]">
                   {p.current.toLocaleString()}{" "}
@@ -150,7 +156,7 @@ export default function StockPredictionCard({
               </div>
               <div className="text-right">
                 <p className="mb-1 text-[8px] font-black uppercase leading-none text-gray-400">
-                  Vitesse Sortie
+                  Sorties / jour
                 </p>
                 <p
                   className={`text-xl font-[1000] tracking-tighter ${isCritical ? "text-red-600" : "text-[#00A09D]"}`}
@@ -174,7 +180,7 @@ export default function StockPredictionCard({
                   className={isCritical ? "text-red-500" : "text-[#00A09D]"}
                 />
                 <span className="text-[9px] font-black uppercase text-gray-500">
-                  Qte suggérée
+                  À commander
                 </span>
               </div>
               <span className="text-xs font-[1000] text-[#1C2434]">
@@ -202,9 +208,9 @@ export default function StockPredictionCard({
           </div>
           <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
             <span className="font-black text-[#1C2434]">
-              +{remainingCount} autres emballages
+              +{remainingCount} autres produits
             </span>{" "}
-            surveillés en temps réel
+            suivis
           </p>
         </div>
 
@@ -214,7 +220,7 @@ export default function StockPredictionCard({
             className="group flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-5 py-2.5 shadow-sm transition-all hover:border-[#00A09D] hover:text-[#00A09D]"
           >
             <span className="text-[10px] font-black uppercase tracking-widest">
-              Rapport complet
+              Voir tout le stock
             </span>
             <TrendingUp
               size={14}

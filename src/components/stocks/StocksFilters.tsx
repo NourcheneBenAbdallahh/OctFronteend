@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Search,
   Filter,
@@ -18,8 +18,17 @@ import {
 import type { Stock, StockFiltersState } from "@/types/stock";
 import { FilterBarSelect } from "@/components/ui/FilterBarSelect";
 
+interface FilterOption {
+  value: string;
+  label: string;
+}
+
 interface Props {
-  rows: Stock[];
+  filterOptions: {
+    entrepots: FilterOption[];
+    emballages: FilterOption[];
+    users: FilterOption[];
+  };
   filters: StockFiltersState;
   onChange: (filters: StockFiltersState) => void;
 }
@@ -54,64 +63,14 @@ function countActiveFilters(filters: StockFiltersState) {
   return count;
 }
 
-export default function StocksFilters({ rows, filters, onChange }: Props) {
+export default function StocksFilters({ filterOptions, filters, onChange }: Props) {
   const [showFilters, setShowFilters] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
   const activeCount = countActiveFilters(filters);
 
-  const entrepots = useMemo(
-    () =>
-      Array.from(
-        new Map(
-          rows
-            .filter((r) => r.entrepot)
-            .map((r) => [
-              String(r.entrepot?.id),
-              {
-                value: String(r.entrepot?.id),
-                label: r.entrepot?.nom || r.entrepot?.name || `Entrepôt #${r.entrepot_id}`,
-              },
-            ])
-        ).values()
-      ),
-    [rows]
-  );
-
-  const emballages = useMemo(
-    () =>
-      Array.from(
-        new Map(
-          rows
-            .filter((r) => r.emballage)
-            .map((r) => [
-              String(r.emballage?.id),
-              {
-                value: String(r.emballage?.id),
-                label: r.emballage?.name || r.emballage?.code || `Emballage #${r.emballage_id}`,
-              },
-            ])
-        ).values()
-      ),
-    [rows]
-  );
-
-  const users = useMemo(
-    () =>
-      Array.from(
-        new Map(
-          rows
-            .filter((r) => r.user)
-            .map((r) => [
-              String(r.user?.id),
-              {
-                value: String(r.user?.id),
-                label: r.user?.name || r.user?.email || `User #${r.user_id}`,
-              },
-            ])
-        ).values()
-      ),
-    [rows]
-  );
+  const entrepots = filterOptions.entrepots;
+  const emballages = filterOptions.emballages;
+  const users = filterOptions.users;
 
   useEffect(() => {
     if (!showFilters) return;

@@ -1,12 +1,12 @@
 "use client";
 
 import { OptionSearchablePicker } from "@/components/ui/OptionSearchablePicker";
-import type { UserRole } from "@/lib/users.api";
+import type { AssignableUserRole } from "@/lib/users.api";
 
 type Props = {
   value: string;
   onChange: (role: string) => void;
-  options: UserRole[];
+  options: AssignableUserRole[];
   roleFr: (role: string) => string;
   placeholder?: string;
   disabled?: boolean;

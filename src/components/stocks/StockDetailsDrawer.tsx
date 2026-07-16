@@ -2,9 +2,12 @@
 
 import { X, Hash, ArrowDownToLine, ArrowUpFromLine, Calendar, User, Warehouse, Package } from "lucide-react";
 import type { Stock } from "@/types/stock";
+import type { UniteMesure } from "@/types/unite-mesure";
+import { formatStockQuantity } from "@/lib/stock.display";
 
 interface Props {
   stock: Stock | null;
+  unitesMesure: UniteMesure[];
   open: boolean;
   onClose: () => void;
 }
@@ -20,7 +23,7 @@ function formatDate(date?: string | null) {
   });
 }
 
-export default function StockDetailsDrawer({ stock, open, onClose }: Props) {
+export default function StockDetailsDrawer({ stock, unitesMesure, open, onClose }: Props) {
   if (!open || !stock) return null;
 
   const isEntree = stock.sens === "entree";
@@ -71,9 +74,8 @@ export default function StockDetailsDrawer({ stock, open, onClose }: Props) {
               <p className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2">Quantité Totale</p>
               <div className="flex items-baseline gap-2">
                 <span className="text-5xl font-[1000] text-[#1C2434]">
-                  {Number(stock.quantite).toLocaleString("fr-FR")}
+                  {formatStockQuantity(stock, unitesMesure, { includeLabel: true })}
                 </span>
-                <span className="text-gray-400 font-bold">unités</span>
               </div>
             </div>
             <div className="text-[#00A09D]/10">

@@ -11,9 +11,12 @@ import {
   History,
 } from "lucide-react";
 import type { Stock } from "@/types/stock";
+import type { UniteMesure } from "@/types/unite-mesure";
+import { formatStockQuantity } from "@/lib/stock.display";
 
 interface Props {
   stock: Stock;
+  unitesMesure: UniteMesure[];
   onView?: (stock: Stock) => void;
   onViewLot?: (stock: Stock) => void;
 }
@@ -33,7 +36,7 @@ function getMouvementId(stock: Stock) {
   return stock.mouvement_stock_id ?? stock.mouvementStock?.id ?? null;
 }
 
-export default function StockCard({ stock, onView, onViewLot }: Props) {
+export default function StockCard({ stock, unitesMesure, onView, onViewLot }: Props) {
   const isEntree = stock.sens === "entree";
   const mouvementId = getMouvementId(stock);
   const lotId = stock.lot_id ?? stock.lot?.id;
@@ -62,10 +65,10 @@ export default function StockCard({ stock, onView, onViewLot }: Props) {
                 isEntree ? "text-emerald-600" : "text-orange-600"
               }`}
             >
-              {Number(stock.quantite).toLocaleString("fr-FR")}
+              {formatStockQuantity(stock, unitesMesure)}
             </span>
             <span className="mt-1.5 block text-[10px] font-bold uppercase leading-snug text-gray-400">
-              Unités · ID #{stock.id}
+              ID #{stock.id}
             </span>
           </div>
         </div>

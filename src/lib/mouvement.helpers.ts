@@ -121,6 +121,19 @@ export function getSelectedLotAvailable(lots: LotDisponible[], lotId: string) {
   return lots.find((l) => l.lot_id === lotId)?.stock_disponible ?? null;
 }
 
+/** lot_id racine ou relation lot (liste GraphQL peut omettre lot_id). */
+export function resolveMouvementLotId(
+  mouvement: Pick<MouvementStock, "lot_id" | "lot">
+): string | null {
+  const direct = mouvement.lot_id ?? mouvement.lot?.id;
+  if (direct == null || direct === "") return null;
+  return String(direct);
+}
+
+export function mouvementHasLot(mouvement: Pick<MouvementStock, "lot_id" | "lot">): boolean {
+  return resolveMouvementLotId(mouvement) != null;
+}
+
 /** Entrepôt servant au calcul des lots disponibles (transferts/production → source ; surplus → destination). */
 export function getEntrepotIdForLots(type: MouvementType, form: MouvementFormState): string {
   if (needsSource(type)) {
@@ -188,6 +201,27 @@ export function validateQuantityAgainstLot(
   return null;
 }
 
+export function formatMouvementTrajetLabel(
+  type: MouvementType,
+  sourceAddress?: string | null,
+  destAddress?: string | null,
+): string | null {
+  const source = sourceAddress?.trim() || null;
+  const dest = destAddress?.trim() || null;
+  const showSource = needsSource(type);
+  const showDest = needsDestination(type);
+
+  if (showSource && showDest) {
+    if (source && dest) return `${source} → ${dest}`;
+    if (source) return source;
+    if (dest) return dest;
+    return null;
+  }
+  if (showSource) return source;
+  if (showDest) return dest;
+  return null;
+}
+
 export function buildSummary(
   form: MouvementFormState,
   emballages: EmballageRef[],
@@ -197,7 +231,7 @@ export function buildSummary(
   const meta = MOUVEMENT_TYPES[form.type];
   const emballage = emballages.find((e) => e.id === form.emballageId);
   const source = entrepots.find((e) => e.id === form.sourceId);
-  const dest = entrepots.find((e) => e.id === (form.type === "EMC" ? form.sourceId : form.destId));
+  const dest = entrepots.find((e) => e.id === form.destId);
 const lot = lots.find((l) => l.lot_id === form.lotId);
   return {
     typeLabel: meta.label,
@@ -205,6 +239,7 @@ const lot = lots.find((l) => l.lot_id === form.lotId);
     emballageLabel: emballage ? `${emballage.code} · ${emballage.name}` : "-",
     sourceLabel: source?.adresse ?? "-",
     destLabel: dest?.adresse ?? "-",
+    trajetLabel: formatMouvementTrajetLabel(form.type, source?.adresse, dest?.adresse),
 lotLabel: lot?.code_lot ?? (form.type === "SPL" ? "Nouveau lot si vide" : "-"), 
    quantiteLabel: form.quantite === "" ? "-" : formatQuantity(Number(form.quantite)),
    motifLabel: form.type === "PTE" ? (form.motif.trim() || "-") : undefined,

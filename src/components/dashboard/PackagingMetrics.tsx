@@ -36,15 +36,15 @@ export default function PackagingMetrics({ stocks, loading }: Props) {
 
   const cards = [
     {
-      label: "Stock Total",
+      label: "Stock total",
       value: `${currentTotalStock.toLocaleString()} PCS`,
       icon: Package,
       color: "text-[#00A09D]",
       bg: "bg-[#F2F7F7]",
-      desc: "Volume global disponible"
+      desc: "Quantité en entrepôt"
     },
     {
-      label: "Alertes Seuil",
+      label: "Alertes stock bas",
       value: alertes,
       icon: AlertTriangle,
       color: alertes > 0 ? "text-red-500" : "text-gray-400",
@@ -52,20 +52,20 @@ export default function PackagingMetrics({ stocks, loading }: Props) {
       desc: `Moins de ${SEUIL_CRITIQUE} unités`
     },
     {
-      label: "Sorties (Mois)",
+      label: "Sorties du mois",
       value: consommation.toLocaleString(),
       icon: TrendingDown,
       color: "text-orange-500",
       bg: "bg-orange-50",
-      desc: "Emballages consommés"
+      desc: "Produits sortis"
     },
     {
-      label: "Types d'Emballages",
+      label: "Types de produits",
       value: modelesActifs,
       icon: Layers,
       color: "text-blue-500",
       bg: "bg-blue-50",
-      desc: "Modèles actifs en stock"
+      desc: "Références en stock"
     }
   ];
 

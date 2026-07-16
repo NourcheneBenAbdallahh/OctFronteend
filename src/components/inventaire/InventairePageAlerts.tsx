@@ -219,13 +219,13 @@ export function InventaireConfirmRegulariserSessionModal({
   onClose,
   onConfirm,
 }: ConfirmSessionProps) {
-  const canRun = !!codeSession;
+  const canRun = !!codeSession && eligibleCount > 0;
 
   return (
     <Modal
       isOpen={open}
       onClose={onClose}
-      className="max-w-md rounded-[32px] p-8"
+      className="max-w-lg rounded-[32px] p-8"
       showCloseButton
     >
       <div className="text-center">
@@ -233,27 +233,81 @@ export function InventaireConfirmRegulariserSessionModal({
           <CheckCheck size={28} />
         </div>
         <h3 className="text-xl font-[1000] text-[#1C2434] tracking-tight mb-2">
-          Régulariser la session ?
+          Régulariser toute la session ?
         </h3>
         {codeSession ? (
-          <p className="text-[11px] font-black uppercase tracking-widest text-[#00A09D] mb-3">
-            {codeSession}
+          <div className="mb-5">
+            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">
+              Session sélectionnée
+            </p>
+            <p className="text-[12px] font-black uppercase tracking-widest text-[#00A09D]">
+              {codeSession}
+            </p>
+          </div>
+        ) : null}
+
+        <div className="text-left rounded-2xl border border-gray-100 bg-gray-50/60 p-5 space-y-4 text-sm text-gray-600 leading-relaxed">
+          <p className="font-bold text-[#1C2434]">
+            Cette action aligne le stock système sur les comptages réels de la session, ligne par ligne.
+          </p>
+          <ul className="space-y-2.5 text-[13px]">
+            <li className="flex gap-2">
+              <span className="text-[#00A09D] font-black shrink-0">•</span>
+              <span>
+                <strong className="text-[#1C2434]">Écart positif (surplus)</strong> : création d&apos;un
+                mouvement <strong>SPL</strong> (entrée en stock + nouveau lot).
+              </span>
+            </li>
+            <li className="flex gap-2">
+              <span className="text-[#00A09D] font-black shrink-0">•</span>
+              <span>
+                <strong className="text-[#1C2434]">Écart négatif (perte)</strong> : création d&apos;un
+                mouvement <strong>PTE</strong> (sortie de stock sur le lot concerné).
+              </span>
+            </li>
+            <li className="flex gap-2">
+              <span className="text-gray-400 font-black shrink-0">•</span>
+              <span>
+                Les lignes déjà <strong>régularisées</strong> et les brouillons <strong>sans
+                comptage</strong> (stock physique à 0) sont ignorés.
+              </span>
+            </li>
+          </ul>
+        </div>
+
+        {codeSession && eligibleCount > 0 ? (
+          <div className="mt-5 rounded-2xl bg-[#00A09D]/10 border border-[#00A09D]/20 px-5 py-4">
+            <p className="text-[11px] font-black uppercase tracking-widest text-[#00A09D] mb-1">
+              Lignes à traiter
+            </p>
+            <p className="text-2xl font-[1000] text-[#1C2434] tracking-tight">
+              {eligibleCount}
+              <span className="ml-2 text-sm font-bold text-gray-500">
+                ligne{eligibleCount > 1 ? "s" : ""} éligible{eligibleCount > 1 ? "s" : ""}
+              </span>
+            </p>
+          </div>
+        ) : null}
+
+        {codeSession && eligibleCount === 0 ? (
+          <p className="text-sm font-bold text-amber-700 mt-5 rounded-2xl bg-amber-50 border border-amber-100 px-4 py-3">
+            Aucune ligne éligible dans cette session : tout est déjà régularisé ou encore en brouillon
+            sans comptage.
           </p>
         ) : null}
-        <p className="text-sm text-gray-500 leading-relaxed">
-          Toutes les lignes non régularisées de cette session seront traitées (mouvements SPL ou PTE
-          selon l&apos;écart de chaque ligne).
+
+        {!codeSession ? (
+          <p className="text-sm font-bold text-amber-700 mt-5 rounded-2xl bg-amber-50 border border-amber-100 px-4 py-3">
+            Aucune session sélectionnée. Choisissez une session ou générez d&apos;abord une campagne
+            d&apos;inventaire.
+          </p>
+        ) : null}
+
+        <p className="text-xs text-gray-400 mt-4 leading-relaxed">
+          Les mouvements créés sont tracés et mettent à jour le stock. Cette opération ne peut pas être
+          annulée automatiquement.
         </p>
-        {eligibleCount > 0 && (
-          <p className="text-sm font-bold text-[#1C2434] mt-4">
-            {eligibleCount} ligne(s) concernée(s) dans la liste actuelle.
-          </p>
-        )}
-        {!canRun && (
-          <p className="text-sm font-bold text-amber-700 mt-4">
-            Aucune session active. Générez d&apos;abord un inventaire entrepôt.
-          </p>
-        )}
+
         <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
           <button
             type="button"
@@ -269,7 +323,7 @@ export function InventaireConfirmRegulariserSessionModal({
             disabled={loading || !canRun}
             className="h-12 px-8 rounded-full bg-[#00A09D] text-white text-[11px] font-black uppercase tracking-widest hover:bg-[#008f8c] disabled:opacity-40 transition-colors"
           >
-            {loading ? "Régularisation…" : "Régulariser la session"}
+            {loading ? "Régularisation…" : `Confirmer (${eligibleCount})`}
           </button>
         </div>
       </div>

@@ -17,6 +17,7 @@ import {
   isAdminUser,
   shouldBypassRouteAccess,
   sidebarBiNavLabel,
+  roleDisplayLabel,
   toAccessRole,
 } from "./access";
 
@@ -25,6 +26,13 @@ describe("toAccessRole", () => {
     expect(toAccessRole("admin")).toBe("ADMIN");
     expect(toAccessRole("CONTRAT")).toBe("LOGISTIQUE");
     expect(toAccessRole("unknown")).toBeNull();
+  });
+});
+
+describe("roleDisplayLabel", () => {
+  it("affiche Logistique pour le rôle legacy CONTRAT", () => {
+    expect(roleDisplayLabel("CONTRAT")).toBe("Logistique");
+    expect(roleDisplayLabel("LOGISTIQUE")).toBe("Logistique");
   });
 });
 
@@ -47,6 +55,14 @@ describe("canAccessPath", () => {
     expect(canAccessPath("/factures", "FINANCE")).toBe(true);
     expect(canAccessPath("/bon-livraisons", "FINANCE")).toBe(true);
     expect(canAccessPath("/commandes", "FINANCE")).toBe(false);
+  });
+
+  it("autorise le calendrier pour ADMIN, LOGISTIQUE et FINANCE uniquement", () => {
+    expect(canAccessPath("/calendar", "ADMIN")).toBe(true);
+    expect(canAccessPath("/calendar", "LOGISTIQUE")).toBe(true);
+    expect(canAccessPath("/calendar", "CONTRAT")).toBe(true);
+    expect(canAccessPath("/calendar", "FINANCE")).toBe(true);
+    expect(canAccessPath("/calendar", "STOCK")).toBe(false);
   });
 
   it("refuse STOCK et LOGISTIQUE sur /factures", () => {
@@ -106,6 +122,14 @@ describe("canAccessPath", () => {
     expect(canAccessPath("/prediction", "STOCK")).toBe(true);
     expect(canAccessPath("/prediction", "FINANCE")).toBe(false);
   });
+
+  it("autorise ADMIN et LOGISTIQUE sur /unites-mesure", () => {
+    expect(canAccessPath("/unites-mesure", "ADMIN")).toBe(true);
+    expect(canAccessPath("/unites-mesure", "LOGISTIQUE")).toBe(true);
+    expect(canAccessPath("/unites-mesure", "CONTRAT")).toBe(true);
+    expect(canAccessPath("/unites-mesure", "STOCK")).toBe(false);
+    expect(canAccessPath("/unites-mesure", "FINANCE")).toBe(false);
+  });
 });
 
 describe("canQueryCommandesList", () => {
@@ -157,9 +181,11 @@ describe("biDataScopeForRole", () => {
 });
 
 describe("sidebarBiNavLabel", () => {
-  it("adapte le libellé menu BI", () => {
-    expect(sidebarBiNavLabel("STOCK")).toBe("BI — Stock");
-    expect(sidebarBiNavLabel("ADMIN")).toBe("Tableau BI");
+  it("retourne toujours Tableau de bord", () => {
+    expect(sidebarBiNavLabel("STOCK")).toBe("Tableau de bord");
+    expect(sidebarBiNavLabel("LOGISTIQUE")).toBe("Tableau de bord");
+    expect(sidebarBiNavLabel("FINANCE")).toBe("Tableau de bord");
+    expect(sidebarBiNavLabel("ADMIN")).toBe("Tableau de bord");
   });
 });
 
@@ -187,9 +213,10 @@ describe("canManageEmballagesCatalog", () => {
 });
 
 describe("canUseStockAi", () => {
-  it("autorise ADMIN et STOCK", () => {
+  it("autorise ADMIN, STOCK et LOGISTIQUE", () => {
     expect(canUseStockAi("ADMIN")).toBe(true);
     expect(canUseStockAi("STOCK")).toBe(true);
+    expect(canUseStockAi("LOGISTIQUE")).toBe(true);
     expect(canUseStockAi("FINANCE")).toBe(false);
   });
 });
@@ -249,10 +276,9 @@ describe("permissions BI et fournisseurs", () => {
     expect(canViewPredictiveStockAlerts("FINANCE")).toBe(false);
   });
 
-  it("sidebarBiNavLabel par scope", () => {
-    expect(sidebarBiNavLabel("STOCK")).toContain("Stock");
-    expect(sidebarBiNavLabel("FINANCE")).toContain("Finance");
-    expect(sidebarBiNavLabel("LOGISTIQUE")).toContain("Logistique");
-    expect(sidebarBiNavLabel("ADMIN")).toBe("Tableau BI");
+  it("sidebarBiNavLabel identique pour tous les rôles", () => {
+    for (const role of ["STOCK", "FINANCE", "LOGISTIQUE", "ADMIN", "CONTRAT"]) {
+      expect(sidebarBiNavLabel(role)).toBe("Tableau de bord");
+    }
   });
 });

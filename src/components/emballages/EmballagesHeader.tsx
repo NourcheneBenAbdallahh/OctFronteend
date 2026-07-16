@@ -1,11 +1,10 @@
 import React from "react";
-import { Box, ChevronRight, LayoutGrid, List } from "lucide-react";
-import { tourPageAttrs } from "@/lib/tourPageAttrs";
+import { Box, LayoutGrid, List } from "lucide-react";
+import { BreadcrumbNav } from "@/components/common/BreadcrumbNav";
+import { BREADCRUMBS } from "@/lib/breadcrumbs";
 import type { TableEmballages } from "@/types/emballage";
 import EmballagesFiltersBar from "./EmballagesFiltersBar";
 import type { EmballagesFiltersState } from "./emballagesFilters";
-
-const tour = tourPageAttrs("/emballages");
 
 interface Props {
   filters: EmballagesFiltersState;
@@ -35,15 +34,12 @@ export const EmballagesHeader = ({
     <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
       <div>
        
+        <BreadcrumbNav items={BREADCRUMBS.emballages} className="mb-2" />
         <h1 className="text-5xl font-black text-gray-900 tracking-tighter">
           Emballage
                     <span className="text-[#00A09D]">.</span>
 
           </h1>
-
-         <nav className="mt-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
-          <span>Logistique</span> <ChevronRight size={10} /> <span>Catalogue Emballages</span>
-        </nav>
       </div>
       <div className="bg-white border border-gray-50 p-4 rounded-[2rem] flex items-center gap-4 min-w-[160px] shadow-sm">
         <div className="h-12 w-12 rounded-2xl flex items-center justify-center bg-indigo-50 text-indigo-600"><Box size={18}/></div>
@@ -53,7 +49,7 @@ export const EmballagesHeader = ({
             {filteredCount != null && filteredCount !== total
               ? `${filteredCount} / ${total}`
               : total}{" "}
-            modèles
+            emballages
           </span>
         </div>
       </div>
@@ -96,7 +92,6 @@ export const EmballagesHeader = ({
         {canManage ? (
           <button
             type="button"
-            {...tour.actions}
             onClick={onOpenNew}
             className="rounded-2xl border-2 border-gray-900 bg-white px-8 py-4 text-[10px] font-black uppercase tracking-widest text-gray-900 shadow-[8px_8px_0px_rgba(0,160,157,0.2)] transition-all hover:bg-gray-900 hover:text-white"
           >

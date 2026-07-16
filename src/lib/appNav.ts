@@ -8,7 +8,7 @@ export type AppNavSearchItem = {
 };
 
 const APP_NAV_SEARCH_ITEMS: AppNavSearchItem[] = [
-  { name: "Tableau BI", path: "/bi", group: "Navigation", keywords: ["bi", "dashboard", "tableau de bord"] },
+  { name: "Tableau de bord", path: "/bi", group: "Navigation", keywords: ["bi", "dashboard", "tableau de bord", "resume"] },
   { name: "Utilisateurs", path: "/users", group: "Administration", keywords: ["users", "comptes"] },
   {
     name: "Unités de mesure",
