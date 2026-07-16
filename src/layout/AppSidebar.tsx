@@ -266,6 +266,7 @@ const AppSidebar: React.FC = () => {
     type: "main" | "others";
     index: number;
   } | null>(null);
+  const [prevPathname, setPrevPathname] = useState<string | null>(null);
   const [subMenuHeight, setSubMenuHeight] = useState<Record<string, number>>(
     {}
   );
@@ -284,18 +285,15 @@ const AppSidebar: React.FC = () => {
 
   const isActive = useCallback((path: string) => path === pathname, [pathname]);
 
-  useEffect(() => {
+  if (pathname !== prevPathname) {
+    setPrevPathname(pathname);
     const matchedIndex = visibleNavItems.findIndex((nav) =>
       nav.subItems?.some((sub) => isSubPathActive(sub.path))
     );
-
-    if (matchedIndex >= 0) {
-      setOpenSubmenu({ type: "main", index: matchedIndex });
-      return;
-    }
-
-    setOpenSubmenu(null);
-  }, [pathname, visibleNavItems, isSubPathActive]);
+    setOpenSubmenu(
+      matchedIndex >= 0 ? { type: "main", index: matchedIndex } : null
+    );
+  }
 
   useEffect(() => {
     // Set the height of the submenu items when the submenu is opened

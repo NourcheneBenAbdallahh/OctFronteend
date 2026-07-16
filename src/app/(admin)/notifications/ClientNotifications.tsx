@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { SortableTh } from '@/components/ui/SortableTableHeader';
 import { useTableSort } from '@/hooks/useTableSort';
@@ -122,6 +122,10 @@ export default function ClientNotifications() {
   };
 
   const { sortKey, sortDirection, toggleSort, sortRows } = useTableSort(ALERT_SORT_COLUMNS);
+  const handleSort = (key: string) => {
+    toggleSort(key);
+    setCurrentPage(1);
+  };
   const sortedAlerts = useMemo(() => sortRows(alerts), [alerts, sortRows]);
   const filteredAlerts = useMemo(
     () => sortedAlerts.filter((alert) => matchesFilter(alert, activeFilter)),
@@ -133,21 +137,12 @@ export default function ClientNotifications() {
   );
 
   const totalPages = Math.max(1, Math.ceil(filteredAlerts.length / itemsPerPage));
-  const start = (currentPage - 1) * itemsPerPage;
+  const page = Math.min(currentPage, totalPages);
+  const start = (page - 1) * itemsPerPage;
   const paginatedAlerts = filteredAlerts.slice(start, start + itemsPerPage);
   const readCount = alerts.filter((a) => a.status === 'read').length;
   const archivedCount = alerts.filter((a) => a.status === 'archived').length;
   const criticalCount = alerts.filter((a) => a.severity === 'critical').length;
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [sortKey, sortDirection, activeFilter]);
-
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
 
   if (loading) {
     return (
@@ -274,10 +269,10 @@ export default function ClientNotifications() {
                 <table className='w-full min-w-[760px]'>
                   <thead className='border-b border-gray-200 bg-gray-50/80 text-xs font-black uppercase tracking-wider text-gray-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-400'>
                     <tr>
-                      <SortableTh columnKey="severity" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-gray-500">Libelle</SortableTh>
-                      <SortableTh columnKey="title" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-gray-500">Titre</SortableTh>
-                      <SortableTh columnKey="status" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-gray-500">Statut</SortableTh>
-                      <SortableTh columnKey="date" sortKey={sortKey} sortDirection={sortDirection} onSort={toggleSort} className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-gray-500">Date</SortableTh>
+                      <SortableTh columnKey="severity" sortKey={sortKey} sortDirection={sortDirection} onSort={handleSort} className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-gray-500">Libelle</SortableTh>
+                      <SortableTh columnKey="title" sortKey={sortKey} sortDirection={sortDirection} onSort={handleSort} className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-gray-500">Titre</SortableTh>
+                      <SortableTh columnKey="status" sortKey={sortKey} sortDirection={sortDirection} onSort={handleSort} className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-gray-500">Statut</SortableTh>
+                      <SortableTh columnKey="date" sortKey={sortKey} sortDirection={sortDirection} onSort={handleSort} className="px-6 py-4 text-left text-xs font-black uppercase tracking-wider text-gray-500">Date</SortableTh>
                       <th className='px-6 py-4 text-right'>Actions</th>
                     </tr>
                   </thead>
@@ -349,21 +344,21 @@ export default function ClientNotifications() {
 
               <div className='flex flex-col gap-3 border-t border-gray-100 px-6 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-gray-800'>
                 <p className='text-xs font-semibold text-gray-500 dark:text-gray-400'>
-                  Page {currentPage} sur {totalPages}
+                  Page {page} sur {totalPages}
                 </p>
                 <div className='flex items-center gap-2'>
                   <button
                     type='button'
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage((p) => Math.max(1, Math.min(p, totalPages) - 1))}
+                    disabled={page === 1}
                     className='rounded-xl border border-gray-200 px-3 py-2 text-xs font-black uppercase tracking-wider text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-300'
                   >
                     Precedent
                   </button>
                   <button
                     type='button'
-                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, Math.min(p, totalPages) + 1))}
+                    disabled={page === totalPages}
                     className='rounded-xl border border-gray-200 px-3 py-2 text-xs font-black uppercase tracking-wider text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-300'
                   >
                     Suivant
