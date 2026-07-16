@@ -28,6 +28,7 @@ const baseStock = (overrides: Partial<Stock> = {}): Stock => ({
   id: 1,
   entrepot_id: 1,
   emballage_id: 1,
+  date_stock: "2026-05-15T10:00:00",
   quantite: 27,
   sens: "sortie",
   ...overrides,
